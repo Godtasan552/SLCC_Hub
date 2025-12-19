@@ -127,21 +127,77 @@ export default async function HomePage(props: Props) {
         </div>
 
         {/* Pagination Controls */}
+        {/* Pagination Controls */}
         <nav className="mt-4">
-          <ul className="pagination justify-content-end pagination-sm custom-pagination">
-             <li className={`page-item ${page <= 1 ? 'disabled' : ''}`}>
-              <Link className="page-link bg-dark text-light border-secondary" href={`/?page=${page - 1}`}>
-                &lt;
+          <ul className="pagination justify-content-center">
+            {/* First Page */}
+            <li className={`page-item ${page <= 1 ? 'disabled' : ''}`}>
+              <Link className="page-link bg-dark text-light border-secondary" href="/?page=1" aria-label="First">
+                <span aria-hidden="true">&laquo;</span>
               </Link>
             </li>
-            <li className="page-item disabled">
-              <span className="page-link bg-dark text-light border-secondary">
-                {page} / {totalPages}
-              </span>
+
+            {/* Previous Page */}
+            <li className={`page-item ${page <= 1 ? 'disabled' : ''}`}>
+              <Link className="page-link bg-dark text-light border-secondary" href={`/?page=${page - 1}`} aria-label="Previous">
+                <span aria-hidden="true">&lsaquo;</span>
+              </Link>
             </li>
-             <li className={`page-item ${page >= totalPages ? 'disabled' : ''}`}>
-               <Link className="page-link bg-dark text-light border-secondary" href={`/?page=${page + 1}`}>
-                 &gt;
+
+            {/* Page Numbers */}
+            {(() => {
+              const items = [];
+              if (totalPages <= 7) {
+                for (let i = 1; i <= totalPages; i++) items.push(i);
+              } else {
+                items.push(1);
+                if (page > 3) items.push('...');
+                
+                let start = Math.max(2, page - 1);
+                let end = Math.min(totalPages - 1, page + 1);
+                
+                if (page <= 3) { end = 4; }
+                if (page >= totalPages - 2) { start = totalPages - 3; }
+
+                for (let i = start; i <= end; i++) items.push(i);
+                
+                if (page < totalPages - 2) items.push('...');
+                items.push(totalPages);
+              }
+
+              return items.map((item, index) => {
+                if (item === '...') {
+                  return (
+                    <li key={`ellipsis-${index}`} className="page-item disabled">
+                      <span className="page-link bg-dark text-secondary border-secondary">...</span>
+                    </li>
+                  );
+                }
+                const isActive = item === page;
+                return (
+                  <li key={item} className={`page-item ${isActive ? 'active' : ''}`}>
+                    <Link 
+                      className={`page-link border-secondary ${isActive ? 'bg-primary text-white border-primary' : 'bg-dark text-light'}`} 
+                      href={`/?page=${item}`}
+                    >
+                      {item}
+                    </Link>
+                  </li>
+                );
+              });
+            })()}
+
+            {/* Next Page */}
+            <li className={`page-item ${page >= totalPages ? 'disabled' : ''}`}>
+               <Link className="page-link bg-dark text-light border-secondary" href={`/?page=${page + 1}`} aria-label="Next">
+                 <span aria-hidden="true">&rsaquo;</span>
+               </Link>
+            </li>
+
+             {/* Last Page */}
+            <li className={`page-item ${page >= totalPages ? 'disabled' : ''}`}>
+               <Link className="page-link bg-dark text-light border-secondary" href={`/?page=${totalPages}`} aria-label="Last">
+                 <span aria-hidden="true">&raquo;</span>
                </Link>
             </li>
           </ul>
