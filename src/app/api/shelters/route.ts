@@ -12,6 +12,24 @@ interface ShelterImportItem {
   phoneNumbers?: string[];
 }
 
+// Helper to clean phone numbers
+const sanitizePhones = (phones: string[] | undefined): string[] => {
+  if (!phones || !Array.isArray(phones)) return [];
+  
+  return phones.reduce((acc, phone) => {
+    // 1. Remove non-digit characters to keep only numbers
+    const clean = phone.replace(/\D/g, '');
+    
+    // 2. Must be 9 or 10 digits (Standard Thai numbers)
+    // 3. Must not be all zeros
+    if (clean.length >= 9 && clean.length <= 10 && !/^0+$/.test(clean)) {
+        // Optional: formatting could go here, e.g. 08x-xxx-xxxx
+        acc.push(clean);
+    }
+    return acc;
+  }, [] as string[]);
+};
+
 // 1. สำหรับคีย์ข้อมูลเองทีละศูนย์
 export async function POST(req: Request) {
   try {
@@ -40,7 +58,7 @@ export async function PATCH(req: Request) {
             subdistrict: item.subdistrict,
             capacity: item.capacity || 0,
             capacityStatus: item.capacityStatus || 'รองรับได้',
-            phoneNumbers: item.phoneNumbers || [],
+            phoneNumbers: sanitizePhones(item.phoneNumbers),
             updatedAt: new Date()
           }
         },
