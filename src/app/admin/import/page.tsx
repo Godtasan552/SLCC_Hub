@@ -29,7 +29,7 @@ export default function ImportPage() {
 
   return (
     <div className="container py-4">
-      <h2 className="mb-4">จัดการข้อมูลศูนย์พักพิง</h2>
+      <h2 className="mb-4" style={{ color: 'var(--text-primary)' }}>จัดการข้อมูลศูนย์พักพิง</h2>
 
       <div className="row g-4">
         {/* ส่วนที่ 1: คีย์ข้อมูลเอง (Manual) */}
@@ -63,7 +63,7 @@ export default function ImportPage() {
           <div className="card shadow-sm border-primary">
             <div className="card-header bg-info text-dark">นำเข้าข้อมูลมหาศาล (JSON/Excel)</div>
             <div className="card-body text-center py-5">
-              <p className="text-muted">อัปโหลดไฟล์ OperationCenters.json เพื่ออัปเดตข้อมูล 944 รายการ</p>
+              <p style={{ color: 'var(--text-secondary)' }}>อัปโหลดไฟล์ </p>
               <input 
                 type="file" 
                 id="fileImport" 

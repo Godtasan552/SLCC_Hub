@@ -30,6 +30,17 @@ const sanitizePhones = (phones: string[] | undefined): string[] => {
   }, [] as string[]);
 };
 
+// GET - Fetch all shelters
+export async function GET() {
+  try {
+    await dbConnect();
+    const shelters = await Shelter.find({}).sort({ updatedAt: -1 });
+    return NextResponse.json({ success: true, data: shelters });
+  } catch (error) {
+    return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
+  }
+}
+
 // 1. สำหรับคีย์ข้อมูลเองทีละศูนย์
 export async function POST(req: Request) {
   try {
