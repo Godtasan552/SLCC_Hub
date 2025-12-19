@@ -13,7 +13,7 @@ export default function Sidebar() {
   ];
 
   return (
-    <div className="d-flex flex-column flex-shrink-0 p-3 text-white border-end border-secondary overflow-y-auto" style={{ width: '280px', height: '100%', backgroundColor: '#16191c' }}>
+    <div className="d-flex flex-column flex-shrink-0 p-3 text-theme border-end border-theme overflow-y-auto bg-dark-theme" style={{ width: '280px', height: '100%' }}>
       <ul className="nav nav-pills flex-column mb-auto">
         {menuItems.map((item) => {
           const isActive = pathname === item.href;
@@ -21,7 +21,7 @@ export default function Sidebar() {
             <li className="nav-item mb-2" key={item.name}>
               <Link 
                 href={item.href} 
-                className={`nav-link d-flex align-items-center ${isActive ? 'active' : 'text-white'}`}
+                className={`nav-link d-flex align-items-center ${isActive ? 'active' : 'text-theme'}`}
                 aria-current={isActive ? 'page' : undefined}
               >
                 <i className={`bi ${item.icon} me-3 fs-5`}></i>
@@ -32,7 +32,7 @@ export default function Sidebar() {
         })}
       </ul>
       <div className="mt-auto border-top border-secondary pt-3">
-        <div className="text-secondary small text-center">
+        <div className="text-theme-secondary small text-center">
           &copy; 2025 SLCC Hub
         </div>
       </div>

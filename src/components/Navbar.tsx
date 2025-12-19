@@ -1,25 +1,28 @@
+'use client';
 import Link from 'next/link';
-import { getServerSession } from 'next-auth';
+import { useSession } from 'next-auth/react';
+import ThemeToggle from './ThemeToggle';
 
-export default async function Navbar() {
-  const session = await getServerSession();
+export default function Navbar() {
+  const { data: session } = useSession();
 
   return (
-    <nav className="navbar navbar-expand-lg navbar-dark" style={{ backgroundColor: '#16191c' }}>
-      <div className="container">
-        <Link href="/" className="navbar-brand">
+    <nav className="navbar navbar-expand-lg navbar-dark bg-dark-theme">
+      <div className="container-fluid px-4">
+        <Link href="/" className="navbar-brand text-theme">
           SLCC Hub
         </Link>
 
-        <div className="navbar-nav ms-auto">
+        <div className="navbar-nav ms-auto d-flex flex-row align-items-center gap-3">
+          <ThemeToggle />
           {session ? (
             <>
-              <span className="nav-link text-white">
+              <span className="nav-link text-theme mb-0">
                  {session.user?.name}
               </span>
               <Link
                 href="/api/auth/signout"
-                className="btn btn-outline-danger btn-sm ms-2"
+                className="btn btn-outline-danger btn-sm"
               >
                 Logout
               </Link>

@@ -1,3 +1,23 @@
+/* Theme Variables */
+:root[data-theme="dark"] {
+  --bg-primary: #212529;
+  --bg-secondary: #16191c;
+  --bg-card: #2d3238;
+  --text-primary: #f8f9fa;
+  --text-secondary: #adb5bd;
+  --border-color: #495057;
+  --table-hover: #343a40;
+}
+
+:root[data-theme="light"] {
+  --bg-primary: #f8f9fa;
+  --bg-secondary: #e9ecef;
+  --bg-card: #ffffff;
+  --text-primary: #212529;
+  --text-secondary: #6c757d;
+  --border-color: #dee2e6;
+  --table-hover: #e9ecef;
+}
 
 html,
 body {
@@ -6,11 +26,12 @@ body {
 }
 
 body {
-  color: #f8f9fa;
-  background: #212529;
+  color: var(--text-primary);
+  background: var(--bg-primary);
   font-family: Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 * {
@@ -24,4 +45,81 @@ a {
   text-decoration: none;
 }
 
+/* Theme-aware table styles */
+.table {
+  --bs-table-bg: var(--bg-card);
+  --bs-table-color: var(--text-primary);
+  --bs-table-border-color: var(--border-color);
+  --bs-table-hover-bg: var(--table-hover);
+}
 
+.table thead {
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+
+.table tbody {
+  color: var(--text-primary);
+}
+
+/* Theme-aware card styles */
+.card {
+  background-color: var(--bg-card) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Theme-aware navbar/sidebar */
+.bg-dark-theme {
+  background-color: var(--bg-secondary) !important;
+}
+
+.text-theme {
+  color: var(--text-primary) !important;
+}
+
+.text-theme-secondary {
+  color: var(--text-secondary) !important;
+}
+
+.border-theme {
+  border-color: var(--border-color) !important;
+}
+
+/* Additional pagination theme support */
+.pagination .page-link {
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+.pagination .page-link:hover {
+  background-color: var(--table-hover);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+.pagination .page-item.active .page-link {
+  background-color: #0d6efd;
+  border-color: #0d6efd;
+  color: #fff;
+}
+
+.pagination .page-item.disabled .page-link {
+  background-color: var(--bg-card);
+  color: var(--text-secondary);
+  border-color: var(--border-color);
+}
+
+/* Badge theme support */
+.badge {
+  --bs-badge-color: var(--text-primary);
+}
+
+/* Button theme support */
+.btn-outline-light {
+  --bs-btn-color: var(--text-primary);
+  --bs-btn-border-color: var(--border-color);
+  --bs-btn-hover-bg: var(--table-hover);
+  --bs-btn-hover-border-color: var(--border-color);
+}

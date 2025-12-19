@@ -58,14 +58,14 @@ export default async function HomePage(props: Props) {
   };
 
   return (
-    <div className="container-fluid bg-dark min-vh-100 text-light py-4">
+    <div className="container-fluid min-vh-100 py-4" style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
       <div className="container">
         {/* Header Count */}
-        <div className="d-flex align-items-center mb-4 p-3 rounded bg-secondary bg-opacity-10 border border-secondary border-opacity-25">
-          <div className="me-auto text-light">
-            <span className="me-2 text-secondary">จำนวนศูนย์พักพิงที่พบ:</span>
+        <div className="d-flex align-items-center mb-4 p-3 rounded border" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
+          <div className="me-auto" style={{ color: 'var(--text-primary)' }}>
+            <span className="me-2" style={{ color: 'var(--text-secondary)' }}>จำนวนศูนย์พักพิงที่พบ:</span>
             <span className="badge bg-primary fs-6 me-3">{totalShelters} รายการ</span>
-            <span className="text-secondary">หน้า {page} จาก {totalPages}</span>
+            <span style={{ color: 'var(--text-secondary)' }}>หน้า {page} จาก {totalPages}</span>
           </div>
           <div>
              <Link href="/admin/import" className="btn btn-outline-light btn-sm">Import JSON</Link>
@@ -74,7 +74,7 @@ export default async function HomePage(props: Props) {
 
         {/* Table */}
         <div className="table-responsive rounded border border-secondary border-opacity-25">
-          <table className="table table-dark table-hover mb-0 align-middle">
+          <table className="table table-hover mb-0 align-middle">
             <thead className="bg-secondary bg-opacity-25">
               <tr className="text-secondary small text-uppercase">
                 <th style={{ width: '35%' }}>ชื่อศูนย์ / สถานที่</th>
@@ -89,22 +89,22 @@ export default async function HomePage(props: Props) {
               {shelters.map((shelter) => (
                 <tr key={String(shelter._id)}>
                   <td>
-                    <div className="fw-bold text-white mb-1">{shelter.name}</div>
-                    <div className="text-secondary small">
+                    <div className="fw-bold mb-1" style={{ color: 'var(--text-primary)' }}>{shelter.name}</div>
+                    <div className="small" style={{ color: 'var(--text-secondary)' }}>
                       <i className="bi bi-geo-alt-fill me-1 text-danger"></i>
                       {shelter.subdistrict ? `📍 ${shelter.subdistrict}` : '📍 -'}
                     </div>
                   </td>
                   <td>
-                    <div className="text-light">{shelter.subdistrict || '-'}</div>
-                    <div className="text-secondary small">{shelter.district}</div>
+                    <div style={{ color: 'var(--text-primary)' }}>{shelter.subdistrict || '-'}</div>
+                    <div className="small" style={{ color: 'var(--text-secondary)' }}>{shelter.district}</div>
                   </td>
-                  <td className="text-light">
+                  <td style={{ color: 'var(--text-primary)' }}>
                     {shelter.phoneNumbers && shelter.phoneNumbers.length > 0 && !/^0+$/.test(shelter.phoneNumbers[0])
                       ? shelter.phoneNumbers[0] 
                       : null}
                   </td>
-                  <td className="text-light fs-5 fw-bold text-opacity-75">
+                  <td className="fs-5 fw-bold" style={{ color: 'var(--text-primary)', opacity: 0.75 }}>
                     {shelter.currentOccupancy || 0} / {shelter.capacity}
                   </td>
                   <td>
