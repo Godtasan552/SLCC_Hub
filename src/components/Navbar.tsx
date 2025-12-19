@@ -5,10 +5,10 @@ export default async function Navbar() {
   const session = await getServerSession();
 
   return (
-    <nav className="navbar navbar-expand-lg navbar-dark bg-dark">
+    <nav className="navbar navbar-expand-lg navbar-dark" style={{ backgroundColor: '#16191c' }}>
       <div className="container">
         <Link href="/" className="navbar-brand">
-          ศูนย์ข้อมูลผู้อพยพ
+          SLCC Hub
         </Link>
 
         <div className="navbar-nav ms-auto">
