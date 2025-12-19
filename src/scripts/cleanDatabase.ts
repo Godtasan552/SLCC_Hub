@@ -52,8 +52,11 @@ const cleanDatabase = async () => {
       }
 
       if (isChanged) {
-        shelter.phoneNumbers = newPhones;
-        await shelter.save();
+        // Use updateOne to bypass schema validation for unrelated fields (like missing district)
+        await Shelter.updateOne(
+          { _id: shelter._id },
+          { $set: { phoneNumbers: newPhones } }
+        );
         modifiedCount++;
         if (modifiedCount % 100 === 0) console.log(`Processed ${modifiedCount} updates...`);
       }
