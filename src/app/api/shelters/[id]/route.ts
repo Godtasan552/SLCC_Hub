@@ -3,11 +3,11 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import Shelter from '@/models/Shelter';
 
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await dbConnect();
     const { currentOccupancy } = await req.json();
-    const id = params.id;
+    const { id } = await params;
 
     // ค้นหาศูนย์เดิมเพื่อดูความจุสูงสุด
     const shelter = await Shelter.findById(id);

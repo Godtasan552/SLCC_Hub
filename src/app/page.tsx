@@ -26,7 +26,7 @@ export default async function HomePage(props: Props) {
   const searchParams = await props.searchParams;
   const pageParam = searchParams?.page;
   const page = typeof pageParam === 'string' ? parseInt(pageParam) : 1;
-  const limit = 20;
+  const limit = 50;
   const skip = (page - 1) * limit;
 
   const totalShelters = await Shelter.countDocuments({});
@@ -66,9 +66,6 @@ export default async function HomePage(props: Props) {
             <span className="me-2" style={{ color: 'var(--text-secondary)' }}>จำนวนศูนย์พักพิงที่พบ:</span>
             <span className="badge bg-primary fs-6 me-3">{totalShelters} รายการ</span>
             <span style={{ color: 'var(--text-secondary)' }}>หน้า {page} จาก {totalPages}</span>
-          </div>
-          <div>
-             <Link href="/admin/import" className="btn btn-outline-light btn-sm">Import JSON</Link>
           </div>
         </div>
 

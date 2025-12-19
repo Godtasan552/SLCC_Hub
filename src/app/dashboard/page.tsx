@@ -36,7 +36,7 @@ export default function Dashboard() {
   };
 
   const filteredShelters = shelters.filter(s => 
-    s.name.includes(searchTerm) || s.district.includes(searchTerm)
+    (s.name?.includes(searchTerm) || false) || (s.district?.includes(searchTerm) || false)
   );
 
   return (
