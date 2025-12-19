@@ -1,5 +1,6 @@
 import dbConnect from '@/lib/dbConnect';
 import Shelter from '@/models/Shelter';
+import Link from 'next/link';
 
 interface ShelterDoc {
   _id: unknown;
@@ -9,11 +10,26 @@ interface ShelterDoc {
   capacityStatus: string;
 }
 
-export default async function HomePage() {
+interface Props {
+  searchParams: { [key: string]: string | string[] | undefined };
+}
+
+export default async function HomePage({ searchParams }: Props) {
   await dbConnect();
-  // Fetch all shelters, sorted by most recently updated
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const shelters = (await Shelter.find({}).sort({ updatedAt: -1 }).lean()) as any as ShelterDoc[];
+  
+  const page = typeof searchParams.page === 'string' ? parseInt(searchParams.page) : 1;
+  const limit = 20; // จำนวนรายการต่อหน้า
+  const skip = (page - 1) * limit;
+
+  const totalShelters = await Shelter.countDocuments({});
+  const totalPages = Math.ceil(totalShelters / limit);
+
+  // Fetch shelters for current page
+  const shelters = (await Shelter.find({})
+    .sort({ updatedAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    .lean()) as unknown as ShelterDoc[];
 
   const getStatusColor = (status: string) => {
     if (status === 'ล้นศูนย์') return 'bg-danger';
@@ -25,10 +41,10 @@ export default async function HomePage() {
     <div className="container">
       <div className="row mb-4">
         <div className="col-md-8">
-          <h2>สถานะศูนย์พักพิง (ทั้งหมด {shelters.length} แห่ง)</h2>
+          <h2>สถานะศูนย์พักพิง (ทั้งหมด {totalShelters} แห่ง)</h2>
         </div>
         <div className="col-md-4 text-end">
-          <button className="btn btn-outline-primary">Import JSON</button>
+          <Link href="/admin/import" className="btn btn-outline-primary">Import JSON</Link>
         </div>
       </div>
 
@@ -65,6 +81,23 @@ export default async function HomePage() {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination Controls */}
+      <nav className="mt-4">
+        <ul className="pagination justify-content-center">
+          <li className={`page-item ${page <= 1 ? 'disabled' : ''}`}>
+            <Link className="page-link" href={`/?page=${page - 1}`}>ก่อนหน้า</Link>
+          </li>
+          <li className="page-item disabled">
+            <span className="page-link">
+              หน้า {page} จาก {totalPages}
+            </span>
+          </li>
+          <li className={`page-item ${page >= totalPages ? 'disabled' : ''}`}>
+            <Link className="page-link" href={`/?page=${page + 1}`}>ถัดไป</Link>
+          </li>
+        </ul>
+      </nav>
     </div>
   );
 }
