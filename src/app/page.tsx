@@ -1,66 +1,70 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+import dbConnect from '@/lib/dbConnect';
+import Shelter from '@/models/Shelter';
 
-export default function Home() {
+interface ShelterDoc {
+  _id: unknown;
+  name: string;
+  district: string;
+  capacity: number;
+  capacityStatus: string;
+}
+
+export default async function HomePage() {
+  await dbConnect();
+  // Fetch all shelters, sorted by most recently updated
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const shelters = (await Shelter.find({}).sort({ updatedAt: -1 }).lean()) as any as ShelterDoc[];
+
+  const getStatusColor = (status: string) => {
+    if (status === 'ล้นศูนย์') return 'bg-danger';
+    if (status === 'ใกล้เต็ม') return 'bg-warning text-dark';
+    return 'bg-success';
+  };
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="container">
+      <div className="row mb-4">
+        <div className="col-md-8">
+          <h2>สถานะศูนย์พักพิง (ทั้งหมด {shelters.length} แห่ง)</h2>
         </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <div className="col-md-4 text-end">
+          <button className="btn btn-outline-primary">Import JSON</button>
         </div>
-      </main>
+      </div>
+
+      <div className="table-responsive">
+        <table className="table table-hover border">
+          <thead className="table-light">
+            <tr>
+              <th>ชื่อศูนย์</th>
+              <th>อำเภอ</th>
+              <th>ความจุ</th>
+              <th>สถานะ</th>
+              <th>จัดการ</th>
+            </tr>
+          </thead>
+          <tbody>
+            {shelters.map((shelter) => (
+              <tr key={String(shelter._id)}>
+                <td>{shelter.name}</td>
+                <td>{shelter.district}</td>
+                <td>{shelter.capacity}</td>
+                <td>
+                  <span className={`badge ${getStatusColor(shelter.capacityStatus)}`}>
+                    {shelter.capacityStatus || 'N/A'}
+                  </span>
+                </td>
+                <td><button className="btn btn-sm btn-info">ดูรายละเอียด</button></td>
+              </tr>
+            ))}
+            {shelters.length === 0 && (
+              <tr>
+                <td colSpan={5} className="text-center">ไม่พบข้อมูล</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
