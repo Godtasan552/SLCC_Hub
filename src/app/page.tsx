@@ -10,14 +10,18 @@ interface ShelterDoc {
   capacityStatus: string;
 }
 
+export const dynamic = 'force-dynamic';
+
 interface Props {
-  searchParams: { [key: string]: string | string[] | undefined };
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
-export default async function HomePage({ searchParams }: Props) {
+export default async function HomePage(props: Props) {
   await dbConnect();
   
-  const page = typeof searchParams.page === 'string' ? parseInt(searchParams.page) : 1;
+  const searchParams = await props.searchParams;
+  const pageParam = searchParams?.page;
+  const page = typeof pageParam === 'string' ? parseInt(pageParam) : 1;
   const limit = 20; // จำนวนรายการต่อหน้า
   const skip = (page - 1) * limit;
 
