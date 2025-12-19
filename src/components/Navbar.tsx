@@ -5,7 +5,7 @@ export default async function Navbar() {
   const session = await getServerSession();
 
   return (
-    <nav className="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+    <nav className="navbar navbar-expand-lg navbar-dark bg-dark">
       <div className="container">
         <Link href="/" className="navbar-brand">
           ศูนย์ข้อมูลผู้อพยพ
@@ -15,11 +15,11 @@ export default async function Navbar() {
           {session ? (
             <>
               <span className="nav-link text-white">
-                ยินดีต้อนรับ, {session.user?.name}
+                 {session.user?.name}
               </span>
               <Link
                 href="/api/auth/signout"
-                className="btn btn-outline-light btn-sm ms-2"
+                className="btn btn-outline-danger btn-sm ms-2"
               >
                 Logout
               </Link>

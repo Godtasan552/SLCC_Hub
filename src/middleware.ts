@@ -1,4 +1,4 @@
-// middleware.ts
+// middleware.ts - Authentication Middleware
 import { withAuth } from "next-auth/middleware";
 
 export default withAuth({
