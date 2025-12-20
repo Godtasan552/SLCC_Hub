@@ -1,4 +1,4 @@
-import mongoose, { Schema, model, models } from 'mongoose';
+import { Schema, model, models } from 'mongoose';
 
 // โครงสร้างการขอทรัพยากร
 const ResourceRequestSchema = new Schema({
@@ -11,6 +11,7 @@ const ResourceRequestSchema = new Schema({
   itemType: { type: String }, // ประเภทแยกย่อย เช่น "ยาสามัญ", "ยาฆ่าเชื้อ"
   amount: { type: Number, default: 0 },
   unit: { type: String }, // แผง, กล่อง, กิโลกรัม
+  urgency: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
   status: { type: String, enum: ['Pending', 'Approved', 'Shipped', 'Received'], default: 'Pending' },
   requestedAt: { type: Date, default: Date.now }
 });
