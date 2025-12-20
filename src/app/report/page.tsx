@@ -50,38 +50,42 @@ export default function ReportPage() {
       {/* ส่วนที่ 1: แถบตัวเลขสำคัญ (Key Metrics) */}
       <div className="row g-3 mb-4">
         <div className="col-md-3">
-          <div className="card h-100 shadow-sm border-0" style={{ backgroundColor: 'rgba(13, 110, 253, 0.15)', borderLeft: '5px solid #0d6efd' }}>
-            <div className="card-body text-center">
-              <h6 style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>ผู้อพยพรวมทั้งหมด</h6>
-              <h2 className="fw-bold mb-0" style={{ color: '#0d6efd' }}>{stats.totalOccupancy.toLocaleString()}</h2>
-              <small style={{ color: 'var(--text-secondary)' }}>คน</small>
+          <div className="card h-100 shadow-lg border-0 overflow-hidden" style={{ background: 'linear-gradient(135deg, #0d6efd 0%, #0043a8 100%)', borderRadius: '15px' }}>
+            <div className="card-body text-center py-4 position-relative">
+              <i className="bi bi-people-fill position-absolute" style={{ fontSize: '4.5rem', right: '-15px', top: '-15px', opacity: '0.1', color: '#fff' }}></i>
+              <h6 className="fw-bold mb-2" style={{ color: 'rgba(255, 255, 255, 0.85)', letterSpacing: '0.5px' }}>ผู้อพยพรวมทั้งหมด</h6>
+              <h2 className="fw-bold mb-0 text-white" style={{ fontSize: '3rem', textShadow: '2px 2px 4px rgba(0,0,0,0.2)' }}>{stats.totalOccupancy.toLocaleString()}</h2>
+              <div className="fw-bold mt-1" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>คน</div>
             </div>
           </div>
         </div>
         <div className="col-md-3">
-          <div className="card h-100 shadow-sm border-0" style={{ backgroundColor: 'rgba(220, 53, 69, 0.15)', borderLeft: '5px solid #dc3545' }}>
-            <div className="card-body text-center">
-              <h6 style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>ศูนย์ที่สถานะ &quot;ล้น&quot;</h6>
-              <h2 className="fw-bold mb-0" style={{ color: '#dc3545' }}>{stats.criticalShelters}</h2>
-              <small style={{ color: 'var(--text-secondary)' }}>แห่ง</small>
+          <div className="card h-100 shadow-lg border-0 overflow-hidden" style={{ background: 'linear-gradient(135deg, #dc3545 0%, #a71d2a 100%)', borderRadius: '15px' }}>
+            <div className="card-body text-center py-4 position-relative">
+              <i className="bi bi-exclamation-octagon-fill position-absolute" style={{ fontSize: '4.5rem', right: '-15px', top: '-15px', opacity: '0.1', color: '#fff' }}></i>
+              <h6 className="fw-bold mb-2" style={{ color: 'rgba(255, 255, 255, 0.85)', letterSpacing: '0.5px' }}>ศูนย์ที่สถานะ &quot;ล้น&quot;</h6>
+              <h2 className="fw-bold mb-0 text-white" style={{ fontSize: '3rem', textShadow: '2px 2px 4px rgba(0,0,0,0.2)' }}>{stats.criticalShelters}</h2>
+              <div className="fw-bold mt-1" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>แห่ง</div>
             </div>
           </div>
         </div>
         <div className="col-md-3">
-          <div className="card h-100 shadow-sm border-0" style={{ backgroundColor: 'rgba(255, 193, 7, 0.15)', borderLeft: '5px solid #ffc107' }}>
-            <div className="card-body text-center">
-              <h6 style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>ศูนย์ที่ &quot;ใกล้เต็ม&quot;</h6>
-              <h2 className="fw-bold mb-0" style={{ color: '#ffc107' }}>{stats.warningShelters}</h2>
-              <small style={{ color: 'var(--text-secondary)' }}>แห่ง</small>
+          <div className="card h-100 shadow-lg border-0 overflow-hidden" style={{ background: 'linear-gradient(135deg, #ffc107 0%, #ff8f00 100%)', borderRadius: '15px' }}>
+            <div className="card-body text-center py-4 position-relative">
+              <i className="bi bi-house-exclamation-fill position-absolute" style={{ fontSize: '4.5rem', right: '-15px', top: '-15px', opacity: '0.1', color: '#000' }}></i>
+              <h6 className="fw-bold mb-2" style={{ color: 'rgba(0, 0, 0, 0.75)', letterSpacing: '0.5px' }}>ศูนย์ที่ &quot;ใกล้เต็ม&quot;</h6>
+              <h2 className="fw-bold mb-0 text-dark" style={{ fontSize: '3rem', textShadow: '1px 1px 2px rgba(255,255,255,0.3)' }}>{stats.warningShelters}</h2>
+              <div className="fw-bold mt-1" style={{ color: 'rgba(0, 0, 0, 0.65)' }}>แห่ง</div>
             </div>
           </div>
         </div>
         <div className="col-md-3">
-          <div className="card h-100 shadow-sm border-0" style={{ backgroundColor: 'rgba(13, 202, 240, 0.15)', borderLeft: '5px solid #0dcaf0' }}>
-            <div className="card-body text-center">
-              <h6 style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>คำร้องขอยา/เวชภัณฑ์</h6>
-              <h2 className="fw-bold mb-0" style={{ color: '#0dcaf0' }}>{stats.totalMedicalRequests}</h2>
-              <small style={{ color: 'var(--text-secondary)' }}>รายการ</small>
+          <div className="card h-100 shadow-lg border-0 overflow-hidden" style={{ background: 'linear-gradient(115deg, #0dcaf0 0%, #00acc1 100%)', borderRadius: '15px' }}>
+            <div className="card-body text-center py-4 position-relative">
+              <i className="bi bi-capsule-pill position-absolute" style={{ fontSize: '4.5rem', right: '-15px', top: '-15px', opacity: '0.1', color: '#fff' }}></i>
+              <h6 className="fw-bold mb-2" style={{ color: 'rgba(255, 255, 255, 0.9)', letterSpacing: '0.5px' }}>คำร้องขอยา/เวชภัณฑ์</h6>
+              <h2 className="fw-bold mb-0 text-white" style={{ fontSize: '3rem', textShadow: '2px 2px 4px rgba(0,0,0,0.2)' }}>{stats.totalMedicalRequests}</h2>
+              <div className="fw-bold mt-1" style={{ color: 'rgba(255, 255, 255, 0.75)' }}>รายการ</div>
             </div>
           </div>
         </div>
