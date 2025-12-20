@@ -31,7 +31,7 @@ export default async function HomePage(props: Props) {
   const qParam = searchParams?.q as string;
 
   const page = typeof pageParam === 'string' ? parseInt(pageParam) : 1;
-  const limit = 50;
+  const limit = 30;
   const skip = (page - 1) * limit;
 
   // Build Filter Query

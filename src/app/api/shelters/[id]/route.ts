@@ -12,50 +12,58 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const shelter = await Shelter.findById(id);
     if (!shelter) return NextResponse.json({ error: 'ไม่พบข้อมูล' }, { status: 404 });
 
-    let finalOccupancy = shelter.currentOccupancy;
-    const today = new Date().toISOString().split('T')[0]; // "YYYY-MM-DD"
+    // คำนวณวันที่ปัจจุบันประเทศไทย (UTC+7) รูปแบบ YYYY-MM-DD
+    const thDate = new Date(new Date().getTime() + (7 * 60 * 60 * 1000)).toISOString().split('T')[0];
 
-    // If it's a direct update (Legacy / Manual Fix)
+    const oldOccupancy = shelter.currentOccupancy || 0;
+    let newOccupancy = oldOccupancy;
+
+    // 1. กรณีระบุจำนวนใหม่ตรงๆ (Manual Edit / Import)
     if (currentOccupancy !== undefined) {
-      finalOccupancy = currentOccupancy;
+      newOccupancy = Number(currentOccupancy);
     } 
-    // If it's a Check-in / Check-out action
+    // 2. กรณีใช้ปุ่ม Check-in / Check-out
     else if (action && amount) {
-      interface DailyLog { date: string; checkIn: number; checkOut: number; }
-      
-      // Ensure dailyLogs exists
-      if (!shelter.dailyLogs) shelter.dailyLogs = [];
-      const logIndex = shelter.dailyLogs.findIndex((log: DailyLog) => log.date === today);
       const val = Number(amount) || 0;
-
-      if (action === 'in') {
-        finalOccupancy += val;
-        if (logIndex > -1) {
-          shelter.dailyLogs[logIndex].checkIn = (shelter.dailyLogs[logIndex].checkIn || 0) + val;
-        } else {
-          shelter.dailyLogs.push({ date: today, checkIn: val, checkOut: 0 });
-        }
-      } else if (action === 'out') {
-        finalOccupancy = Math.max(0, finalOccupancy - val);
-        if (logIndex > -1) {
-          shelter.dailyLogs[logIndex].checkOut = (shelter.dailyLogs[logIndex].checkOut || 0) + val;
-        } else {
-          shelter.dailyLogs.push({ date: today, checkIn: 0, checkOut: val });
-        }
-      }
+      if (action === 'in') newOccupancy += val;
+      else if (action === 'out') newOccupancy = Math.max(0, newOccupancy - val);
     }
 
-    // Recalculate status
+    // คำนวณส่วนต่างเพื่อบันทึกประวัติ (Movement)
+    const diff = newOccupancy - oldOccupancy;
+
+    if (diff !== 0) {
+      if (!shelter.dailyLogs) shelter.dailyLogs = [];
+      
+      interface DailyLog { date: string; checkIn: number; checkOut: number; }
+      let logIndex = shelter.dailyLogs.findIndex((log: DailyLog) => log.date === thDate);
+      
+      if (logIndex === -1) {
+        shelter.dailyLogs.push({ date: thDate, checkIn: 0, checkOut: 0 });
+        logIndex = shelter.dailyLogs.length - 1;
+      }
+
+      if (diff > 0) {
+        shelter.dailyLogs[logIndex].checkIn = (shelter.dailyLogs[logIndex].checkIn || 0) + diff;
+      } else {
+        shelter.dailyLogs[logIndex].checkOut = (shelter.dailyLogs[logIndex].checkOut || 0) + Math.abs(diff);
+      }
+      
+      // บังคับให้ Mongoose บันทึกการเปลี่ยนแปลงใน Array
+      shelter.markModified('dailyLogs');
+    }
+
+    // บันทึกสถานะใหม่
     let newStatus = 'รองรับได้';
-    const ratio = (finalOccupancy / (shelter.capacity || 1)) * 100;
+    const ratio = (newOccupancy / (shelter.capacity || 1)) * 100;
     if (ratio >= 100) newStatus = 'ล้นศูนย์';
     else if (ratio >= 80) newStatus = 'ใกล้เต็ม';
 
-    shelter.currentOccupancy = finalOccupancy;
+    shelter.currentOccupancy = newOccupancy;
     shelter.capacityStatus = newStatus;
     shelter.updatedAt = new Date();
+    
     await shelter.save();
-
     return NextResponse.json({ success: true, data: shelter });
   } catch (error) {
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 400 });

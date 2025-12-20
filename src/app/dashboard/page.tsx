@@ -108,20 +108,24 @@ export default function UnifiedDashboard() {
 
   // Helper เพื่อคำนวณยอดสะสมตามช่วงเวลา
   const getAggregatedMovement = (logs: Shelter['dailyLogs']) => {
-    if (!logs) return { in: 0, out: 0 };
+    if (!logs || !Array.isArray(logs)) return { in: 0, out: 0 };
     
-    const dates: string[] = [];
+    // สร้าง Array ของวันที่ย้อนหลังตาม timeRange (ยึดตามเขตเวลาประเทศไทย UTC+7) รูปแบบ YYYY-MM-DD
+    const targetDates: string[] = [];
+    const now = new Date();
+    
     for (let i = 0; i < timeRange; i++) {
-      const d = new Date();
+      const d = new Date(now.getTime() + (7 * 60 * 60 * 1000));
       d.setDate(d.getDate() - i);
-      dates.push(d.toISOString().split('T')[0]);
+      const dateStr = d.toISOString().split('T')[0];
+      targetDates.push(dateStr);
     }
 
     return logs
-      .filter(log => dates.includes(log.date))
+      .filter(log => targetDates.includes(log.date))
       .reduce((acc, log) => ({
-        in: acc.in + (log.checkIn || 0),
-        out: acc.out + (log.checkOut || 0)
+        in: acc.in + (Number(log.checkIn) || 0),
+        out: acc.out + (Number(log.checkOut) || 0)
       }), { in: 0, out: 0 });
   };
 
