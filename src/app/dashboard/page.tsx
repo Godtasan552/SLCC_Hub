@@ -11,6 +11,7 @@ interface Shelter {
   capacity: number;
   currentOccupancy: number;
   capacityStatus?: string;
+  dailyLogs?: { date: string; checkIn: number; checkOut: number }[];
 }
 
 interface Stats {
@@ -47,19 +48,6 @@ export default function UnifiedDashboard() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-
-  const handleUpdateOccupancy = async (id: string, current: number) => {
-    const newValue = prompt("ระบุจำนวนผู้อพยพปัจจุบัน:", current.toString());
-    if (newValue !== null && !isNaN(parseInt(newValue))) {
-      try {
-        await axios.put(`/api/shelters/${id}`, { currentOccupancy: parseInt(newValue) });
-        fetchData(); // Refresh both stats and list
-      } catch (err) {
-        console.error('Update occupancy failed:', err);
-        alert('เกิดข้อผิดพลาดในการอัปเดตข้อมูล');
-      }
-    }
-  };
 
   const exportToExcel = async () => {
     if (!stats) return;
@@ -115,6 +103,7 @@ export default function UnifiedDashboard() {
   );
 
   const occupancyRate = stats ? (stats.totalOccupancy / (stats.totalCapacity || 1)) * 100 : 0;
+  const todayStr = new Date().toISOString().split('T')[0];
 
   if (loading) return (
     <div className="container py-5 text-center">
@@ -128,8 +117,8 @@ export default function UnifiedDashboard() {
       {/* ส่วนที่ 1: หัวข้อและปุ่ม Export */}
       <div className="d-flex justify-content-between align-items-end mb-4">
         <div>
-          <h2 className="mb-1" style={{ color: 'var(--text-primary)' }}>📊 แดชบอร์ดและรายงานสถานการณ์</h2>
-          <p className="text-secondary mb-0 small">ข้อมูลสรุปและจัดการศูนย์พักพิงแบบ Real-time</p>
+          <h2 className="mb-1" style={{ color: 'var(--text-primary)' }}>📊 แดชบอร์ดความเคลื่อนไหวรายวัน</h2>
+          <p className="text-secondary mb-0 small">สรุปสถานะการเข้าพักและจำนวนผู้อพยพเข้า-ออกวันนี้</p>
         </div>
         <div className="d-flex gap-2">
           <button className="btn btn-outline-secondary btn-sm" onClick={fetchData}>
@@ -145,34 +134,38 @@ export default function UnifiedDashboard() {
       {stats && (
         <div className="row g-3 mb-4">
           <div className="col-md-3">
-            <div className="card h-100 border-0 shadow-sm overflow-hidden" style={{ background: 'linear-gradient(45deg, #0d6efd, #0043a8)', color: 'white', borderRadius: '12px' }}>
-              <div className="card-body py-3">
-                <small className="opacity-75">ผู้อพยพรวม</small>
-                <h3 className="mb-0 fw-bold">{stats.totalOccupancy.toLocaleString()} <span className="fs-6 fw-normal">คน</span></h3>
+            <div className="card h-100 border-0 shadow-sm overflow-hidden text-white" style={{ background: 'linear-gradient(45deg, #0d6efd, #0043a8)', borderRadius: '15px' }}>
+              <div className="card-body p-4 position-relative">
+                <i className="bi bi-people-fill position-absolute bottom-0 end-0 opacity-25 me-3 mb-2" style={{ fontSize: '2.5rem' }}></i>
+                <div className="text-white fw-bold mb-1" style={{ fontSize: '0.9rem', letterSpacing: '0.5px' }}>ผู้อพยพรวมทั้งหมด</div>
+                <h2 className="mb-0 fw-bold" style={{ fontSize: '2.4rem' }}>{stats.totalOccupancy.toLocaleString()} <small className="fs-6 fw-normal opacity-75">คน</small></h2>
               </div>
             </div>
           </div>
           <div className="col-md-3">
-            <div className="card h-100 border-0 shadow-sm overflow-hidden" style={{ background: 'linear-gradient(45deg, #dc3545, #a71d2a)', color: 'white', borderRadius: '12px' }}>
-              <div className="card-body py-3">
-                <small className="opacity-75">ศูนย์ที่มีสถานะ &quot;ล้น&quot;</small>
-                <h3 className="mb-0 fw-bold">{stats.criticalShelters} <span className="fs-6 fw-normal">แห่ง</span></h3>
+            <div className="card h-100 border-0 shadow-sm overflow-hidden text-white" style={{ background: 'linear-gradient(45deg, #dc3545, #a71d2a)', borderRadius: '15px' }}>
+              <div className="card-body p-4 position-relative">
+                <i className="bi bi-exclamation-triangle-fill position-absolute bottom-0 end-0 opacity-25 me-3 mb-2" style={{ fontSize: '2.5rem' }}></i>
+                <div className="text-white fw-bold mb-1" style={{ fontSize: '0.9rem', letterSpacing: '0.5px' }}>ศูนย์ในสถานะ &quot;ล้น&quot;</div>
+                <h2 className="mb-0 fw-bold" style={{ fontSize: '2.4rem' }}>{stats.criticalShelters} <small className="fs-6 fw-normal opacity-75">แห่ง</small></h2>
               </div>
             </div>
           </div>
           <div className="col-md-3">
-            <div className="card h-100 border-0 shadow-sm overflow-hidden" style={{ background: 'linear-gradient(45deg, #ffc107, #ff8f00)', color: 'black', borderRadius: '12px' }}>
-              <div className="card-body py-3">
-                <small className="opacity-75 fw-bold">ศูนย์ที่ &quot;ใกล้เต็ม&quot;</small>
-                <h3 className="mb-0 fw-bold">{stats.warningShelters} <span className="fs-6 fw-normal">แห่ง</span></h3>
+            <div className="card h-100 border-0 shadow-sm overflow-hidden" style={{ background: 'linear-gradient(45deg, #ffc107, #ff8f00)', color: '#212529', borderRadius: '15px' }}>
+              <div className="card-body p-4 position-relative">
+                <i className="bi bi-house-exclamation-fill position-absolute bottom-0 end-0 opacity-25 me-3 mb-2" style={{ fontSize: '2.5rem' }}></i>
+                <div className="fw-bold mb-1" style={{ fontSize: '0.9rem', letterSpacing: '0.5px' }}>ศูนย์ที่ &quot;ใกล้เต็ม&quot;</div>
+                <h2 className="mb-0 fw-bold" style={{ fontSize: '2.4rem' }}>{stats.warningShelters} <small className="fs-6 fw-normal opacity-75">แห่ง</small></h2>
               </div>
             </div>
           </div>
           <div className="col-md-3">
-            <div className="card h-100 border-0 shadow-sm overflow-hidden" style={{ background: 'linear-gradient(45deg, #0dcaf0, #00acc1)', color: 'white', borderRadius: '12px' }}>
-              <div className="card-body py-3">
-                <small className="opacity-75">คำร้องขอยาทั้งหมด</small>
-                <h3 className="mb-0 fw-bold">{stats.totalMedicalRequests} <span className="fs-6 fw-normal">รายการ</span></h3>
+            <div className="card h-100 border-0 shadow-sm overflow-hidden text-white" style={{ background: 'linear-gradient(45deg, #0dcaf0, #00acc1)', borderRadius: '15px' }}>
+              <div className="card-body p-4 position-relative">
+                <i className="bi bi-capsule-pill position-absolute bottom-0 end-0 opacity-25 me-3 mb-2" style={{ fontSize: '2.5rem' }}></i>
+                <div className="text-white fw-bold mb-1" style={{ fontSize: '0.9rem', letterSpacing: '0.5px' }}>คำร้องขอยาทั้งหมด</div>
+                <h2 className="mb-0 fw-bold" style={{ fontSize: '2.4rem' }}>{stats.totalMedicalRequests} <small className="fs-6 fw-normal opacity-75">รายการ</small></h2>
               </div>
             </div>
           </div>
@@ -183,7 +176,7 @@ export default function UnifiedDashboard() {
       <div className="card shadow-sm border-theme mb-4">
         <div className="card-body py-3">
           <div className="d-flex justify-content-between align-items-center mb-2">
-            <h6 className="mb-0 fw-bold" style={{ color: 'var(--text-primary)' }}>อัตราครองเตียงภาพรวมทั้งจังหวัด</h6>
+            <h6 className="mb-0 fw-bold" style={{ color: 'var(--text-primary)' }}>ระดับความหนาแน่นผู้อพยพภาพรวมทั้งจังหวัด</h6>
             <span className="badge bg-light text-dark">{occupancyRate.toFixed(1)}%</span>
           </div>
           <div className="progress" style={{ height: '12px', borderRadius: '6px' }}>
@@ -195,9 +188,9 @@ export default function UnifiedDashboard() {
         </div>
       </div>
 
-      {/* ส่วนที่ 4: รายการศูนย์พักพิง (จากหน้า Dashboard เดิม) */}
+      {/* ส่วนที่ 4: รายการศูนย์พักพิง */}
       <div className="d-flex justify-content-between align-items-center mb-3">
-        <h5 className="mb-0" style={{ color: 'var(--text-primary)' }}>📍 จัดการข้อมูลรายศูนย์ ({filteredShelters.length})</h5>
+        <h5 className="mb-0" style={{ color: 'var(--text-primary)' }}>📍 ความเคลื่อนไหวรายศูนย์วันนี้ ({filteredShelters.length})</h5>
         <div className="position-relative w-25">
           <i className="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-secondary"></i>
           <input 
@@ -217,31 +210,37 @@ export default function UnifiedDashboard() {
           if (percent >= 100) color = "danger";
           else if (percent >= 80) color = "warning";
 
+          // หายอด เข้า-ออก ของวันนี้
+          const todayLog = shelter.dailyLogs?.find(l => l.date === todayStr);
+          const checkedIn = todayLog?.checkIn || 0;
+          const checkedOut = todayLog?.checkOut || 0;
+
           return (
             <div className="col-md-4 col-lg-3" key={shelter._id}>
               <div className={`card h-100 shadow-sm border-top border-4 border-${color}`}>
                 <div className="card-body p-3">
                   <h6 className="card-title text-truncate fw-bold mb-1" style={{ color: 'var(--text-primary)' }}>{shelter.name}</h6>
-                  <p className="small text-secondary mb-2">{shelter.district}</p>
+                  <p className="small text-secondary mb-3">{shelter.district}</p>
                   
+                  <div className="bg-light rounded p-2 mb-3 border">
+                    <div className="row g-0 text-center">
+                      <div className="col-6 border-end">
+                        <small className="d-block text-secondary" style={{ fontSize: '0.7rem' }}>เข้าวันนี้</small>
+                        <span className="fw-bold text-success">+{checkedIn}</span>
+                      </div>
+                      <div className="col-6">
+                        <small className="d-block text-secondary" style={{ fontSize: '0.7rem' }}>ออกวันนี้</small>
+                        <span className="fw-bold text-danger">-{checkedOut}</span>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="d-flex justify-content-between mb-1 small">
                     <span className={`text-${color} fw-bold`}>{percent.toFixed(0)}%</span>
                     <span style={{ color: 'var(--text-secondary)' }}>{shelter.currentOccupancy}/{shelter.capacity} คน</span>
                   </div>
-                  <div className="progress mb-3" style={{ height: '6px' }}>
+                  <div className="progress" style={{ height: '6px' }}>
                     <div className={`progress-bar bg-${color}`} style={{ width: `${Math.min(percent, 100)}%` }}></div>
-                  </div>
-
-                  <div className="d-flex gap-1">
-                    <button 
-                      className="btn btn-sm btn-outline-primary py-1 px-2 flex-grow-1"
-                      onClick={() => handleUpdateOccupancy(shelter._id, shelter.currentOccupancy)}
-                    >
-                      <i className="bi bi-pencil me-1"></i> อัปเดต
-                    </button>
-                    <button className="btn btn-sm btn-light py-1 px-2">
-                       <i className="bi bi-info-circle"></i>
-                    </button>
                   </div>
                 </div>
               </div>

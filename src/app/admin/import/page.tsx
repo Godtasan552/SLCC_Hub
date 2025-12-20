@@ -1,7 +1,15 @@
 'use client'
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import ExcelJS from 'exceljs';
+
+interface Shelter {
+  _id: string;
+  name: string;
+  district: string;
+  capacity: number;
+  currentOccupancy: number;
+}
 
 interface ShelterData {
   name: string;
@@ -11,9 +19,12 @@ interface ShelterData {
   phoneNumbers?: string[];
 }
 
-export default function ImportPage() {
+export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [shelters, setShelters] = useState<Shelter[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  
   const [manualForm, setManualForm] = useState({
     name: '',
     district: '',
@@ -21,6 +32,19 @@ export default function ImportPage() {
     capacity: 0,
     currentOccupancy: 0
   });
+
+  const fetchShelters = useCallback(async () => {
+    try {
+      const res = await axios.get('/api/shelters');
+      setShelters(res.data.data);
+    } catch (err) {
+      console.error('Fetch shelters failed:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchShelters();
+  }, [fetchShelters]);
 
   // 1. Manual Entry Submission
   const handleManualSubmit = async (e: React.FormEvent) => {
@@ -30,6 +54,7 @@ export default function ImportPage() {
       await axios.post('/api/shelters', manualForm);
       setMessage(`บันทึกข้อมูลศูนย์ "${manualForm.name}" เรียบร้อยแล้ว`);
       setManualForm({ name: '', district: '', subdistrict: '', capacity: 0, currentOccupancy: 0 });
+      fetchShelters();
     } catch (err) {
       const errorMessage = axios.isAxiosError(err) ? err.response?.data?.error : (err as Error).message;
       setMessage(`เกิดข้อผิดพลาด: ${errorMessage}`);
@@ -75,134 +100,146 @@ export default function ImportPage() {
         }
       }
 
-      const res = await axios.patch('/api/shelters', { data: dataToImport });
-      setMessage(`นำเข้าสำเร็จ! เพิ่มใหม่ ${res.data.imported} ศูนย์, อัปเดต ${res.data.updated} ศูนย์`);
+      await axios.patch('/api/shelters', { data: dataToImport });
+      setMessage('นำเข้าและอัปเดตข้อมูลไฟล์สำเร็จ');
+      fetchShelters();
     } catch (err) {
-      setMessage('เกิดข้อผิดพลาดในการประมวลผลไฟล์ กรุณาตรวจสอบรูปแบบข้อมูล');
+      setMessage('เกิดข้อผิดพลาดในการประมวลผลไฟล์');
       console.error(err);
     } finally {
       setLoading(false);
-      // Reset input
       e.target.value = '';
     }
   };
 
+  // 3. Check-in / Check-out Logic
+  const handleCheckInOut = async (id: string, action: 'in' | 'out') => {
+    const label = action === 'in' ? 'พักพิงเพิ่ม' : 'ออกจากศูนย์';
+    const val = prompt(`ระบุจำนวนคนที่ต้องการ ${label}:`, "1");
+    if (!val || isNaN(parseInt(val))) return;
+
+    try {
+      setLoading(true);
+      await axios.put(`/api/shelters/${id}`, { action, amount: parseInt(val) });
+      fetchShelters();
+      setMessage(`ทำรายการ ${label} สำเร็จ`);
+    } catch (err) {
+      console.error('Check-in/out update failed:', err);
+      setMessage('ไม่สามารถอัปเดตข้อมูลได้');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredShelters = shelters.filter(s => 
+    s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    s.district.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <div className="container py-4">
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <h2 style={{ color: 'var(--text-primary)' }}>🛠️ ระบบจัดการและนำเข้าข้อมูล</h2>
+        <h2 className="fw-bold" style={{ color: 'var(--text-primary)' }}>🛠️ ระบบจัดการข้อมูล (Admin Hub)</h2>
         {message && (
-          <div className={`alert ${message.includes('สำเร็จ') ? 'alert-success' : 'alert-info'} mb-0 py-2`}>
+          <div className={`alert ${message.includes('สำเร็จ') ? 'alert-success' : 'alert-danger'} mb-0 py-2 small fw-bold`}>
             {message}
           </div>
         )}
       </div>
 
+      {/* ส่วนหลัก: การจัดการเข้า-ออก (Check-in/Out Section) */}
+      <div className="card shadow-sm border-0 mb-5 overflow-hidden" style={{ backgroundColor: 'var(--bg-card)' }}>
+        <div className="card-header bg-success text-white py-3 d-flex justify-content-between align-items-center">
+          <h5 className="mb-0 fw-bold"><i className="bi bi-people-fill me-2"></i> จัดการความเคลื่อนไหว (เข้า-ออกศูนย์)</h5>
+          <div className="w-25">
+            <input 
+              type="text" 
+              className="form-control form-control-sm border-0 shadow-sm" 
+              placeholder="ค้นหาชื่อศูนย์..."
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="card-body p-0">
+          <div className="table-responsive" style={{ maxHeight: '400px' }}>
+            <table className="table table-hover align-middle mb-0">
+              <thead className="table-light sticky-top">
+                <tr className="small text-secondary">
+                  <th className="ps-4">ชื่อศูนย์พักพิง</th>
+                  <th>อำเภอ</th>
+                  <th className="text-center">จำนวนคนปัจจุบัน</th>
+                  <th className="text-end pe-4">ดำเนินการ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredShelters.map((s) => (
+                  <tr key={s._id}>
+                    <td className="ps-4 fw-bold" style={{ color: 'var(--text-primary)' }}>{s.name}</td>
+                    <td style={{ color: 'var(--text-secondary)' }}>{s.district}</td>
+                    <td className="text-center">
+                       <span className={`badge ${s.currentOccupancy >= s.capacity ? 'bg-danger' : 'bg-primary'}`}>
+                          {s.currentOccupancy} / {s.capacity}
+                       </span>
+                    </td>
+                    <td className="text-end pe-4">
+                      <div className="btn-group btn-group-sm">
+                        <button className="btn btn-success" onClick={() => handleCheckInOut(s._id, 'in')}>
+                          <i className="bi bi-person-plus-fill me-1"></i> เข้าพัก
+                        </button>
+                        <button className="btn btn-outline-danger" onClick={() => handleCheckInOut(s._id, 'out')}>
+                          <i className="bi bi-person-dash-fill me-1"></i> ออกจากศูนย์
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <div className="row g-4">
-        {/* ส่วนที่ 1: คีย์ข้อมูลเอง (Manual Entry) */}
-        <div className="col-md-5">
+        {/* คีย์ข้อมูลเอง (Manual Entry) */}
+        <div className="col-md-6">
           <div className="card shadow-sm border-0 h-100" style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)' }}>
-            <div className="card-header bg-primary text-white border-0 py-3">
-              <h5 className="mb-0"><i className="bi bi-pencil-square me-2"></i> เพิ่มศูนย์ใหม่แบบ Manual</h5>
+            <div className="card-header bg-primary text-white py-3">
+              <h5 className="mb-0 fw-bold"><i className="bi bi-plus-circle me-2"></i> ทะเบียนศูนย์ใหม่</h5>
             </div>
             <div className="card-body">
               <form onSubmit={handleManualSubmit}>
                 <div className="mb-3">
                   <label className="form-label small fw-bold">ชื่อศูนย์พักพิง</label>
-                  <input 
-                    type="text" 
-                    className="form-control" 
-                    value={manualForm.name}
-                    onChange={(e) => setManualForm({...manualForm, name: e.target.value})}
-                    placeholder="เช่น โรงเรียนบ้านพัฒนา..." 
-                    required 
-                  />
+                  <input type="text" className="form-control" value={manualForm.name} onChange={(e) => setManualForm({...manualForm, name: e.target.value})} required />
                 </div>
                 <div className="row">
                   <div className="col-md-6 mb-3">
                     <label className="form-label small fw-bold">อำเภอ</label>
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      value={manualForm.district}
-                      onChange={(e) => setManualForm({...manualForm, district: e.target.value})}
-                      required
-                    />
+                    <input type="text" className="form-control" value={manualForm.district} onChange={(e) => setManualForm({...manualForm, district: e.target.value})} required />
                   </div>
                   <div className="col-md-6 mb-3">
-                    <label className="form-label small fw-bold">ตำบล</label>
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      value={manualForm.subdistrict}
-                      onChange={(e) => setManualForm({...manualForm, subdistrict: e.target.value})}
-                    />
+                    <label className="form-label small fw-bold">ความจุสูงสุด</label>
+                    <input type="number" className="form-control" value={manualForm.capacity} onChange={(e) => setManualForm({...manualForm, capacity: Number(e.target.value)})} />
                   </div>
                 </div>
-                <div className="row">
-                  <div className="col-md-6 mb-3">
-                    <label className="form-label small fw-bold">ความจุ (คน)</label>
-                    <input 
-                      type="number" 
-                      className="form-control" 
-                      value={manualForm.capacity}
-                      onChange={(e) => setManualForm({...manualForm, capacity: Number(e.target.value)})}
-                    />
-                  </div>
-                  <div className="col-md-6 mb-3">
-                    <label className="form-label small fw-bold">จำนวนปัจจุบัน</label>
-                    <input 
-                      type="number" 
-                      className="form-control" 
-                      value={manualForm.currentOccupancy}
-                      onChange={(e) => setManualForm({...manualForm, currentOccupancy: Number(e.target.value)})}
-                    />
-                  </div>
-                </div>
-                <button type="submit" className="btn btn-primary w-100 py-2 mt-2" disabled={loading}>
-                  {loading ? 'กำลังบันทึก...' : 'บันทึกข้อมูลศูนย์พักพิง'}
-                </button>
+                <button type="submit" className="btn btn-primary w-100 fw-bold" disabled={loading}>บันทึกข้อมูล</button>
               </form>
             </div>
           </div>
         </div>
 
-        {/* ส่วนที่ 2: นำเข้าไฟล์ (Bulk Import) */}
-        <div className="col-md-7">
+        {/* นำเข้าไฟล์ (Import) */}
+        <div className="col-md-6">
           <div className="card shadow-sm border-0 h-100" style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)' }}>
-            <div className="card-header bg-dark text-white border-0 py-3 d-flex justify-content-between">
-              <h5 className="mb-0"><i className="bi bi-cloud-upload me-2"></i> นำเข้าข้อมูลจำนวนมาก</h5>
-              <span className="badge bg-secondary">JSON / Excel</span>
+            <div className="card-header bg-dark text-white py-3">
+              <h5 className="mb-0 fw-bold"><i className="bi bi-file-earmark-spreadsheet me-2"></i> นำเข้าผ่าน Excel/JSON</h5>
             </div>
-            <div className="card-body d-flex flex-column justify-content-center p-5">
-              <div 
-                className="upload-zone text-center p-5 mb-3" 
-                style={{ 
-                  border: '2px dashed var(--border-color)', 
-                  borderRadius: '15px',
-                  backgroundColor: 'rgba(0,0,0,0.02)',
-                  transition: 'all 0.3s'
-                }}
-              >
-                <i className="bi bi-file-earmark-arrow-up text-primary" style={{ fontSize: '4rem' }}></i>
-                <h4 className="mt-3">เลือกไฟล์เพื่อนำเข้าข้อมูล</h4>
-                <p className="text-secondary small">รองรับไฟล์ .json และ .xlsx จากระบบสำรองข้อมูล</p>
-                <input 
-                  type="file" 
-                  id="fileImport" 
-                  className="d-none" 
-                  accept=".json,.xlsx" 
-                  onChange={handleFileUpload} 
-                />
-                <label htmlFor="fileImport" className={`btn btn-primary btn-lg px-5 ${loading ? 'disabled' : ''}`}>
-                  {loading ? 'กำลังประมวลผล...' : 'คลิกเพื่อเลือกไฟล์'}
-                </label>
-              </div>
-              
-              <div className="alert alert-warning small mb-0">
-                <i className="bi bi-info-circle me-2"></i>
-                <strong>คำแนะนำ:</strong> การนำเข้าจะใช้ <strong>ชื่อศูนย์</strong> และ <strong>อำเภอ</strong> เป็นตัวตรวจสอบ 
-                หากข้อมูลตรงกันระบบจะทำการอัปเดตข้อมูลล่าสุดให้โดยอัตโนมัติ (Upsert)
+            <div className="card-body text-center p-5">
+              <div className="upload-zone p-4" onClick={() => document.getElementById('fileIn')?.click()}>
+                <i className="bi bi-cloud-arrow-up text-primary fs-1"></i>
+                <h5 className="mt-3">เลือกไฟล์นำเข้าข้อมูล</h5>
+                <input type="file" id="fileIn" className="d-none" accept=".json,.xlsx" onChange={handleFileUpload} />
+                <button className="btn btn-outline-primary mt-2">Browse File</button>
               </div>
             </div>
           </div>
@@ -210,9 +247,15 @@ export default function ImportPage() {
       </div>
 
       <style jsx>{`
+        .upload-zone {
+          border: 2px dashed var(--border-color);
+          border-radius: 12px;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
         .upload-zone:hover {
-          border-color: #0d6efd !important;
-          background-color: rgba(13, 110, 253, 0.05) !important;
+          background: rgba(13, 110, 253, 0.05);
+          border-color: #0d6efd;
         }
       `}</style>
     </div>

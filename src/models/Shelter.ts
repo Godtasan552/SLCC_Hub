@@ -16,15 +16,23 @@ const ResourceRequestSchema = new Schema({
   requestedAt: { type: Date, default: Date.now }
 });
 
+// โครงสร้างบันทึกรายวัน (สำหรับ Dashboard)
+const DailyOccupancySchema = new Schema({
+  date: { type: String, required: true }, // Format "YYYY-MM-DD"
+  checkIn: { type: Number, default: 0 },
+  checkOut: { type: Number, default: 0 }
+});
+
 const ShelterSchema = new Schema({
   name: { type: String, required: true },
   district: { type: String, required: true },
   subdistrict: { type: String },
   capacity: { type: Number, default: 0 },
-  currentOccupancy: { type: Number, default: 0 }, // จำนวนคนปัจจุบัน (คีย์เพิ่มเองได้)
+  currentOccupancy: { type: Number, default: 0 }, // จำนวนคนปัจจุบัน
   phoneNumbers: [String],
   capacityStatus: { type: String }, // ล้นศูนย์, ใกล้เต็ม, รองรับได้
   resources: [ResourceRequestSchema], // รายการสิ่งของที่ศูนย์นี้ร้องขอ
+  dailyLogs: [DailyOccupancySchema], // บันทึกเข้า-ออกรายวัน
   updatedAt: { type: Date, default: Date.now }
 });
 
