@@ -167,3 +167,22 @@ input:-webkit-autofill:active {
   --bs-btn-hover-bg: var(--table-hover);
   --bs-btn-hover-border-color: var(--border-color);
 }
+
+/* Sidebar Responsive Styles */
+.sidebar-container {
+  width: 280px;
+  height: 100%;
+  transition: transform 0.3s ease-in-out;
+}
+
+@media (max-width: 991.98px) {
+  .sidebar-container {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform: translateX(-100%);
+  }
+  .sidebar-container.show {
+    transform: translateX(0);
+  }
+}

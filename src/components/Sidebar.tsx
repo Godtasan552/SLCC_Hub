@@ -23,7 +23,7 @@ export default function Sidebar() {
       {/* Mobile Overlay */}
       {isOpen && (
         <div 
-          className="position-absolute top-0 start-0 w-100 h-100 bg-dark opacity-50 d-lg-none" 
+          className="position-fixed top-0 start-0 w-100 vh-100 bg-dark opacity-50 d-lg-none" 
           style={{ zIndex: 1040 }}
           onClick={closeSidebar}
         ></div>
@@ -33,6 +33,12 @@ export default function Sidebar() {
         className={`d-flex flex-column flex-shrink-0 p-3 text-theme border-end border-theme overflow-y-auto bg-dark-theme sidebar-container ${isOpen ? 'show' : ''}`} 
         style={{ zIndex: 1050 }}
       >
+        <div className="d-flex justify-content-between align-items-center mb-4 d-lg-none">
+          <span className="fw-bold fs-5">เมนู</span>
+          <button className="btn btn-link text-theme p-0" onClick={closeSidebar}>
+            <i className="bi bi-x-lg fs-3"></i>
+          </button>
+        </div>
         <ul className="nav nav-pills flex-column mb-auto">
           {menuItems.map((item) => {
             const isActive = pathname === item.href;
@@ -56,25 +62,6 @@ export default function Sidebar() {
             &copy; 2025 SLCC Hub
           </div>
         </div>
-
-        <style jsx>{`
-          .sidebar-container {
-            width: 280px;
-            height: 100%;
-            transition: transform 0.3s ease-in-out;
-          }
-          @media (max-width: 991.98px) {
-            .sidebar-container {
-              position: absolute;
-              left: 0;
-              top: 0;
-              transform: translateX(-100%);
-            }
-            .sidebar-container.show {
-              transform: translateX(0);
-            }
-          }
-        `}</style>
       </div>
     </>
   );
