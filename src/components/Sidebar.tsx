@@ -12,7 +12,7 @@ export default function Sidebar() {
     { name: 'สรุปรายการจัดส่ง (ด่วน)', href: '/requests/summary', icon: 'bi-truck' },
     { name: 'รายงานสถานการณ์', href: '/report', icon: 'bi-bar-chart-line' },
     { name: 'จัดการข้อมูล (Import)', href: '/admin/import', icon: 'bi-cloud-upload' },
-    { name: 'แผนที่ศูนย์พักพิง', href: '#', icon: 'bi-map' }, // Placeholder
+    { name: 'แผนที่ศูนย์พักพิง', href: '/map', icon: 'bi-map' },
     { name: 'ตั้งค่าระบบ', href: '#', icon: 'bi-gear' },
   ];
 

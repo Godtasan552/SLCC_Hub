@@ -3,14 +3,19 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import Shelter from '@/models/Shelter';
 
-interface ShelterImportItem {
-  name: string;
-  district: string;
-  subdistrict?: string;
-  capacity?: number;
-  capacityStatus?: string;
-  phoneNumbers?: string[];
-}
+import { z } from 'zod';
+
+const ShelterSchema = z.object({
+  name: z.string().min(1, "ต้องระบุชื่อศูนย์"),
+  district: z.string().min(1, "ต้องระบุอำเภอ"),
+  subdistrict: z.string().optional(),
+  capacity: z.number().nonnegative().default(0),
+  currentOccupancy: z.number().nonnegative().default(0),
+  phoneNumbers: z.array(z.string()).optional(),
+  capacityStatus: z.string().optional(),
+});
+
+const ShelterImportSchema = z.array(ShelterSchema);
 
 // Helper to clean phone numbers
 const sanitizePhones = (phones: string[] | undefined): string[] => {
@@ -45,11 +50,15 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     await dbConnect();
-    const data = await req.json();
-    const newShelter = await Shelter.create(data);
+    const body = await req.json();
+    const parsedData = ShelterSchema.parse(body); // Validate single item
+    const newShelter = await Shelter.create(parsedData);
     return NextResponse.json({ success: true, data: newShelter }, { status: 201 });
   } catch (error) {
-    return NextResponse.json({ success: false, error: (error as Error).message }, { status: 400 });
+    return NextResponse.json({ 
+      success: false, 
+      error: error instanceof z.ZodError ? error.issues[0].message : (error as Error).message 
+    }, { status: 400 });
   }
 }
 
@@ -57,9 +66,10 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   try {
     await dbConnect();
-    const { data } = await req.json(); // รับอาเรย์ 'data' จากไฟล์ JSON
+    const { data } = await req.json(); // รับอาเรย์ 'data'
+    const parsedData = ShelterImportSchema.parse(data); // Validate array
 
-    const operations = data.map((item: ShelterImportItem) => ({
+    const operations = parsedData.map((item) => ({
       updateOne: {
         filter: { name: item.name, district: item.district }, // ใช้ชื่อและอำเภอเป็น Key
         update: { 
@@ -68,6 +78,7 @@ export async function PATCH(req: Request) {
             district: item.district,
             subdistrict: item.subdistrict,
             capacity: item.capacity || 0,
+            currentOccupancy: item.currentOccupancy || 0,
             capacityStatus: item.capacityStatus || 'รองรับได้',
             phoneNumbers: sanitizePhones(item.phoneNumbers),
             updatedAt: new Date()
@@ -80,6 +91,9 @@ export async function PATCH(req: Request) {
     const result = await Shelter.bulkWrite(operations);
     return NextResponse.json({ success: true, imported: result.upsertedCount, updated: result.modifiedCount });
   } catch (error) {
-    return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
+    return NextResponse.json({ 
+      success: false, 
+      error: error instanceof z.ZodError ? "ข้อมูลนำเข้าไม่ถูกต้อง: " + error.issues[0].message : (error as Error).message 
+    }, { status: 500 });
   }
 }
