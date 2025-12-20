@@ -6,6 +6,7 @@ import { Shelter, Stats } from "@/types/shelter";
 import StatsGrid from '@/components/dashboard/StatsGrid';
 import CapacityOverview from '@/components/dashboard/CapacityOverview';
 import ShelterList from '@/components/dashboard/ShelterList';
+import CriticalShelters from '@/components/dashboard/CriticalShelters';
 
 export default function UnifiedDashboard() {
   const [shelters, setShelters] = useState<Shelter[]>([]);
@@ -109,6 +110,9 @@ export default function UnifiedDashboard() {
 
       {/* ส่วนที่ 2: การ์ดตัวเลขสรุป */}
       {stats && <StatsGrid stats={stats} />}
+
+      {/* ส่วนที่ 2.1: ศูนย์วิกฤต */}
+      <CriticalShelters shelters={shelters} />
 
       {/* ส่วนที่ 3: แถบความหนาแน่นรวม */}
       {stats && <CapacityOverview stats={stats} />}
