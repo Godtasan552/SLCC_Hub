@@ -2,8 +2,11 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
+import { useSidebar } from '@/contexts/SidebarContext';
+
 export default function Sidebar() {
   const pathname = usePathname();
+  const { isOpen, closeSidebar } = useSidebar();
 
   const menuItems = [
     { name: 'รายการศูนย์พักพิง', href: '/', icon: 'bi-table' },
@@ -16,29 +19,63 @@ export default function Sidebar() {
   ];
 
   return (
-    <div className="d-flex flex-column flex-shrink-0 p-3 text-theme border-end border-theme overflow-y-auto bg-dark-theme" style={{ width: '280px', height: '100%' }}>
-      <ul className="nav nav-pills flex-column mb-auto">
-        {menuItems.map((item) => {
-          const isActive = pathname === item.href;
-          return (
-            <li className="nav-item mb-2" key={item.name}>
-              <Link 
-                href={item.href} 
-                className={`nav-link d-flex align-items-center ${isActive ? 'active' : 'text-theme'}`}
-                aria-current={isActive ? 'page' : undefined}
-              >
-                <i className={`bi ${item.icon} me-3 fs-5`}></i>
-                {item.name}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-      <div className="mt-auto border-top border-secondary pt-3">
-        <div className="text-theme-secondary small text-center">
-          &copy; 2025 SLCC Hub
+    <>
+      {/* Mobile Overlay */}
+      {isOpen && (
+        <div 
+          className="position-absolute top-0 start-0 w-100 h-100 bg-dark opacity-50 d-lg-none" 
+          style={{ zIndex: 1040 }}
+          onClick={closeSidebar}
+        ></div>
+      )}
+
+      <div 
+        className={`d-flex flex-column flex-shrink-0 p-3 text-theme border-end border-theme overflow-y-auto bg-dark-theme sidebar-container ${isOpen ? 'show' : ''}`} 
+        style={{ zIndex: 1050 }}
+      >
+        <ul className="nav nav-pills flex-column mb-auto">
+          {menuItems.map((item) => {
+            const isActive = pathname === item.href;
+            return (
+              <li className="nav-item mb-2" key={item.name}>
+                <Link 
+                  href={item.href} 
+                  className={`nav-link d-flex align-items-center ${isActive ? 'active' : 'text-theme'}`}
+                  aria-current={isActive ? 'page' : undefined}
+                  onClick={() => closeSidebar()}
+                >
+                  <i className={`bi ${item.icon} me-3 fs-5`}></i>
+                  <span className="sidebar-text">{item.name}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="mt-auto border-top border-secondary pt-3">
+          <div className="text-theme-secondary small text-center">
+            &copy; 2025 SLCC Hub
+          </div>
         </div>
+
+        <style jsx>{`
+          .sidebar-container {
+            width: 280px;
+            height: 100%;
+            transition: transform 0.3s ease-in-out;
+          }
+          @media (max-width: 991.98px) {
+            .sidebar-container {
+              position: absolute;
+              left: 0;
+              top: 0;
+              transform: translateX(-100%);
+            }
+            .sidebar-container.show {
+              transform: translateX(0);
+            }
+          }
+        `}</style>
       </div>
-    </div>
+    </>
   );
 }

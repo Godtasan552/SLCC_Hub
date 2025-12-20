@@ -138,10 +138,10 @@ export default function AdminPage() {
 
   return (
     <div className="container py-4">
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <h2 className="fw-bold" style={{ color: 'var(--text-primary)' }}>🛠️ ระบบจัดการข้อมูล (Admin Hub)</h2>
+      <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+        <h2 className="fw-bold mb-0 text-center text-md-start" style={{ color: 'var(--text-primary)' }}>🛠️ ระบบจัดการข้อมูล (Admin Hub)</h2>
         {message && (
-          <div className={`alert ${message.includes('สำเร็จ') ? 'alert-success' : 'alert-danger'} mb-0 py-2 small fw-bold`}>
+          <div className={`alert ${message.includes('สำเร็จ') ? 'alert-success' : 'alert-danger'} mb-0 py-2 small fw-bold flex-grow-1 text-center`} style={{ maxWidth: '400px' }}>
             {message}
           </div>
         )}
@@ -149,15 +149,22 @@ export default function AdminPage() {
 
       {/* ส่วนหลัก: การจัดการเข้า-ออก (Check-in/Out Section) */}
       <div className="card shadow-sm border-0 mb-5 overflow-hidden" style={{ backgroundColor: 'var(--bg-card)' }}>
-        <div className="card-header bg-success text-white py-3 d-flex justify-content-between align-items-center">
-          <h5 className="mb-0 fw-bold"><i className="bi bi-people-fill me-2"></i> จัดการความเคลื่อนไหว (เข้า-ออกศูนย์)</h5>
-          <div className="w-25">
-            <input 
-              type="text" 
-              className="form-control form-control-sm border-0 shadow-sm" 
-              placeholder="ค้นหาชื่อศูนย์..."
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+        <div className="card-header bg-success text-white py-3">
+          <div className="row g-3 align-items-center">
+            <div className="col-12 col-md-6">
+              <h5 className="mb-0 fw-bold"><i className="bi bi-people-fill me-2"></i> จัดการความเคลื่อนไหว (เข้า-ออกศูนย์)</h5>
+            </div>
+            <div className="col-12 col-md-6">
+              <div className="position-relative">
+                <i className="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-secondary"></i>
+                <input 
+                  type="text" 
+                  className="form-control form-control-sm ps-5 border-0 shadow-sm" 
+                  placeholder="ค้นหาชื่อศูนย์..."
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+            </div>
           </div>
         </div>
         <div className="card-body p-0">
@@ -166,7 +173,7 @@ export default function AdminPage() {
               <thead className="table-light sticky-top">
                 <tr className="small text-secondary">
                   <th className="ps-4">ชื่อศูนย์พักพิง</th>
-                  <th>อำเภอ</th>
+                  <th className="d-none d-md-table-cell">อำเภอ</th>
                   <th className="text-center">จำนวนคนปัจจุบัน</th>
                   <th className="text-end pe-4">ดำเนินการ</th>
                 </tr>
@@ -174,20 +181,23 @@ export default function AdminPage() {
               <tbody>
                 {filteredShelters.map((s) => (
                   <tr key={s._id}>
-                    <td className="ps-4 fw-bold" style={{ color: 'var(--text-primary)' }}>{s.name}</td>
-                    <td style={{ color: 'var(--text-secondary)' }}>{s.district}</td>
+                    <td className="ps-4">
+                      <div className="fw-bold" style={{ color: 'var(--text-primary)' }}>{s.name}</div>
+                      <div className="d-md-none small text-secondary">{s.district}</div>
+                    </td>
+                    <td className="d-none d-md-table-cell" style={{ color: 'var(--text-secondary)' }}>{s.district}</td>
                     <td className="text-center">
                        <span className={`badge ${s.currentOccupancy >= s.capacity ? 'bg-danger' : 'bg-primary'}`}>
                           {s.currentOccupancy} / {s.capacity}
                        </span>
                     </td>
                     <td className="text-end pe-4">
-                      <div className="btn-group btn-group-sm">
+                      <div className="btn-group btn-group-sm w-100 w-md-auto">
                         <button className="btn btn-success" onClick={() => handleCheckInOut(s._id, 'in')}>
-                          <i className="bi bi-person-plus-fill me-1"></i> เข้าพัก
+                          <i className="bi bi-person-plus-fill me-1"></i> <span className="d-none d-sm-inline">เข้าพัก</span>
                         </button>
                         <button className="btn btn-outline-danger" onClick={() => handleCheckInOut(s._id, 'out')}>
-                          <i className="bi bi-person-dash-fill me-1"></i> ออกจากศูนย์
+                          <i className="bi bi-person-dash-fill me-1"></i> <span className="d-none d-sm-inline">ออก</span>
                         </button>
                       </div>
                     </td>

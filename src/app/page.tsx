@@ -102,12 +102,12 @@ export default async function HomePage(props: Props) {
           <table className="table table-hover mb-0 align-middle">
             <thead className="bg-secondary bg-opacity-25">
               <tr className="text-secondary small text-uppercase">
-                <th style={{ width: '35%' }}>ชื่อศูนย์ / สถานที่</th>
-                <th style={{ width: '15%' }}>ตำบล / อำเภอ</th>
-                <th style={{ width: '15%' }}>เบอร์โทรติดต่อ</th>
-                <th style={{ width: '10%' }}>ความจุ</th>
-                <th style={{ width: '10%' }}>สถานะความจุ</th>
-                <th style={{ width: '15%' }}>วันที่สร้าง</th>
+                <th style={{ width: '40%' }}>ชื่อศูนย์ / สถานที่</th>
+                <th className="d-none d-md-table-cell" style={{ width: '15%' }}>ตำบล / อำเภอ</th>
+                <th className="d-none d-sm-table-cell" style={{ width: '15%' }}>เบอร์โทรติดต่อ</th>
+                <th style={{ width: '15%' }}>ความจุ</th>
+                <th style={{ width: '15%' }}>สถานะ</th>
+                <th className="d-none d-lg-table-cell" style={{ width: '15%' }}>วันที่สร้าง</th>
               </tr>
             </thead>
             <tbody>
@@ -115,27 +115,32 @@ export default async function HomePage(props: Props) {
                 <tr key={String(shelter._id)}>
                   <td>
                     <div className="fw-bold mb-1" style={{ color: 'var(--text-primary)' }}>{shelter.name}</div>
-                    <div className="small" style={{ color: 'var(--text-secondary)' }}>
+                    <div className="small text-secondary">
                       <i className="bi bi-geo-alt-fill me-1 text-danger"></i>
-                      {shelter.subdistrict ? `📍 ${shelter.subdistrict}` : '📍 -'}
+                      {shelter.district} {shelter.subdistrict ? `(${shelter.subdistrict})` : ''}
+                    </div>
+                    <div className="d-sm-none small mt-1">
+                      {shelter.phoneNumbers && shelter.phoneNumbers[0] && !/^0+$/.test(shelter.phoneNumbers[0]) && (
+                        <span className="text-primary"><i className="bi bi-telephone-fill me-1"></i>{shelter.phoneNumbers[0]}</span>
+                      )}
                     </div>
                   </td>
-                  <td>
+                  <td className="d-none d-md-table-cell">
                     <div style={{ color: 'var(--text-primary)' }}>{shelter.subdistrict || '-'}</div>
-                    <div className="small" style={{ color: 'var(--text-secondary)' }}>{shelter.district}</div>
+                    <div className="small text-secondary">{shelter.district}</div>
                   </td>
-                  <td style={{ color: 'var(--text-primary)' }}>
+                  <td className="d-none d-sm-table-cell" style={{ color: 'var(--text-primary)' }}>
                     {shelter.phoneNumbers && shelter.phoneNumbers.length > 0 && !/^0+$/.test(shelter.phoneNumbers[0])
                       ? shelter.phoneNumbers[0] 
                       : null}
                   </td>
-                  <td className="fs-5 fw-bold" style={{ color: 'var(--text-primary)', opacity: 0.75 }}>
+                  <td className="fw-bold" style={{ color: 'var(--text-primary)', opacity: 0.85 }}>
                     {shelter.currentOccupancy || 0} / {shelter.capacity}
                   </td>
                   <td>
                     {getStatusBadge(shelter.capacityStatus)}
                   </td>
-                  <td className="text-secondary">
+                  <td className="d-none d-lg-table-cell text-secondary">
                     {shelter.updatedAt ? formatDate(shelter.updatedAt) : '-'}
                   </td>
                 </tr>
