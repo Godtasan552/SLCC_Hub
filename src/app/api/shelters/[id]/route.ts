@@ -22,26 +22,25 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     // If it's a Check-in / Check-out action
     else if (action && amount) {
       interface DailyLog { date: string; checkIn: number; checkOut: number; }
+      
+      // Ensure dailyLogs exists
+      if (!shelter.dailyLogs) shelter.dailyLogs = [];
+      const logIndex = shelter.dailyLogs.findIndex((log: DailyLog) => log.date === today);
+      const val = Number(amount) || 0;
 
       if (action === 'in') {
-        finalOccupancy += amount;
-        
-        // Update Daily Log
-        const logIndex = shelter.dailyLogs.findIndex((log: DailyLog) => log.date === today);
+        finalOccupancy += val;
         if (logIndex > -1) {
-          shelter.dailyLogs[logIndex].checkIn += amount;
+          shelter.dailyLogs[logIndex].checkIn = (shelter.dailyLogs[logIndex].checkIn || 0) + val;
         } else {
-          shelter.dailyLogs.push({ date: today, checkIn: amount, checkOut: 0 });
+          shelter.dailyLogs.push({ date: today, checkIn: val, checkOut: 0 });
         }
       } else if (action === 'out') {
-        finalOccupancy = Math.max(0, finalOccupancy - amount);
-        
-        // Update Daily Log
-        const logIndex = shelter.dailyLogs.findIndex((log: DailyLog) => log.date === today);
+        finalOccupancy = Math.max(0, finalOccupancy - val);
         if (logIndex > -1) {
-          shelter.dailyLogs[logIndex].checkOut += amount;
+          shelter.dailyLogs[logIndex].checkOut = (shelter.dailyLogs[logIndex].checkOut || 0) + val;
         } else {
-          shelter.dailyLogs.push({ date: today, checkIn: 0, checkOut: amount });
+          shelter.dailyLogs.push({ date: today, checkIn: 0, checkOut: val });
         }
       }
     }
