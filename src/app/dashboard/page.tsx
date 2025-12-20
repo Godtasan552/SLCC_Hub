@@ -263,13 +263,13 @@ export default function UnifiedDashboard() {
           <table className="table table-hover align-middle mb-0 text-theme" style={{ fontSize: '0.9rem' }}>
             <thead className="table-dark">
               <tr className="small fw-bold opacity-75">
-                <th className="ps-4 py-3" style={{ width: '30%' }}>ชื่อศูนย์ / สถานที่</th>
-                <th className="py-3">ตำบล / อำเภอ</th>
+                <th className="ps-4 py-3" style={{ width: '35%' }}>ชื่อศูนย์ / สถานที่</th>
+                <th className="py-3 d-none d-lg-table-cell">ตำบล / อำเภอ</th>
                 {timeRange > 0 && <th className="text-center py-3">ความเคลื่อนไหว</th>}
                 <th className="text-center py-3">ครองเตียง (%)</th>
-                <th className="py-3">ความจุ (คน)</th>
+                <th className="py-3 d-none d-md-table-cell">ความจุรวม</th>
                 <th className="py-3">สถานะ</th>
-                <th className="pe-4 py-3">อัปเดตล่าสุด</th>
+                <th className="pe-4 py-3 d-none d-xl-table-cell">อัปเดตล่าสุด</th>
               </tr>
             </thead>
             <tbody>
@@ -285,16 +285,18 @@ export default function UnifiedDashboard() {
 
                 return (
                   <tr key={shelter._id} className="border-bottom-theme">
-                    <td className="ps-4">
+                    <td className="ps-4 py-3">
                       <div className="d-flex align-items-start gap-2">
-                        <i className="bi bi-geo-alt-fill text-danger mt-1"></i>
+                        <i className="bi bi-geo-alt-fill text-danger mt-1 d-none d-sm-block"></i>
                         <div>
-                          <div className="fw-bold mb-0 text-primary-theme">{shelter.name}</div>
-                          <small className="text-secondary">{shelter.subdistrict || '-'}</small>
+                          <div className="fw-bold mb-0 text-primary-theme" style={{ fontSize: '0.95rem' }}>{shelter.name}</div>
+                          <div className="small text-secondary d-lg-none">
+                            {shelter.subdistrict} {shelter.district}
+                          </div>
                         </div>
                       </div>
                     </td>
-                    <td>
+                    <td className="d-none d-lg-table-cell py-3">
                       <div>{shelter.subdistrict}</div>
                       <small className="text-secondary">{shelter.district}</small>
                     </td>
@@ -314,15 +316,15 @@ export default function UnifiedDashboard() {
                         </div>
                       </div>
                     </td>
-                    <td className="text-center fw-bold">
+                    <td className="text-center fw-bold d-none d-md-table-cell py-3">
                        {shelter.currentOccupancy} / {shelter.capacity}
                     </td>
-                    <td>
-                      <span className={`badge rounded-pill bg-${statusColor}-subtle text-${statusColor} px-3`}>
+                    <td className="py-3">
+                      <span className={`badge rounded-pill bg-${statusColor}-subtle text-${statusColor} px-2 py-1`} style={{ fontSize: '0.75rem' }}>
                         {statusText}
                       </span>
                     </td>
-                    <td className="pe-4 text-secondary small">
+                    <td className="pe-4 text-secondary small d-none d-xl-table-cell py-3">
                       {new Date(shelter.updatedAt || Date.now()).toLocaleDateString('th-TH')}
                     </td>
                   </tr>
@@ -410,32 +412,36 @@ export default function UnifiedDashboard() {
 
       <style jsx>{`
         .custom-pagination .pagination-container {
-          background-color: #1e2125;
-          border: 1px solid #343a40;
-          border-radius: 8px;
+          background-color: #1a1d21;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 50px; /* ปรับให้โค้งมนเป็น Pill เหมือนรูปตัวอย่าง */
           overflow: hidden;
+          padding: 4px;
+          box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
         }
         .pag-btn {
           background: transparent;
           border: none;
-          border-right: 1px solid #343a40;
-          color: #dee2e6;
-          padding: 8px 16px;
-          min-width: 45px;
+          color: #adb5bd;
+          padding: 6px 14px;
+          min-width: 40px;
+          height: 38px;
+          border-radius: 50px; /* แต่ละปุ่มมีความโค้งมนตัวเอง */
           transition: all 0.2s;
-          font-size: 0.95rem;
-        }
-        .pag-btn:last-child {
-          border-right: none;
+          font-size: 0.9rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
         .pag-btn:hover:not(:disabled):not(.active) {
-          background-color: rgba(255, 255, 255, 0.05);
+          background-color: rgba(255, 255, 255, 0.08);
           color: #fff;
         }
         .pag-btn.active {
           background-color: #0d6efd;
           color: white;
           font-weight: bold;
+          box-shadow: 0 4px 12px rgba(13, 110, 253, 0.4);
         }
         .pag-btn:disabled {
           color: #495057;
@@ -463,6 +469,50 @@ export default function UnifiedDashboard() {
         
         .table-hover tbody tr:hover {
           background-color: rgba(255, 255, 255, 0.02);
+        }
+
+        /* Responsive Pagination Pills */
+        .page-btn-pill {
+          background: transparent;
+          color: var(--text-secondary);
+          border: none;
+          padding: 6px 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s;
+          cursor: pointer;
+        }
+        .page-btn-pill:disabled {
+          opacity: 0.3;
+          cursor: default;
+        }
+        .page-btn-pill:not(:disabled):hover {
+          color: #fff;
+        }
+        .page-num-pill {
+          background: transparent;
+          color: var(--text-secondary);
+          border: none;
+          min-width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 0.85rem;
+          transition: all 0.2s;
+          cursor: pointer;
+        }
+        .page-num-pill:hover {
+          background: rgba(255, 255, 255, 0.05);
+          color: #fff;
+        }
+        .page-num-pill.active {
+          background: #0d6efd;
+          color: #fff;
+          font-weight: bold;
+          box-shadow: 0 4px 10px rgba(13, 110, 253, 0.3);
         }
       `}</style>
     </div>
