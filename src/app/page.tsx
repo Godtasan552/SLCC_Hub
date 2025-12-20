@@ -1,6 +1,7 @@
 import dbConnect from '@/lib/dbConnect';
 import Shelter from '@/models/Shelter';
 import Link from 'next/link';
+import SearchBar from '@/components/SearchBar';
 
 interface ShelterDoc {
   _id: unknown;
@@ -25,19 +26,41 @@ export default async function HomePage(props: Props) {
   
   const searchParams = await props.searchParams;
   const pageParam = searchParams?.page;
+  const statusParam = searchParams?.status as string;
+  const districtParam = searchParams?.district as string;
+  const qParam = searchParams?.q as string;
+
   const page = typeof pageParam === 'string' ? parseInt(pageParam) : 1;
   const limit = 50;
   const skip = (page - 1) * limit;
 
-  const totalShelters = await Shelter.countDocuments({});
-  const totalPages = Math.ceil(totalShelters / limit);
+  // Build Filter Query
+  const query: Record<string, unknown> = {};
+  if (statusParam && statusParam !== 'ทั้งหมด') {
+    query.capacityStatus = statusParam;
+  }
+  if (districtParam && districtParam !== 'ทั้งหมด') {
+    query.district = districtParam;
+  }
+  if (qParam && qParam !== '') {
+    query.$or = [
+      { name: { $regex: qParam, $options: 'i' } },
+      { subdistrict: { $regex: qParam, $options: 'i' } }
+    ];
+  }
+
+  const totalShelters = await Shelter.countDocuments(query);
+  const totalPages = Math.ceil(totalShelters / limit) || 1;
 
   // Fetch shelters for current page
-  const shelters = (await Shelter.find({})
+  const shelters = (await Shelter.find(query)
     .sort({ updatedAt: -1 })
     .skip(skip)
     .limit(limit)
     .lean()) as unknown as ShelterDoc[];
+
+  // Fetch unique districts for filter
+  const districts = (await Shelter.distinct('district')).filter(Boolean);
 
   const getStatusBadge = (status: string) => {
     if (status === 'ล้นศูนย์') return <span className="badge rounded-pill bg-danger">ล้นศูนย์</span>;
@@ -60,6 +83,11 @@ export default async function HomePage(props: Props) {
   return (
     <div className="container-fluid min-vh-100 py-4" style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
       <div className="container">
+        {/* Search Bar */}
+        <div className="mb-4">
+          <SearchBar districts={districts} />
+        </div>
+
         {/* Header Count */}
         <div className="d-flex align-items-center mb-4 p-3 rounded border" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
           <div className="me-auto" style={{ color: 'var(--text-primary)' }}>

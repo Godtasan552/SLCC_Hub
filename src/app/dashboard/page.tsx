@@ -48,11 +48,6 @@ export default function Dashboard() {
           className="form-control w-25" 
           placeholder="ค้นหาชื่อศูนย์/อำเภอ..." 
           onChange={(e) => setSearchTerm(e.target.value)}
-          style={{ 
-            backgroundColor: 'var(--bg-card)', 
-            color: 'var(--text-primary)',
-            borderColor: 'var(--border-color)'
-          }}
         />
       </div>
 
