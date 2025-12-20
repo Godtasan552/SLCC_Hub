@@ -10,8 +10,8 @@ import { SidebarProvider } from '@/contexts/SidebarContext';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="th">
-      <body className="vh-100 d-flex flex-column overflow-hidden">
+    <html lang="th" suppressHydrationWarning>
+      <body className="vh-100 d-flex flex-column overflow-hidden" suppressHydrationWarning>
         <ThemeProvider>
           <AuthProvider>
             <SidebarProvider>

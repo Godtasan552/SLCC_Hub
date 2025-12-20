@@ -174,9 +174,9 @@ export default function UnifiedDashboard() {
           <div className="col-12 col-sm-6 col-lg-3">
             <div className="card h-100 border-0 shadow-sm overflow-hidden text-white" style={{ background: 'linear-gradient(45deg, #0d6efd, #0043a8)', borderRadius: '15px' }}>
               <div className="card-body p-3 p-md-4 position-relative">
-                <i className="bi bi-people-fill position-absolute bottom-0 end-0 opacity-25 me-3 mb-2" style={{ fontSize: '2rem' }}></i>
-                <div className="text-white fw-bold mb-1" style={{ fontSize: '0.8rem', letterSpacing: '0.5px' }}>ผู้อพยพรวมทั้งหมด</div>
-                <h2 className="mb-0 fw-bold" style={{ fontSize: '1.8rem' }}>{stats.totalOccupancy.toLocaleString()} <small className="fs-6 fw-normal opacity-75">คน</small></h2>
+                <i className="bi bi-house-door-fill position-absolute bottom-0 end-0 opacity-25 me-3 mb-2" style={{ fontSize: '2rem' }}></i>
+                <div className="text-white fw-bold mb-1" style={{ fontSize: '0.8rem', letterSpacing: '0.5px' }}>จำนวนศูนย์ทั้งหมด</div>
+                <h2 className="mb-0 fw-bold" style={{ fontSize: '1.8rem' }}>{stats.totalShelters.toLocaleString()} <small className="fs-6 fw-normal opacity-75">แห่ง</small></h2>
               </div>
             </div>
           </div>
@@ -215,7 +215,7 @@ export default function UnifiedDashboard() {
         <div className="card-body py-3">
           <div className="d-flex justify-content-between align-items-center mb-2">
             <h6 className="mb-0 fw-bold" style={{ color: 'var(--text-primary)' }}>ระดับความหนาแน่นผู้อพยพภาพรวมทั้งจังหวัด</h6>
-            <span className="badge bg-light text-dark">{occupancyRate.toFixed(1)}%</span>
+            <span className="badge bg-light text-dark">{stats?.totalOccupancy.toLocaleString()} / {stats?.totalCapacity.toLocaleString()} คน ({occupancyRate.toFixed(1)}%)</span>
           </div>
           <div className="progress" style={{ height: '12px', borderRadius: '6px' }}>
             <div 
@@ -265,7 +265,7 @@ export default function UnifiedDashboard() {
         
         <div className="table-responsive">
           <table className="table table-hover align-middle mb-0 text-theme" style={{ fontSize: '0.9rem' }}>
-            <thead className="table-dark">
+            <thead>
               <tr className="small fw-bold opacity-75">
                 <th className="ps-4 py-3" style={{ width: '35%' }}>ชื่อศูนย์ / สถานที่</th>
                 <th className="py-3 d-none d-lg-table-cell">ตำบล / อำเภอ</th>
@@ -416,21 +416,21 @@ export default function UnifiedDashboard() {
 
       <style jsx>{`
         .custom-pagination .pagination-container {
-          background-color: #1a1d21;
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 50px; /* ปรับให้โค้งมนเป็น Pill เหมือนรูปตัวอย่าง */
+          background-color: var(--bg-secondary);
+          border: 1px solid var(--border-color);
+          border-radius: 50px;
           overflow: hidden;
           padding: 4px;
-          box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+          box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
         }
         .pag-btn {
           background: transparent;
           border: none;
-          color: #adb5bd;
+          color: var(--text-secondary);
           padding: 6px 14px;
           min-width: 40px;
           height: 38px;
-          border-radius: 50px; /* แต่ละปุ่มมีความโค้งมนตัวเอง */
+          border-radius: 50px;
           transition: all 0.2s;
           font-size: 0.9rem;
           display: flex;
@@ -438,8 +438,8 @@ export default function UnifiedDashboard() {
           justify-content: center;
         }
         .pag-btn:hover:not(:disabled):not(.active) {
-          background-color: rgba(255, 255, 255, 0.08);
-          color: #fff;
+          background-color: var(--table-hover);
+          color: var(--text-primary);
         }
         .pag-btn.active {
           background-color: #0d6efd;
@@ -448,13 +448,13 @@ export default function UnifiedDashboard() {
           box-shadow: 0 4px 12px rgba(13, 110, 253, 0.4);
         }
         .pag-btn:disabled {
-          color: #495057;
+          color: var(--text-secondary);
+          opacity: 0.4;
           cursor: not-allowed;
         }
         .pag-ellipsis {
           padding: 8px 12px;
-          color: #6c757d;
-          border-right: 1px solid #343a40;
+          color: var(--text-secondary);
           background-color: transparent;
           font-size: 0.8rem;
           display: flex;
@@ -462,17 +462,17 @@ export default function UnifiedDashboard() {
           height: 100%;
         }
         .border-bottom-theme {
-          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+          border-bottom: 1px solid var(--border-color);
         }
         .text-primary-theme {
-          color: #e9ecef;
+          color: var(--text-primary);
         }
         .bg-danger-subtle { background-color: rgba(220, 53, 69, 0.1) !important; }
         .bg-warning-subtle { background-color: rgba(255, 193, 7, 0.1) !important; }
         .bg-success-subtle { background-color: rgba(25, 135, 84, 0.1) !important; }
         
         .table-hover tbody tr:hover {
-          background-color: rgba(255, 255, 255, 0.02);
+          background-color: var(--table-hover);
         }
 
         /* Responsive Pagination Pills */
