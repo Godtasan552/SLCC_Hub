@@ -19,16 +19,10 @@ export async function GET() {
           warningShelters: {
             $sum: { $cond: [{ $eq: ["$capacityStatus", "ใกล้เต็ม"] }, 1, 0] }
           },
-          // สรุปยอดรวมของที่ต้องการ (ตัวอย่าง: ยา)
-          totalMedicalRequests: {
+          // สรุปยอดรวมคำขอทรัพยากรทั้งหมด
+          totalResourceRequests: {
             $sum: {
-              $size: {
-                $filter: {
-                  input: { $ifNull: ["$resources", []] },
-                  as: "res",
-                  cond: { $eq: ["$$res.category", "Medical"] }
-                }
-              }
+              $size: { $ifNull: ["$resources", []] }
             }
           }
         }
@@ -41,7 +35,7 @@ export async function GET() {
       totalOccupancy: 0,
       criticalShelters: 0,
       warningShelters: 0,
-      totalMedicalRequests: 0,
+      totalResourceRequests: 0,
     };
 
     return NextResponse.json(stats);

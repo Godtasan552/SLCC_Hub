@@ -38,9 +38,9 @@ export default function StatsGrid({ stats }: StatsGridProps) {
       <div className="col-12 col-sm-6 col-lg-3">
         <div className="card h-100 border-0 shadow-sm overflow-hidden text-white" style={{ background: 'linear-gradient(45deg, #0dcaf0, #00acc1)', borderRadius: '15px' }}>
           <div className="card-body p-3 p-md-4 position-relative">
-            <i className="bi bi-capsule-pill position-absolute bottom-0 end-0 opacity-25 me-3 mb-2" style={{ fontSize: '2rem' }}></i>
-            <div className="text-white fw-bold mb-1" style={{ fontSize: '0.8rem', letterSpacing: '0.5px' }}>คำร้องขอยาทั้งหมด</div>
-            <h2 className="mb-0 fw-bold" style={{ fontSize: '1.8rem' }}>{stats.totalMedicalRequests} <small className="fs-6 fw-normal opacity-75">รายการ</small></h2>
+            <i className="bi bi-box-seam-fill position-absolute bottom-0 end-0 opacity-25 me-3 mb-2" style={{ fontSize: '2rem' }}></i>
+            <div className="text-white fw-bold mb-1" style={{ fontSize: '0.8rem', letterSpacing: '0.5px' }}>คำร้องขอทรัพยากร</div>
+            <h2 className="mb-0 fw-bold" style={{ fontSize: '1.8rem' }}>{stats.totalResourceRequests} <small className="fs-6 fw-normal opacity-75">รายการ</small></h2>
           </div>
         </div>
       </div>

@@ -1,22 +1,38 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-
 import { useSidebar } from '@/contexts/SidebarContext';
 
 export default function Sidebar() {
   const pathname = usePathname();
   const { isOpen, closeSidebar } = useSidebar();
 
-  const menuItems = [
-    { name: 'รายการศูนย์พักพิง', href: '/', icon: 'bi-table' },
-    { name: 'แดชบอร์ด & รายงาน', href: '/dashboard', icon: 'bi-speedometer2' },
-    { name: 'รายการสิ่งของ', href: '/supplies', icon: 'bi-box-seam' },
-    { name: 'รายการร้องขอทรัพยากร', href: '/requests', icon: 'bi-box-seam' },
-    { name: 'สรุปรายการจัดส่ง (ด่วน)', href: '/requests/summary', icon: 'bi-truck' },
-    { name: 'จัดการข้อมูล (Import)', href: '/admin/import', icon: 'bi-cloud-upload' },
-    { name: 'จัดการสิ่งของ (Import)', href: '/admin/supplies', icon: 'bi-box2' },
-    { name: 'ตั้งค่าระบบ', href: '#', icon: 'bi-gear' },
+  const menuGroups = [
+    {
+      title: 'ศูนย์อำนวยการ',
+      icon: 'bi-building',
+      items: [
+        { name: 'จัดการศูนย์พักพิง', href: '/admin/import', icon: 'bi-list-ul' },
+        { name: 'จัดการคลังสิ่งของ', href: '/admin/supplies', icon: 'bi-box-seam' },
+        { name: 'คำร้องขอสิ่งของ', href: '/requests', icon: 'bi-folder2-open' },
+      ],
+    },
+    {
+      title: 'ศูนย์พักพิง',
+      icon: 'bi-hospital',
+      items: [
+        { name: 'รายชื่อศูนย์', href: '/', icon: 'bi-list-task' },
+        { name: 'รายการสิ่งของ', href: '/supplies', icon: 'bi-box' },
+        { name: 'รายการเบิกจ่าย', href: '/requests/summary', icon: 'bi-hexagon' },
+      ],
+    },
+    {
+      title: 'ระบบ',
+      icon: 'bi-gear',
+      items: [
+        { name: 'ตั้งค่าระบบ', href: '#', icon: 'bi-sliders' },
+      ],
+    }
   ];
 
   return (
@@ -31,34 +47,54 @@ export default function Sidebar() {
       )}
 
       <div 
-        className={`d-flex flex-column flex-shrink-0 p-3 text-theme border-end border-theme overflow-y-auto bg-dark-theme sidebar-container ${isOpen ? 'show' : ''}`} 
-        style={{ zIndex: 1050 }}
+        className={`d-flex flex-column flex-shrink-0 text-theme border-end border-theme overflow-y-auto bg-dark-theme sidebar-container ${isOpen ? 'show' : ''}`} 
+        style={{ zIndex: 1050, padding: 0 }}
       >
-        <div className="d-flex justify-content-between align-items-center mb-4 d-lg-none">
-          <span className="fw-bold fs-5">เมนู</span>
-          <button className="btn btn-link text-theme p-0" onClick={closeSidebar}>
-            <i className="bi bi-x-lg fs-3"></i>
-          </button>
+        {/* Main Home Button */}
+        <div className="p-3">
+            <Link 
+              href="/dashboard" 
+              className={`btn btn-primary w-100 d-flex align-items-center justify-content-start fw-bold shadow-sm ${pathname === '/dashboard' ? 'active' : ''}`}
+              style={{ borderRadius: '8px', padding: '10px 15px' }}
+              onClick={closeSidebar}
+            >
+              <i className="bi bi-house-door-fill me-2 fs-5"></i>
+              <span>หน้าหลัก</span>
+            </Link>
         </div>
-        <ul className="nav nav-pills flex-column mb-auto">
-          {menuItems.map((item) => {
-            const isActive = pathname === item.href;
-            return (
-              <li className="nav-item mb-2" key={item.name}>
-                <Link 
-                  href={item.href} 
-                  className={`nav-link d-flex align-items-center ${isActive ? 'active' : 'text-theme'}`}
-                  aria-current={isActive ? 'page' : undefined}
-                  onClick={() => closeSidebar()}
-                >
-                  <i className={`bi ${item.icon} me-3 fs-5`}></i>
-                  <span className="sidebar-text">{item.name}</span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-        <div className="mt-auto border-top border-secondary pt-3">
+
+        <div className="px-3 pb-3">
+          {menuGroups.map((group, groupIndex) => (
+            <div key={group.title} className="mb-3">
+              {/* Group Header */}
+              <div className="d-flex align-items-center mb-2 px-2" style={{ color: 'var(--text-primary)' }}>
+                <i className={`bi ${group.icon} me-2`}></i>
+                <span className="fw-semibold">{group.title}</span>
+              </div>
+
+              {/* Group Items with Left Border Line */}
+              <div className="d-flex flex-column" style={{ marginLeft: '11px', borderLeft: '2px solid rgba(128, 128, 128, 0.3)', paddingLeft: '15px' }}>
+                {group.items.map((item) => {
+                  const isActive = pathname === item.href;
+                  return (
+                    <Link 
+                      key={item.name}
+                      href={item.href} 
+                      className={`d-flex align-items-center mb-2 text-decoration-none ${isActive ? 'text-primary' : 'text-theme-secondary'}`}
+                      style={{ padding: '6px 0', fontSize: '0.95rem', transition: 'all 0.2s ease' }}
+                      onClick={closeSidebar}
+                    >
+                      <i className={`bi ${item.icon} me-2 ${isActive ? 'fw-bold' : ''}`} style={{ fontSize: '1.1rem' }}></i>
+                      <span className={isActive ? 'fw-bold' : ''}>{item.name}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-auto border-top border-secondary pt-3 pb-3 px-3 mx-2">
           <div className="text-theme-secondary small text-center">
             &copy; 2025 SLCC Hub
           </div>

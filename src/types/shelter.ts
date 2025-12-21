@@ -36,5 +36,5 @@ export interface Stats {
   totalOccupancy: number;
   criticalShelters: number;
   warningShelters: number;
-  totalMedicalRequests: number;
+  totalResourceRequests: number;
 }
