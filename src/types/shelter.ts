@@ -37,4 +37,7 @@ export interface Stats {
   criticalShelters: number;
   warningShelters: number;
   totalResourceRequests: number;
+  totalSupplies?: number;
+  lowStockSupplies?: number;
+  outOfStockSupplies?: number;
 }
