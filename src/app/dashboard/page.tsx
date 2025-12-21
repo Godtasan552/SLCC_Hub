@@ -111,11 +111,17 @@ export default function UnifiedDashboard() {
       {/* ส่วนที่ 2: การ์ดตัวเลขสรุป */}
       {stats && <StatsGrid stats={stats} />}
 
-      {/* ส่วนที่ 2.1: ศูนย์วิกฤต */}
-      <CriticalShelters shelters={shelters} />
-
-      {/* ส่วนที่ 3: แถบความหนาแน่นรวม */}
-      {stats && <CapacityOverview stats={stats} />}
+      {/* ส่วนที่ 3: กราฟและข้อมูลวิกฤต (2 คอลัมน์) */}
+      <div className="row g-4 mb-4">
+        {/* กราฟความหนาแน่นรวม */}
+        <div className="col-12 col-xl-6">
+           {stats && <CapacityOverview stats={stats} />}
+        </div>
+        {/* รายการศูนย์วิกฤต */}
+        <div className="col-12 col-xl-6">
+           <CriticalShelters shelters={shelters} />
+        </div>
+      </div>
 
       {/* ส่วนที่ 4: รายการศูนย์พักพิงแบบตาราง */}
       <ShelterList 
