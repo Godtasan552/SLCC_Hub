@@ -9,6 +9,7 @@ interface ShelterListProps {
   setTimeRange: (range: number) => void;
   searchTerm: string;
   setSearchTerm: (term: string) => void;
+  onAction?: (id: string, action: 'in' | 'out') => void;
 }
 
 const ITEMS_PER_PAGE = 30;
@@ -18,7 +19,8 @@ export default function ShelterList({
   timeRange, 
   setTimeRange, 
   searchTerm, 
-  setSearchTerm 
+  setSearchTerm,
+  onAction
 }: ShelterListProps) {
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -40,10 +42,11 @@ export default function ShelterList({
   return (
     <div className="card shadow-sm border-0 mb-3" style={{ backgroundColor: 'var(--bg-card)' }}>
       <div className="card-header bg-transparent border-bottom py-3">
+        {/* ... (Header Content Same as Before) ... */}
         <div className="row g-3 align-items-center">
           <div className="col-12 col-xl-4 text-center text-xl-start">
             <h5 className="mb-0 fw-bold" style={{ color: 'var(--text-primary)' }}>
-              📍 ความเคลื่อนไหวรายศูนย์ {timeRange === 1 ? '(วันนี้)' : `(ย้อนหลัง ${timeRange} วัน)`}
+              {onAction ? '🛠️ จัดการข้อมูลรายศูนย์' : `📍 ความเคลื่อนไหวรายศูนย์ ${timeRange === 1 ? '(วันนี้)' : `(ย้อนหลัง ${timeRange} วัน)`}`}
             </h5>
           </div>
           <div className="col-12 col-md-7 col-xl-4 d-flex justify-content-center">
@@ -78,13 +81,14 @@ export default function ShelterList({
         <table className="table table-hover align-middle mb-0 text-theme" style={{ fontSize: '0.9rem' }}>
           <thead>
             <tr className="small fw-bold opacity-75">
-              <th className="ps-4 py-3" style={{ width: '35%' }}>ชื่อศูนย์ / สถานที่</th>
+              <th className="ps-4 py-3" style={{ width: '30%' }}>ชื่อศูนย์ / สถานที่</th>
               <th className="py-3 d-none d-lg-table-cell">ตำบล / อำเภอ</th>
               {timeRange > 0 && <th className="text-center py-3">ความเคลื่อนไหว</th>}
               <th className="text-center py-3">ครองเตียง (%)</th>
-              <th className="py-3 d-none d-md-table-cell">ความจุรวม</th>
+              <th className="py-3 d-none d-md-table-cell text-center">ความจุรวม</th>
               <th className="py-3">สถานะ</th>
               <th className="pe-4 py-3 d-none d-xl-table-cell">อัปเดตล่าสุด</th>
+              {onAction && <th className="text-center py-3">ดำเนินการ</th>}
             </tr>
           </thead>
           <tbody>
@@ -136,6 +140,18 @@ export default function ShelterList({
                   <td className="pe-4 text-secondary small d-none d-xl-table-cell py-3">
                     {new Date(shelter.updatedAt || Date.now()).toLocaleDateString('th-TH')}
                   </td>
+                  {onAction && (
+                    <td className="text-center">
+                      <div className="btn-group btn-group-sm">
+                        <button className="btn btn-success" onClick={() => onAction(shelter._id, 'in')}>
+                          <i className="bi bi-plus-lg"></i>
+                        </button>
+                        <button className="btn btn-outline-danger" onClick={() => onAction(shelter._id, 'out')}>
+                          <i className="bi bi-dash-lg"></i>
+                        </button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               );
             })}

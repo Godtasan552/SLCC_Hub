@@ -1,15 +1,10 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import ExcelJS from 'exceljs';
-
-interface Shelter {
-  _id: string;
-  name: string;
-  district: string;
-  capacity: number;
-  currentOccupancy: number;
-}
+import ShelterList from '@/components/dashboard/ShelterList';
+import { Shelter } from "@/types/shelter";
+import { Modal } from 'bootstrap';
 
 interface ShelterData {
   name: string;
@@ -20,11 +15,25 @@ interface ShelterData {
 }
 
 export default function AdminPage() {
+  // --- States ---
+  const [activeTab, setActiveTab] = useState<'daily' | 'management'>('daily');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [shelters, setShelters] = useState<Shelter[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [timeRange, setTimeRange] = useState(1);
   
+  // Modal State
+  const [modalState, setModalState] = useState<{ isOpen: boolean, shelter: Shelter | null, action: 'in' | 'out', amount: number }>({
+    isOpen: false,
+    shelter: null,
+    action: 'in',
+    amount: 1
+  });
+  const modalRef = useRef<HTMLDivElement>(null);
+  const bsModalRef = useRef<Modal | null>(null);
+
+  // Form State
   const [manualForm, setManualForm] = useState({
     name: '',
     district: '',
@@ -33,6 +42,7 @@ export default function AdminPage() {
     currentOccupancy: 0
   });
 
+  // --- Fetch Data ---
   const fetchShelters = useCallback(async () => {
     try {
       const res = await axios.get('/api/shelters');
@@ -46,24 +56,74 @@ export default function AdminPage() {
     fetchShelters();
   }, [fetchShelters]);
 
-  // 1. Manual Entry Submission
-  const handleManualSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // --- Modal Logic ---
+  useEffect(() => {
+    if (modalRef.current) {
+        if (typeof window !== 'undefined') {
+          import('bootstrap').then((bootstrap) => {
+             bsModalRef.current = new bootstrap.Modal(modalRef.current!);
+          });
+        }
+    }
+  }, []);
+
+  const openActionModal = (id: string, action: 'in' | 'out') => {
+    const targetShelter = shelters.find(s => s._id === id);
+    if (!targetShelter) return;
+    
+    setModalState({
+        isOpen: true,
+        shelter: targetShelter,
+        action,
+        amount: 1
+    });
+    bsModalRef.current?.show();
+  };
+
+  const confirmAction = async () => {
+    if (!modalState.shelter) return;
+    
     setLoading(true);
+    bsModalRef.current?.hide();
+    
     try {
-      await axios.post('/api/shelters', manualForm);
-      setMessage(`บันทึกข้อมูลศูนย์ "${manualForm.name}" เรียบร้อยแล้ว`);
-      setManualForm({ name: '', district: '', subdistrict: '', capacity: 0, currentOccupancy: 0 });
+      await axios.put(`/api/shelters/${modalState.shelter._id}`, { 
+          action: modalState.action, 
+          amount: modalState.amount 
+      });
       fetchShelters();
+      showToast(`บันทึกข้อมูลเรียบร้อย: ${modalState.action === 'in' ? 'รับเข้า' : 'ส่งออก'} ${modalState.amount} คน`);
     } catch (err) {
-      const errorMessage = axios.isAxiosError(err) ? err.response?.data?.error : (err as Error).message;
-      setMessage(`เกิดข้อผิดพลาด: ${errorMessage}`);
+      console.error(err);
+      showToast('เกิดข้อผิดพลาดในการบันทึก');
     } finally {
       setLoading(false);
     }
   };
 
-  // 2. JSON & Excel Bulk Import
+  // --- Handlers ---
+  const showToast = (msg: string) => {
+    setMessage(msg); // In a real app, use a proper Toast component
+    setTimeout(() => setMessage(''), 3000);
+  };
+
+  const handleManualSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await axios.post('/api/shelters', manualForm);
+      showToast(`เพิ่มศูนย์ "${manualForm.name}" เรียบร้อย`);
+      setManualForm({ name: '', district: '', subdistrict: '', capacity: 0, currentOccupancy: 0 });
+      fetchShelters();
+    } catch (err) {
+       // @ts-expect-error: Error response type is not strictly typed
+      const errorMessage = err.response?.data?.error || err.message;
+      showToast(`Error: ${errorMessage}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -73,21 +133,18 @@ export default function AdminPage() {
 
     try {
       let dataToImport: ShelterData[] = [];
-
       if (file.name.endsWith('.json')) {
         const text = await file.text();
         const json = JSON.parse(text);
         dataToImport = json.data || json;
-      } 
-      else if (file.name.endsWith('.xlsx')) {
+      } else if (file.name.endsWith('.xlsx')) {
         const arrayBuffer = await file.arrayBuffer();
         const workbook = new ExcelJS.Workbook();
         await workbook.xlsx.load(arrayBuffer);
         const worksheet = workbook.getWorksheet(1);
-        
         if (worksheet) {
           worksheet.eachRow((row, rowNumber) => {
-            if (rowNumber > 1) { // Skip header
+            if (rowNumber > 1) { 
               dataToImport.push({
                 name: String(row.getCell(1).value || ''),
                 district: String(row.getCell(2).value || ''),
@@ -99,12 +156,11 @@ export default function AdminPage() {
           });
         }
       }
-
       await axios.patch('/api/shelters', { data: dataToImport });
-      setMessage('นำเข้าและอัปเดตข้อมูลไฟล์สำเร็จ');
+      showToast('นำเข้าไฟล์สำเร็จ');
       fetchShelters();
     } catch (err) {
-      setMessage('เกิดข้อผิดพลาดในการประมวลผลไฟล์');
+      showToast('ไฟล์ไม่ถูกต้อง หรือเกิดข้อผิดพลาด');
       console.error(err);
     } finally {
       setLoading(false);
@@ -112,160 +168,175 @@ export default function AdminPage() {
     }
   };
 
-  // 3. Check-in / Check-out Logic
-  const handleCheckInOut = async (id: string, action: 'in' | 'out') => {
-    const label = action === 'in' ? 'พักพิงเพิ่ม' : 'ออกจากศูนย์';
-    const val = prompt(`ระบุจำนวนคนที่ต้องการ ${label}:`, "1");
-    if (!val || isNaN(parseInt(val))) return;
-
-    try {
-      setLoading(true);
-      await axios.put(`/api/shelters/${id}`, { action, amount: parseInt(val) });
-      fetchShelters();
-      setMessage(`ทำรายการ ${label} สำเร็จ`);
-    } catch (err) {
-      console.error('Check-in/out update failed:', err);
-      setMessage('ไม่สามารถอัปเดตข้อมูลได้');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filteredShelters = shelters.filter(s => 
-    s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    s.district.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   return (
-    <div className="container py-4">
-      <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
-        <h2 className="fw-bold mb-0 text-center text-md-start" style={{ color: 'var(--text-primary)' }}>🛠️ ระบบจัดการข้อมูล (Admin Hub)</h2>
-        {message && (
-          <div className={`alert ${message.includes('สำเร็จ') ? 'alert-success' : 'alert-danger'} mb-0 py-2 small fw-bold flex-grow-1 text-center`} style={{ maxWidth: '400px' }}>
-            {message}
-          </div>
+    <div className="container-fluid px-4 py-4" style={{ maxWidth: '1600px', minHeight: '100vh', backgroundColor: 'var(--bg-body)' }}>
+      
+      {/* 1. Header & Tabs */}
+      <div className="d-flex flex-column flex-md-row justify-content-between align-items-end mb-4 gap-3">
+        <div>
+           <div className="d-flex align-items-center mb-2">
+                <span className="badge bg-primary rounded-circle p-2 me-2"><i className="bi bi-shield-lock-fill fs-5 text-white"></i></span>
+                <h4 className="fw-bold mb-0" style={{ color: 'var(--text-primary)' }}>ระบบจัดการศูนย์พักพิง</h4>
+           </div>
+           <p className="text-secondary small mb-0 ps-1">ระบบบริหารจัดการข้อมูลผู้ประสบภัยและทรัพยากร</p>
+        </div>
+        
+        {/* Tab Navigation */}
+        <div className="bg-white dark-mode-bg rounded-pill p-1 shadow-sm d-flex" style={{ border: '1px solid var(--border-color)' }}>
+            <button 
+                className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'daily' ? 'btn-primary shadow-sm' : 'text-secondary hover-bg-light'}`}
+                onClick={() => setActiveTab('daily')}
+            >
+                <i className="bi bi-list-check me-2"></i>อัปเดตรายวัน
+            </button>
+            <button 
+                className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'management' ? 'btn-primary shadow-sm' : 'text-secondary hover-bg-light'}`}
+                onClick={() => setActiveTab('management')}
+            >
+                <i className="bi bi-database-gear me-2"></i>จัดการฐานข้อมูล
+            </button>
+        </div>
+      </div>
+      
+      {/* Alert Toast (Fixed Top) */}
+      {message && (
+         <div className="position-fixed top-0 start-50 translate-middle-x mt-4 z-index-toast" style={{ zIndex: 1050 }}>
+            <div className={`alert ${message.includes('Error') || message.includes('ผิดพลาด') ? 'alert-danger' : 'alert-success'} shadow-lg d-flex align-items-center py-2 px-4 rounded-pill border-0`}>
+             <i className={`bi ${message.includes('Error') ? 'bi-x-circle-fill' : 'bi-check-circle-fill'} me-2 fs-5`}></i>
+             <span className="fw-bold">{message}</span>
+           </div>
+         </div>
+      )}
+
+      {/* 2. Content Area */}
+      <div className="animate-fade-in">
+        
+        {/* TAB 1: Daily Operations */}
+        {activeTab === 'daily' && (
+            <div className="row g-4 justify-content-center">
+                <div className="col-12">
+                   {/* Search & List */}
+                    <ShelterList 
+                        shelters={shelters}
+                        timeRange={timeRange}
+                        setTimeRange={setTimeRange}
+                        searchTerm={searchTerm}
+                        setSearchTerm={setSearchTerm}
+                        onAction={openActionModal}
+                    />
+                </div>
+            </div>
+        )}
+
+        {/* TAB 2: Management (Add/Import) */}
+        {activeTab === 'management' && (
+             <div className="row g-4">
+                {/* Manual Add */}
+                <div className="col-lg-6">
+                    <div className="card border-0 shadow-sm h-100" style={{ backgroundColor: 'var(--bg-card)' }}>
+                        <div className="card-header bg-transparent border-bottom py-3 px-4">
+                            <h6 className="mb-0 fw-bold text-primary"><i className="bi bi-plus-circle me-2"></i>ลงทะเบียนศูนย์ใหม่</h6>
+                        </div>
+                        <div className="card-body p-4">
+                            <form onSubmit={handleManualSubmit}>
+                                <div className="row g-3">
+                                    <div className="col-12">
+                                        <label className="form-label small fw-bold text-secondary">ชื่อศูนย์พักพิง</label>
+                                        <input type="text" className="form-control border" value={manualForm.name} onChange={(e) => setManualForm({...manualForm, name: e.target.value})} required placeholder="เช่น วัดป่า..." />
+                                    </div>
+                                    <div className="col-md-6">
+                                        <label className="form-label small fw-bold text-secondary">อำเภอ</label>
+                                        <input type="text" className="form-control border" value={manualForm.district} onChange={(e) => setManualForm({...manualForm, district: e.target.value})} required placeholder="เช่น เมือง..." />
+                                    </div>
+                                    <div className="col-md-6">
+                                        <label className="form-label small fw-bold text-secondary">ความจุ (คน)</label>
+                                        <input type="number" className="form-control border" value={manualForm.capacity} onChange={(e) => setManualForm({...manualForm, capacity: Number(e.target.value)})} />
+                                    </div>
+                                    <div className="col-12 mt-4">
+                                        <button type="submit" className="btn btn-primary w-100 py-2 rounded-3 fw-bold shadow-sm" disabled={loading}>
+                                            <i className="bi bi-save me-2"></i>บันทึกข้อมูล
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Import File */}
+                <div className="col-lg-6">
+                    <div className="card border-0 shadow-sm h-100" style={{ backgroundColor: 'var(--bg-card)' }}>
+                         <div className="card-header bg-transparent border-bottom py-3 px-4">
+                            <h6 className="mb-0 fw-bold text-success"><i className="bi bi-file-earmark-excel me-2"></i>นำเข้า Excel / JSON</h6>
+                        </div>
+                        <div className="card-body p-4 d-flex flex-column justify-content-center text-center">
+                            <div className="upload-box p-5 rounded-4 border-2 border-dashed mb-3 cursor-pointer transition-all">
+                                <i className="bi bi-cloud-arrow-up-fill text-success" style={{ fontSize: '3rem', opacity: 0.8 }}></i>
+                                <h5 className="mt-3 fw-bold" style={{ color: 'var(--text-primary)' }}>ลากไฟล์มาวาง หรือ คลิกเพื่อเลือกไฟล์</h5>
+                                <p className="text-secondary small">รองรับไฟล์มาตรฐาน .xlsx และ .json</p>
+                                <button className="btn btn-outline-success btn-sm rounded-pill px-4 mt-2" onClick={() => document.getElementById('fileIn')?.click()}>
+                                    Browse Files
+                                </button>
+                                <input type="file" id="fileIn" className="d-none" accept=".json,.xlsx" onChange={handleFileUpload} />
+                            </div>
+                            <div className="alert alert-light border small text-start d-flex gap-2">
+                                <i className="bi bi-info-circle text-primary mt-1"></i>
+                                <span className="text-secondary">การนำเข้าไฟล์จะอัปเดตข้อมูลที่มีอยู่แล้วหากชื่อตรงกัน และสร้างใหม่หากยังไม่มี</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+             </div>
         )}
       </div>
 
-      {/* ส่วนหลัก: การจัดการเข้า-ออก (Check-in/Out Section) */}
-      <div className="card shadow-sm border-0 mb-5 overflow-hidden" style={{ backgroundColor: 'var(--bg-card)' }}>
-        <div className="card-header bg-success text-white py-3">
-          <div className="row g-3 align-items-center">
-            <div className="col-12 col-md-6">
-              <h5 className="mb-0 fw-bold"><i className="bi bi-people-fill me-2"></i> จัดการความเคลื่อนไหว (เข้า-ออกศูนย์)</h5>
-            </div>
-            <div className="col-12 col-md-6">
-              <div className="position-relative">
-                <i className="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-secondary"></i>
-                <input 
-                  type="text" 
-                  className="form-control form-control-sm ps-5 border-0 shadow-sm" 
-                  placeholder="ค้นหาชื่อศูนย์..."
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="card-body p-0">
-          <div className="table-responsive" style={{ maxHeight: '400px' }}>
-            <table className="table table-hover align-middle mb-0">
-              <thead className="table-light sticky-top">
-                <tr className="small text-secondary">
-                  <th className="ps-4">ชื่อศูนย์พักพิง</th>
-                  <th className="d-none d-md-table-cell">อำเภอ</th>
-                  <th className="text-center">จำนวนคนปัจจุบัน</th>
-                  <th className="text-end pe-4">ดำเนินการ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredShelters.map((s) => (
-                  <tr key={s._id}>
-                    <td className="ps-4">
-                      <div className="fw-bold" style={{ color: 'var(--text-primary)' }}>{s.name}</div>
-                      <div className="d-md-none small text-secondary">{s.district}</div>
-                    </td>
-                    <td className="d-none d-md-table-cell" style={{ color: 'var(--text-secondary)' }}>{s.district}</td>
-                    <td className="text-center">
-                       <span className={`badge ${s.currentOccupancy >= s.capacity ? 'bg-danger' : 'bg-primary'}`}>
-                          {s.currentOccupancy} / {s.capacity}
-                       </span>
-                    </td>
-                    <td className="text-end pe-4">
-                      <div className="btn-group btn-group-sm w-100 w-md-auto">
-                        <button className="btn btn-success" onClick={() => handleCheckInOut(s._id, 'in')}>
-                          <i className="bi bi-person-plus-fill me-1"></i> <span className="d-none d-sm-inline">เข้าพัก</span>
-                        </button>
-                        <button className="btn btn-outline-danger" onClick={() => handleCheckInOut(s._id, 'out')}>
-                          <i className="bi bi-person-dash-fill me-1"></i> <span className="d-none d-sm-inline">ออก</span>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <div className="row g-4">
-        {/* คีย์ข้อมูลเอง (Manual Entry) */}
-        <div className="col-md-6">
-          <div className="card shadow-sm border-0 h-100" style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)' }}>
-            <div className="card-header bg-primary text-white py-3">
-              <h5 className="mb-0 fw-bold"><i className="bi bi-plus-circle me-2"></i> ทะเบียนศูนย์ใหม่</h5>
-            </div>
-            <div className="card-body">
-              <form onSubmit={handleManualSubmit}>
-                <div className="mb-3">
-                  <label className="form-label small fw-bold">ชื่อศูนย์พักพิง</label>
-                  <input type="text" className="form-control" value={manualForm.name} onChange={(e) => setManualForm({...manualForm, name: e.target.value})} required />
+      {/* 3. Action Modal */}
+      <div className="modal fade" id="actionModal" ref={modalRef} tabIndex={-1} aria-hidden="true">
+        <div className="modal-dialog modal-dialog-centered modal-sm">
+            <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden" style={{ backgroundColor: 'var(--bg-card)' }}>
+                <div className={`modal-header border-0 py-3 ${modalState.action === 'in' ? 'bg-success' : 'bg-danger'} text-white`}>
+                    <h5 className="modal-title fw-bold">
+                        <i className={`bi ${modalState.action === 'in' ? 'bi-box-arrow-in-right' : 'bi-box-arrow-right'} me-2`}></i>
+                        {modalState.action === 'in' ? 'รับผู้อพยพเข้า' : 'จำหน่ายออก'}
+                    </h5>
+                    <button type="button" className="btn-close btn-close-white" onClick={() => bsModalRef.current?.hide()}></button>
                 </div>
-                <div className="row">
-                  <div className="col-md-6 mb-3">
-                    <label className="form-label small fw-bold">อำเภอ</label>
-                    <input type="text" className="form-control" value={manualForm.district} onChange={(e) => setManualForm({...manualForm, district: e.target.value})} required />
-                  </div>
-                  <div className="col-md-6 mb-3">
-                    <label className="form-label small fw-bold">ความจุสูงสุด</label>
-                    <input type="number" className="form-control" value={manualForm.capacity} onChange={(e) => setManualForm({...manualForm, capacity: Number(e.target.value)})} />
-                  </div>
+                <div className="modal-body p-4">
+                    <div className="mb-3 text-center">
+                        <p className="mb-1 text-secondary small">ศูนย์พักพิง</p>
+                        <h6 className="fw-bold" style={{ color: 'var(--text-primary)' }}>{modalState.shelter?.name}</h6>
+                    </div>
+                    <label className="form-label small fw-bold text-secondary">จำนวนคน</label>
+                    <div className="input-group mb-3">
+                        <button className="btn btn-outline-secondary" type="button" onClick={() => setModalState(prev => ({...prev, amount: Math.max(1, prev.amount - 1)}))}>-</button>
+                        <input type="number" className="form-control text-center fw-bold fs-5" value={modalState.amount} onChange={(e) => setModalState(prev => ({...prev, amount: Math.max(1, parseInt(e.target.value) || 0)}))} />
+                        <button className="btn btn-outline-secondary" type="button" onClick={() => setModalState(prev => ({...prev, amount: prev.amount + 1}))}>+</button>
+                    </div>
+                    <button onClick={confirmAction} className={`btn w-100 py-2 fw-bold rounded-3 ${modalState.action === 'in' ? 'btn-success' : 'btn-danger'}`} disabled={loading}>
+                        {loading ? 'กำลังบันทึก...' : 'ยืนยันรายการ'}
+                    </button>
                 </div>
-                <button type="submit" className="btn btn-primary w-100 fw-bold" disabled={loading}>บันทึกข้อมูล</button>
-              </form>
             </div>
-          </div>
-        </div>
-
-        {/* นำเข้าไฟล์ (Import) */}
-        <div className="col-md-6">
-          <div className="card shadow-sm border-0 h-100" style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)' }}>
-            <div className="card-header bg-dark text-white py-3">
-              <h5 className="mb-0 fw-bold"><i className="bi bi-file-earmark-spreadsheet me-2"></i> นำเข้าผ่าน Excel/JSON</h5>
-            </div>
-            <div className="card-body text-center p-5">
-              <div className="upload-zone p-4" onClick={() => document.getElementById('fileIn')?.click()}>
-                <i className="bi bi-cloud-arrow-up text-primary fs-1"></i>
-                <h5 className="mt-3">เลือกไฟล์นำเข้าข้อมูล</h5>
-                <input type="file" id="fileIn" className="d-none" accept=".json,.xlsx" onChange={handleFileUpload} />
-                <button className="btn btn-outline-primary mt-2">Browse File</button>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
       <style jsx>{`
-        .upload-zone {
-          border: 2px dashed var(--border-color);
-          border-radius: 12px;
-          cursor: pointer;
-          transition: all 0.2s;
+        .cursor-pointer { cursor: pointer; }
+        .upload-box {
+            border: 2px dashed var(--border-color);
+            background-color: var(--bg-secondary);
         }
-        .upload-zone:hover {
-          background: rgba(13, 110, 253, 0.05);
-          border-color: #0d6efd;
+        .upload-box:hover {
+            border-color: #198754;
+            background-color: rgba(25, 135, 84, 0.05);
+        }
+        .dark-mode-bg {
+             background-color: var(--bg-card) !important;
+        }
+        .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
     </div>
