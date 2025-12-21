@@ -70,20 +70,17 @@ export default function SuppliesListPage() {
   const totalQuantity = filteredAndSortedSupplies.reduce((sum, s) => sum + s.quantity, 0);
   const categoriesCount = new Set(filteredAndSortedSupplies.map(s => s.category)).size;
 
-  // Get category badge color
-  const getCategoryColor = (category: string) => {
-    const colors: Record<string, string> = {
-      'อาหารและน้ำดื่ม': 'success',
-      'วัตถุดิบประกอบอาหาร': 'success',
-      'ยา และเวชภัณฑ์': 'danger',
-      'อุปกรณ์ปฐมพยาบาล': 'danger',
-      'เสื้อผ้า และรองเท้า': 'info',
-      'ผ้าห่ม และหมอน': 'info',
-      'อุปกรณ์ป้องกันส่วนบุคคล (PPE)': 'warning',
-      'สิ่งของเครื่องใช้': 'primary',
-      'อุปกรณ์ทำความสะอาด': 'primary',
-    };
-    return colors[category] || 'secondary';
+  // Get stock status based on quantity
+  const getStockStatus = (quantity: number): { label: string; color: string; icon: string } => {
+    if (quantity === 0) {
+      return { label: 'หมด', color: 'danger', icon: 'bi-x-circle-fill' };
+    } else if (quantity <= 10) {
+      return { label: 'น้อย', color: 'warning', icon: 'bi-exclamation-triangle-fill' };
+    } else if (quantity <= 50) {
+      return { label: 'พอใช้', color: 'info', icon: 'bi-dash-circle-fill' };
+    } else {
+      return { label: 'เยอะ', color: 'success', icon: 'bi-check-circle-fill' };
+    }
   };
 
   return (
@@ -99,52 +96,38 @@ export default function SuppliesListPage() {
 
       {/* Statistics Cards */}
       <div className="row g-3 mb-4">
-        <div className="col-md-4">
-          <div className="card border-0 shadow-sm h-100" style={{ backgroundColor: 'var(--bg-card)' }}>
+        <div className="col-md-6">
+          <div className="card border-0 shadow-sm h-100 text-white" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
             <div className="card-body">
               <div className="d-flex align-items-center">
                 <div className="flex-shrink-0">
-                  <div className="bg-primary bg-opacity-10 rounded-3 p-3">
-                    <i className="bi bi-box-seam fs-3 text-primary"></i>
+                  <div className="bg-white bg-opacity-25 rounded-3 p-3">
+                    <i className="bi bi-box-seam fs-2 text-white"></i>
                   </div>
                 </div>
                 <div className="flex-grow-1 ms-3">
-                  <div className="small text-secondary">รายการทั้งหมด</div>
-                  <div className="h4 mb-0 fw-bold" style={{ color: 'var(--text-primary)' }}>{totalItems}</div>
+                  <div className="small text-white-50 fw-semibold">รายการทั้งหมด</div>
+                  <div className="h2 mb-0 fw-bold text-white">{totalItems}</div>
+                  <div className="small text-white-50">รายการสิ่งของ</div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-        <div className="col-md-4">
-          <div className="card border-0 shadow-sm h-100" style={{ backgroundColor: 'var(--bg-card)' }}>
+
+        <div className="col-md-6">
+          <div className="card border-0 shadow-sm h-100 text-white" style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' }}>
             <div className="card-body">
               <div className="d-flex align-items-center">
                 <div className="flex-shrink-0">
-                  <div className="bg-success bg-opacity-10 rounded-3 p-3">
-                    <i className="bi bi-stack fs-3 text-success"></i>
+                  <div className="bg-white bg-opacity-25 rounded-3 p-3">
+                    <i className="bi bi-tags fs-2 text-white"></i>
                   </div>
                 </div>
                 <div className="flex-grow-1 ms-3">
-                  <div className="small text-secondary">จำนวนรวม</div>
-                  <div className="h4 mb-0 fw-bold" style={{ color: 'var(--text-primary)' }}>{totalQuantity.toLocaleString()}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="col-md-4">
-          <div className="card border-0 shadow-sm h-100" style={{ backgroundColor: 'var(--bg-card)' }}>
-            <div className="card-body">
-              <div className="d-flex align-items-center">
-                <div className="flex-shrink-0">
-                  <div className="bg-info bg-opacity-10 rounded-3 p-3">
-                    <i className="bi bi-tags fs-3 text-info"></i>
-                  </div>
-                </div>
-                <div className="flex-grow-1 ms-3">
-                  <div className="small text-secondary">หมวดหมู่</div>
-                  <div className="h4 mb-0 fw-bold" style={{ color: 'var(--text-primary)' }}>{categoriesCount}</div>
+                  <div className="small text-white-50 fw-semibold">หมวดหมู่</div>
+                  <div className="h2 mb-0 fw-bold text-white">{categoriesCount}</div>
+                  <div className="small text-white-50">ประเภทสิ่งของ</div>
                 </div>
               </div>
             </div>
@@ -280,7 +263,7 @@ export default function SuppliesListPage() {
                         )}
                       </td>
                       <td>
-                        <span className={`badge bg-${getCategoryColor(supply.category)}`}>
+                        <span className="badge bg-secondary">
                           {supply.category}
                         </span>
                       </td>
@@ -315,15 +298,15 @@ export default function SuppliesListPage() {
                         </div>
                       </td>
                       <td className="d-none d-xl-table-cell pe-4">
-                        {supply.quantity > 0 ? (
-                          <span className="badge bg-success">
-                            <i className="bi bi-check-circle-fill"></i>
-                          </span>
-                        ) : (
-                          <span className="badge bg-danger">
-                            <i className="bi bi-x-circle-fill"></i>
-                          </span>
-                        )}
+                        {(() => {
+                          const status = getStockStatus(supply.quantity);
+                          return (
+                            <span className={`badge bg-${status.color}`}>
+                              <i className={`${status.icon} me-1`}></i>
+                              {status.label}
+                            </span>
+                          );
+                        })()}
                       </td>
                     </tr>
                   ))}
