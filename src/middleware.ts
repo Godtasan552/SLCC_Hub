@@ -8,7 +8,7 @@ export default withAuth(
     const isAdminRoute = req.nextUrl.pathname.startsWith("/admin");
     const isAdminApi = req.nextUrl.pathname.startsWith("/api/admin");
 
-    if ((isAdminRoute || isAdminApi) && token?.role !== "admin") {
+    if ((isAdminRoute || isAdminApi) && token?.role !== "admin" && token?.role !== "staff") {
       return NextResponse.redirect(new URL("/", req.url));
     }
   },
