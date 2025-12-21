@@ -11,10 +11,10 @@ export const getAggregatedMovement = (logs: DailyLog[] | undefined, timeRangeDay
   const now = new Date();
   
   for (let i = 0; i < timeRangeDays; i++) {
-    // ปรับเป็น UTC+7
-    const d = new Date(now.getTime() + (7 * 60 * 60 * 1000));
+    const d = new Date(now);
     d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().split('T')[0];
+    // ใช้ toLocaleDateString('en-CA') จะได้ format YYYY-MM-DD ตาม local time ของเครื่อง
+    const dateStr = d.toLocaleDateString('en-CA'); 
     targetDates.push(dateStr);
   }
 

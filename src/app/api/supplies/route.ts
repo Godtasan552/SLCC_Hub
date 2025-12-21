@@ -75,16 +75,27 @@ export async function PATCH(req: NextRequest) {
     
     for (const item of data) {
       try {
-        // ตรวจสอบว่ามีสิ่งของนี้อยู่แล้วหรือไม่ (ตาม name และ category)
-        const existing = await Supply.findOne({ 
+        // ตรวจสอบว่ามีสิ่งของนี้อยู่แล้วหรือไม่
+        const query: Record<string, string | null | object> = { 
           name: item.name, 
-          category: item.category,
-          shelterId: item.shelterId || null
-        });
+          category: item.category
+        };
+        
+        if (item.shelterId) {
+          query.shelterId = item.shelterId;
+        } else if (item.shelterName) {
+           query.shelterName = item.shelterName;
+        } else {
+           // กรณีของกลาง (ไม่มีศูนย์)
+           query.shelterId = null;
+           query.shelterName = { $in: [null, ''] };
+        }
+
+        const existing = await Supply.findOne(query);
         
         if (existing) {
           // อัพเดทข้อมูล
-          existing.quantity = item.quantity || existing.quantity;
+          existing.quantity = item.quantity !== undefined ? item.quantity : existing.quantity;
           existing.unit = item.unit || existing.unit;
           existing.description = item.description || existing.description;
           existing.expiryDate = item.expiryDate || existing.expiryDate;

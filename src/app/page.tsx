@@ -80,6 +80,15 @@ export default async function HomePage(props: Props) {
     }
   };
 
+  const formatPhoneNumber = (phone: string) => {
+    if (!phone) return '-';
+    // แยกเบอร์ออกจากชื่อ (ถ้ามี / คั่น)
+    const phonePart = phone.split('/')[0].trim();
+    // ถ้าอยากแสดงชื่อด้วยก็ return phone ไปเลย แต่ถ้าเอาแค่เบอร์ก็ phonePart
+    // ในที่นี้ user บอกว่า "เบอร์ มีตัวหนังสือติดมาด้วย" แปลว่าอยากเอาออก
+    return phonePart;
+  };
+
   return (
     <div className="container-fluid min-vh-100 py-4" style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
       <div className="container">
@@ -121,7 +130,7 @@ export default async function HomePage(props: Props) {
                     </div>
                     <div className="d-sm-none small mt-1">
                       {shelter.phoneNumbers && shelter.phoneNumbers[0] && !/^0+$/.test(shelter.phoneNumbers[0]) && (
-                        <span className="text-primary"><i className="bi bi-telephone-fill me-1"></i>{shelter.phoneNumbers[0]}</span>
+                        <span className="text-primary"><i className="bi bi-telephone-fill me-1"></i>{formatPhoneNumber(shelter.phoneNumbers[0])}</span>
                       )}
                     </div>
                   </td>
@@ -131,8 +140,8 @@ export default async function HomePage(props: Props) {
                   </td>
                   <td className="d-none d-sm-table-cell" style={{ color: 'var(--text-primary)' }}>
                     {shelter.phoneNumbers && shelter.phoneNumbers.length > 0 && !/^0+$/.test(shelter.phoneNumbers[0])
-                      ? shelter.phoneNumbers[0] 
-                      : null}
+                      ? <span className="text-nowrap">{formatPhoneNumber(shelter.phoneNumbers[0])}</span> 
+                      : '-'}
                   </td>
                   <td className="fw-bold" style={{ color: 'var(--text-primary)', opacity: 0.85 }}>
                     {shelter.currentOccupancy || 0} / {shelter.capacity}
