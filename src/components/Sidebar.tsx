@@ -11,6 +11,7 @@ export default function Sidebar() {
   const menuItems = [
     { name: 'รายการศูนย์พักพิง', href: '/', icon: 'bi-table' },
     { name: 'แดชบอร์ด & รายงาน', href: '/dashboard', icon: 'bi-speedometer2' },
+    { name: 'รายการสิ่งของ', href: '/supplies', icon: 'bi-box-seam' },
     { name: 'รายการร้องขอทรัพยากร', href: '/requests', icon: 'bi-box-seam' },
     { name: 'สรุปรายการจัดส่ง (ด่วน)', href: '/requests/summary', icon: 'bi-truck' },
     { name: 'จัดการข้อมูล (Import)', href: '/admin/import', icon: 'bi-cloud-upload' },
