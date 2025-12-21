@@ -75,7 +75,7 @@ export default async function HomePage(props: Props) {
         month: '2-digit',
         year: 'numeric',
       }).format(new Date(date));
-    } catch (e) {
+    } catch {
       return '-';
     }
   };

@@ -7,7 +7,10 @@ export default function ThemeToggle() {
 
   // When mounted on client, now safe to show UI
   useEffect(() => {
-    setMounted(true);
+    const timer = setTimeout(() => {
+      setMounted(true);
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   if (!mounted) {
