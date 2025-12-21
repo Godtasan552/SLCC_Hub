@@ -14,7 +14,6 @@ export default function Sidebar() {
     { name: 'รายการร้องขอทรัพยากร', href: '/requests', icon: 'bi-box-seam' },
     { name: 'สรุปรายการจัดส่ง (ด่วน)', href: '/requests/summary', icon: 'bi-truck' },
     { name: 'จัดการข้อมูล (Import)', href: '/admin/import', icon: 'bi-cloud-upload' },
-    { name: 'แผนที่ศูนย์พักพิง', href: '/map', icon: 'bi-map' },
     { name: 'ตั้งค่าระบบ', href: '#', icon: 'bi-gear' },
   ];
 
