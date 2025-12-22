@@ -20,6 +20,8 @@ interface ShelterWithResources {
 
 export const dynamic = 'force-dynamic';
 
+import Link from 'next/link';
+
 export default async function RequestsPage() {
   await dbConnect();
 
@@ -57,7 +59,12 @@ export default async function RequestsPage() {
 
   return (
     <div className="container py-4">
-      <h2 className="mb-4" style={{ color: 'var(--text-primary)' }}>รายการร้องขอทรัพยากรทั้งหมด</h2>
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <h2 className="mb-0" style={{ color: 'var(--text-primary)' }}>รายการร้องขอทรัพยากรทั้งหมด</h2>
+        <Link href="/requests/create" className="btn btn-warning fw-bold shadow-sm">
+          <i className="bi bi-plus-circle me-2"></i>สร้างคำร้องขอ
+        </Link>
+      </div>
       
       <div className="table-responsive rounded border" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
         <table className="table table-hover align-middle mb-0">

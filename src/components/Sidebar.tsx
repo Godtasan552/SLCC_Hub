@@ -23,6 +23,7 @@ export default function Sidebar() {
       items: [
         { name: 'รายชื่อศูนย์', href: '/', icon: 'bi-list-task' },
         { name: 'รายการสิ่งของ', href: '/supplies', icon: 'bi-box' },
+        { name: 'สร้างคำร้องขอ', href: '/requests/create', icon: 'bi-plus-square' },
         { name: 'รายการเบิกจ่าย', href: '/requests/summary', icon: 'bi-hexagon' },
       ],
     },
