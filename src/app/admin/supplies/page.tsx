@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import ExcelJS from 'exceljs';
 import { SupplyCategory, Supply, SupplyData } from '@/types/supply';
-import { STANDARD_ITEMS, getItemsByCategory } from '@/constants/standardItems';
+import { getItemsByCategory } from '@/constants/standardItems';
 
 interface Shelter {
   _id: string;
@@ -61,12 +61,12 @@ export default function SuppliesPage() {
     fetchShelters();
   }, [fetchSupplies]);
 
-  const handleItemNameChange = (name: string) => {
-    const item = STANDARD_ITEMS.find(i => i.name === name);
+  const handleCategoryChange = (category: SupplyCategory) => {
     setManualForm({
       ...manualForm,
-      name,
-      unit: item?.defaultUnit || manualForm.unit
+      category,
+      name: '',
+      unit: ''
     });
   };
 
@@ -308,16 +308,25 @@ export default function SuppliesPage() {
                             <form onSubmit={handleManualSubmit}>
                                 <div className="row g-3">
                                     <div className="col-12">
-                                        <label className="form-label small fw-bold text-secondary">ชื่อสิ่งของ (รายการมาตรฐาน)</label>
-                                        <select className="form-select border" value={manualForm.name} onChange={(e) => handleItemNameChange(e.target.value)} required>
-                                            <option value="">-- โปรดเลือกสิ่งของ --</option>
-                                            {availableItems.map(item => (<option key={item.name} value={item.name}>{item.name}</option>))}
-                                            <option value="อื่นๆ">อื่นๆ (ระบุในรายละเอียด)</option>
-                                        </select>
+                                        <label className="form-label small fw-bold text-secondary">ชื่อสิ่งของ</label>
+                                        <input 
+                                            type="text" 
+                                            className="form-control border" 
+                                            list="admin-standard-items"
+                                            value={manualForm.name} 
+                                            onChange={(e) => setManualForm({...manualForm, name: e.target.value})} 
+                                            required 
+                                            placeholder="พิมพ์ชื่อสิ่งของ เช่น ข้าวสาร 5 กก., ยาพารา..."
+                                        />
+                                        <datalist id="admin-standard-items">
+                                            {availableItems.map(item => (
+                                                <option key={item.name} value={item.name} />
+                                            ))}
+                                        </datalist>
                                     </div>
                                     <div className="col-md-6">
                                         <label className="form-label small fw-bold text-secondary">หมวดหมู่</label>
-                                        <select className="form-select border" value={manualForm.category} onChange={(e) => setManualForm({...manualForm, category: e.target.value as SupplyCategory})}>
+                                        <select className="form-select border" value={manualForm.category} onChange={(e) => handleCategoryChange(e.target.value as SupplyCategory)}>
                                             {Object.values(SupplyCategory).filter(c => c !== 'ทั้งหมด').map(cat => (<option key={cat} value={cat}>{cat}</option>))}
                                         </select>
                                     </div>
@@ -327,14 +336,30 @@ export default function SuppliesPage() {
                                     </div>
                                     <div className="col-md-3">
                                         <label className="form-label small fw-bold text-secondary">หน่วย</label>
-                                        <input type="text" className="form-control border bg-light" value={manualForm.unit} readOnly />
+                                        <input 
+                                            type="text" 
+                                            className="form-control border" 
+                                            value={manualForm.unit} 
+                                            onChange={(e) => setManualForm({...manualForm, unit: e.target.value})} 
+                                            placeholder="เช่น ชื้น, ถุง, กล่อง"
+                                        />
                                     </div>
                                     <div className="col-12">
-                                        <label className="form-label small fw-bold text-secondary">สถานที่เก็บสินค้า</label>
-                                        <select className="form-select border fw-bold text-primary" value={manualForm.shelterId} onChange={(e) => handleShelterChange(e.target.value)}>
-                                            <option value="">🏢 คลังกลาง (Central Hub)</option>
-                                            {shelters.map(s => (<option key={s._id} value={s._id}>📍 {s.name}</option>))}
+                                        <label className="form-label small fw-bold text-secondary">สถานที่รับสินค้า (คลังกลาง)</label>
+                                        <select 
+                                            className="form-select border fw-bold text-primary" 
+                                            value={manualForm.shelterId} 
+                                            onChange={(e) => handleShelterChange(e.target.value)}
+                                        >
+                                            <option value="">🏢 คลังกลาง (สต็อกส่วนกลาง)</option>
+                                            {shelters.filter(s => s.name.includes('คลังกลาง')).map(s => (
+                                                <option key={s._id} value={s._id}>📍 {s.name}</option>
+                                            ))}
                                         </select>
+                                        <div className="form-text small text-info">
+                                            <i className="bi bi-info-circle me-1"></i>
+                                            สินค้าใหม่จะต้องลงทะเบียนเข้า **คลังกลาง** เท่านั้น เพื่อรอการกระจายไปยังศูนย์ต่างๆ
+                                        </div>
                                     </div>
                                     <div className="col-12">
                                         <label className="form-label small fw-bold text-secondary">รายละเอียดเพิ่มเติม</label>

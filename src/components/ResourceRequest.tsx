@@ -23,23 +23,16 @@ export default function ResourceRequest({ shelterId, shelterName }: ResourceRequ
   );
 
   const handleCategoryChange = (category: string) => {
-    const items = getItemsByCategory(category as SupplyCategory);
     setFormData({
       ...formData,
       category,
-      itemName: items.length > 0 ? items[0].name : '',
-      unit: items.length > 0 ? items[0].defaultUnit : ''
+      itemName: '',
+      unit: ''
     });
   };
 
-  const handleItemChange = (itemName: string) => {
-    const selectedItem = availableItems.find(i => i.name === itemName);
-    setFormData({
-      ...formData,
-      itemName,
-      unit: selectedItem?.defaultUnit || formData.unit
-    });
-  };
+  // handleItemChange is no longer needed but we can keep it if we want to auto-fill unit from datalist selection
+  // However, simple manual typing is safer as requested.
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,19 +70,20 @@ export default function ResourceRequest({ shelterId, shelterName }: ResourceRequ
           </div>
 
           <div className="mb-3">
-            <label className="form-label fw-bold">ชื่อสิ่งของ (เลือกจากรายการมาตรฐาน)</label>
-            <select 
-              className="form-select"
+            <label className="form-label fw-bold">ชื่อสิ่งของ (พิมพ์เองหรือเลือกตามคำแนะนำ)</label>
+            <input 
+              className="form-control"
+              list="resource-items-list"
               value={formData.itemName}
-              onChange={(e) => handleItemChange(e.target.value)}
+              onChange={(e) => setFormData({...formData, itemName: e.target.value})}
+              placeholder="พิมพ์ชื่อสิ่งของ เช่น ข้าวสาร, ยาพารา..."
               required
-            >
-              <option value="">-- โปรดเลือกสิ่งของ --</option>
+            />
+            <datalist id="resource-items-list">
               {availableItems.map(item => (
-                <option key={item.name} value={item.name}>{item.name}</option>
+                <option key={item.name} value={item.name} />
               ))}
-              <option value="อื่นๆ">อื่นๆ (โปรดระบุในหมายเหตุ)</option>
-            </select>
+            </datalist>
           </div>
 
           <div className="row">
@@ -107,9 +101,10 @@ export default function ResourceRequest({ shelterId, shelterName }: ResourceRequ
               <label className="form-label fw-bold">หน่วย</label>
               <input 
                 type="text" 
-                className="form-control bg-light" 
+                className="form-control" 
                 value={formData.unit}
-                readOnly
+                onChange={(e) => setFormData({...formData, unit: e.target.value})}
+                placeholder="เช่น ชื้น, ถุง, กล่อง"
               />
             </div>
           </div>
