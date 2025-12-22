@@ -1,6 +1,7 @@
-'use client';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import axios from 'axios';
+import { SupplyCategory } from '@/types/supply';
+import { getItemsByCategory } from '@/constants/standardItems';
 
 interface ResourceRequestProps {
   shelterId: string;
@@ -9,26 +10,46 @@ interface ResourceRequestProps {
 
 export default function ResourceRequest({ shelterId, shelterName }: ResourceRequestProps) {
   const [formData, setFormData] = useState({
-    category: 'Medical',
+    category: SupplyCategory.MEDICINE as string,
     itemName: '',
     amount: 1,
-    unit: 'แผง',
+    unit: '',
     urgency: 'medium'
   });
 
+  const availableItems = useMemo(() => 
+    getItemsByCategory(formData.category as SupplyCategory),
+    [formData.category]
+  );
+
+  const handleCategoryChange = (category: string) => {
+    const items = getItemsByCategory(category as SupplyCategory);
+    setFormData({
+      ...formData,
+      category,
+      itemName: items.length > 0 ? items[0].name : '',
+      unit: items.length > 0 ? items[0].defaultUnit : ''
+    });
+  };
+
+  const handleItemChange = (itemName: string) => {
+    const selectedItem = availableItems.find(i => i.name === itemName);
+    setFormData({
+      ...formData,
+      itemName,
+      unit: selectedItem?.defaultUnit || formData.unit
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.itemName) {
+      alert('โปรดเลือกชื่อสิ่งของ');
+      return;
+    }
     try {
       await axios.post(`/api/shelters/${shelterId}/resources`, formData);
       alert('ส่งคำขอสำเร็จ');
-      // ล้างค่าฟอร์มหลังจากส่งสำเร็จ
-      setFormData({
-        category: 'Medical',
-        itemName: '',
-        amount: 1,
-        unit: 'แผง',
-        urgency: 'medium'
-      });
     } catch (err) {
       console.error('Error sending resource request:', err);
       alert('เกิดข้อผิดพลาดในการส่งคำขอ');
@@ -43,33 +64,37 @@ export default function ResourceRequest({ shelterId, shelterName }: ResourceRequ
       <div className="card-body">
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
-            <label className="form-label">ประเภทสิ่งของ</label>
+            <label className="form-label fw-bold">ประเภทสิ่งของ</label>
             <select 
               className="form-select" 
               value={formData.category}
-              onChange={(e) => setFormData({...formData, category: e.target.value})}
+              onChange={(e) => handleCategoryChange(e.target.value)}
             >
-              <option value="Medical">ยา / เวชภัณฑ์</option>
-              <option value="Food">อาหาร / น้ำดื่ม</option>
-              <option value="Supplies">ของใช้ทั่วไป (มุ้ง, ผ้าห่ม)</option>
-              <option value="Others">อื่นๆ</option>
+              {Object.values(SupplyCategory).filter(c => c !== SupplyCategory.ALL).map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
             </select>
           </div>
 
           <div className="mb-3">
-            <label className="form-label">ชื่อสิ่งของ (เช่น พาราเซตามอล, นมผง)</label>
-            <input 
-              type="text" 
-              className="form-control" 
-              required 
+            <label className="form-label fw-bold">ชื่อสิ่งของ (เลือกจากรายการมาตรฐาน)</label>
+            <select 
+              className="form-select"
               value={formData.itemName}
-              onChange={(e) => setFormData({...formData, itemName: e.target.value})}
-            />
+              onChange={(e) => handleItemChange(e.target.value)}
+              required
+            >
+              <option value="">-- โปรดเลือกสิ่งของ --</option>
+              {availableItems.map(item => (
+                <option key={item.name} value={item.name}>{item.name}</option>
+              ))}
+              <option value="อื่นๆ">อื่นๆ (โปรดระบุในหมายเหตุ)</option>
+            </select>
           </div>
 
           <div className="row">
             <div className="col-md-6 mb-3">
-              <label className="form-label">จำนวน</label>
+              <label className="form-label fw-bold">จำนวน</label>
               <input 
                 type="number" 
                 className="form-control" 
@@ -79,19 +104,18 @@ export default function ResourceRequest({ shelterId, shelterName }: ResourceRequ
               />
             </div>
             <div className="col-md-6 mb-3">
-              <label className="form-label">หน่วย</label>
+              <label className="form-label fw-bold">หน่วย</label>
               <input 
                 type="text" 
-                className="form-control" 
-                placeholder="กล่อง/โหล/กิโล"
+                className="form-control bg-light" 
                 value={formData.unit}
-                onChange={(e) => setFormData({...formData, unit: e.target.value})}
+                readOnly
               />
             </div>
           </div>
 
           <div className="mb-3">
-            <label className="form-label d-block">ระดับความด่วน</label>
+            <label className="form-label d-block fw-bold">ระดับความด่วน</label>
             <div className="d-flex gap-3">
               {['low', 'medium', 'high'].map((level) => (
                 <div key={level} className="form-check">
@@ -104,7 +128,7 @@ export default function ResourceRequest({ shelterId, shelterName }: ResourceRequ
                     onChange={() => setFormData({...formData, urgency: level})}
                   />
                   <label 
-                    className="form-check-label text-capitalize" 
+                    className="form-check-label" 
                     htmlFor={`urgency-${level}`}
                     style={{ color: 'var(--text-primary)' }}
                   >
@@ -115,7 +139,9 @@ export default function ResourceRequest({ shelterId, shelterName }: ResourceRequ
             </div>
           </div>
 
-          <button type="submit" className="btn btn-warning w-100 fw-bold">ส่งคำขอด่วน</button>
+          <button type="submit" className="btn btn-warning w-100 fw-bold py-2">
+            <i className="bi bi-send-fill me-2"></i>ส่งคำร้องขอ
+          </button>
         </form>
       </div>
     </div>

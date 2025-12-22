@@ -1,8 +1,14 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import ExcelJS from 'exceljs';
 import { SupplyCategory, Supply, SupplyData } from '@/types/supply';
+import { STANDARD_ITEMS, getItemsByCategory } from '@/constants/standardItems';
+
+interface Shelter {
+  _id: string;
+  name: string;
+}
 
 export default function SuppliesPage() {
   const [activeTab, setActiveTab] = useState<'inventory' | 'management'>('inventory');
@@ -11,6 +17,7 @@ export default function SuppliesPage() {
   const [supplies, setSupplies] = useState<Supply[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ทั้งหมด');
+  const [shelters, setShelters] = useState<Shelter[]>([]);
   
   const [manualForm, setManualForm] = useState({
     name: '',
@@ -18,9 +25,15 @@ export default function SuppliesPage() {
     quantity: 0,
     unit: 'ชิ้น',
     description: '',
-    shelterName: '',
+    shelterId: '', // Empty means Central Hub
+    shelterName: 'คลังกลาง (Central Hub)',
     supplier: ''
   });
+
+  const availableItems = useMemo(() => 
+    getItemsByCategory(manualForm.category as SupplyCategory),
+    [manualForm.category]
+  );
 
   const fetchSupplies = useCallback(async () => {
     try {
@@ -28,7 +41,6 @@ export default function SuppliesPage() {
       if (selectedCategory !== 'ทั้งหมด') {
         params.append('category', selectedCategory);
       }
-      
       const res = await axios.get(`/api/supplies?${params.toString()}`);
       setSupplies(res.data.data);
     } catch (err) {
@@ -38,40 +50,70 @@ export default function SuppliesPage() {
 
   useEffect(() => {
     fetchSupplies();
+    const fetchShelters = async () => {
+      try {
+        const res = await axios.get('/api/shelters');
+        setShelters(res.data.data);
+      } catch (err) {
+        console.error('Fetch shelters failed:', err);
+      }
+    };
+    fetchShelters();
   }, [fetchSupplies]);
 
-  const showToast = (msg: string, isError = false) => {
+  const handleItemNameChange = (name: string) => {
+    const item = STANDARD_ITEMS.find(i => i.name === name);
+    setManualForm({
+      ...manualForm,
+      name,
+      unit: item?.defaultUnit || manualForm.unit
+    });
+  };
+
+  const handleShelterChange = (id: string) => {
+    if (!id) {
+      setManualForm({ ...manualForm, shelterId: '', shelterName: 'คลังกลาง (Central Hub)' });
+    } else {
+      const shelter = shelters.find(s => s._id === id);
+      setManualForm({ ...manualForm, shelterId: id, shelterName: shelter?.name || '' });
+    }
+  };
+
+  const showToast = (msg: string) => {
     setMessage(msg);
     setTimeout(() => setMessage(''), 3000);
   };
 
-  // 1. Manual Entry Submission
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await axios.post('/api/supplies', manualForm);
-      showToast(`บันทึกข้อมูล \"${manualForm.name}\" เรียบร้อยแล้ว`);
+      const payload = {
+        ...manualForm,
+        shelterId: manualForm.shelterId || null
+      };
+      await axios.post('/api/supplies', payload);
+      showToast(`บันทึกข้อมูล "${manualForm.name}" เรียบร้อยแล้ว`);
       setManualForm({ 
         name: '', 
         category: SupplyCategory.FOOD_AND_WATER, 
         quantity: 0, 
         unit: 'ชิ้น',
         description: '',
-        shelterName: '',
+        shelterId: '',
+        shelterName: 'คลังกลาง (Central Hub)',
         supplier: ''
       });
       fetchSupplies();
     } catch (err) {
        // @ts-expect-error: Error response type
       const errorMessage = err.response?.data?.error || err.message;
-      showToast(`เกิดข้อผิดพลาด: ${errorMessage}`, true);
+      showToast(`เกิดข้อผิดพลาด: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
   };
 
-  // 2. JSON & Excel Bulk Import
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -81,40 +123,37 @@ export default function SuppliesPage() {
 
     try {
       let dataToImport: SupplyData[] = [];
-
       if (file.name.endsWith('.json')) {
         const text = await file.text();
         const json = JSON.parse(text);
         dataToImport = json.data || json;
-      } 
-      else if (file.name.endsWith('.xlsx')) {
+      } else if (file.name.endsWith('.xlsx')) {
         const arrayBuffer = await file.arrayBuffer();
         const workbook = new ExcelJS.Workbook();
         await workbook.xlsx.load(arrayBuffer);
         const worksheet = workbook.getWorksheet(1);
-        
         if (worksheet) {
           worksheet.eachRow((row, rowNumber) => {
-            if (rowNumber > 1) { // Skip header
+            if (rowNumber > 1) {
               dataToImport.push({
                 name: String(row.getCell(1).value || ''),
                 category: String(row.getCell(2).value || SupplyCategory.OTHER),
                 quantity: Number(row.getCell(3).value) || 0,
                 unit: String(row.getCell(4).value || 'ชิ้น'),
                 description: String(row.getCell(5).value || ''),
-                shelterName: String(row.getCell(6).value || ''),
+                shelterId: undefined, // Default to hub if imported
+                shelterName: String(row.getCell(6).value || 'คลังกลาง (Central Hub)'),
                 supplier: String(row.getCell(7).value || '')
               });
             }
           });
         }
       }
-
       await axios.patch('/api/supplies', { data: dataToImport });
       showToast('นำเข้าและอัปเดตข้อมูลไฟล์สำเร็จ');
       fetchSupplies();
     } catch (err) {
-      showToast('เกิดข้อผิดพลาดในการประมวลผลไฟล์', true);
+      showToast('เกิดข้อผิดพลาดในการประมวลผลไฟล์');
       console.error(err);
     } finally {
       setLoading(false);
@@ -122,10 +161,8 @@ export default function SuppliesPage() {
     }
   };
 
-  // 3. Delete Supply
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`ต้องการลบ "${name}" หรือไม่?`)) return;
-    
     try {
       setLoading(true);
       await axios.delete(`/api/supplies/${id}`);
@@ -133,17 +170,15 @@ export default function SuppliesPage() {
       fetchSupplies();
     } catch (err) {
       console.error('Delete failed:', err);
-      showToast('ไม่สามารถลบข้อมูลได้', true);
+      showToast('ไม่สามารถลบข้อมูลได้');
     } finally {
       setLoading(false);
     }
   };
 
-  // 4. Update Quantity
   const handleUpdateQuantity = async (id: string, currentQty: number, name: string) => {
     const val = prompt(`ระบุจำนวนใหม่สำหรับ "${name}":`, String(currentQty));
     if (!val || isNaN(parseInt(val))) return;
-
     try {
       setLoading(true);
       await axios.put(`/api/supplies/${id}`, { quantity: parseInt(val) });
@@ -151,7 +186,7 @@ export default function SuppliesPage() {
       showToast(`อัพเดทจำนวน "${name}" สำเร็จ`);
     } catch (err) {
       console.error('Update failed:', err);
-      showToast('ไม่สามารถอัปเดตข้อมูลได้', true);
+      showToast('ไม่สามารถอัปเดตข้อมูลได้');
     } finally {
       setLoading(false);
     }
@@ -162,13 +197,10 @@ export default function SuppliesPage() {
     (s.shelterName && s.shelterName.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  // Get all categories for dropdown
   const categories = ['ทั้งหมด', ...Object.values(SupplyCategory).filter(c => c !== SupplyCategory.ALL)];
 
   return (
     <div className="container-fluid px-4 py-4" style={{ maxWidth: '1600px', minHeight: '100vh', backgroundColor: 'var(--bg-body)' }}>
-      
-      {/* 1. Header & Tabs */}
       <div className="d-flex flex-column flex-md-row justify-content-between align-items-end mb-4 gap-3">
         <div>
            <div className="d-flex align-items-center mb-2">
@@ -177,38 +209,26 @@ export default function SuppliesPage() {
            </div>
            <p className="text-secondary small mb-0 ps-1">ระบบบริหารจัดการทรัพยากร สิ่งของบริจาค และเวชภัณฑ์</p>
         </div>
-        
-        {/* Tab Navigation */}
         <div className="bg-white dark-mode-bg rounded-pill p-1 shadow-sm d-flex" style={{ border: '1px solid var(--border-color)' }}>
-            <button 
-                className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'inventory' ? 'btn-primary shadow-sm' : 'text-secondary hover-bg-light'}`}
-                onClick={() => setActiveTab('inventory')}
-            >
+            <button className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'inventory' ? 'btn-primary shadow-sm' : 'text-secondary hover-bg-light'}`} onClick={() => setActiveTab('inventory')}>
                 <i className="bi bi-list-ul me-2"></i>รายการสินค้า
             </button>
-            <button 
-                className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'management' ? 'btn-primary shadow-sm' : 'text-secondary hover-bg-light'}`}
-                onClick={() => setActiveTab('management')}
-            >
+            <button className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'management' ? 'btn-primary shadow-sm' : 'text-secondary hover-bg-light'}`} onClick={() => setActiveTab('management')}>
                 <i className="bi bi-database-gear me-2"></i>จัดการสต็อก
             </button>
         </div>
       </div>
 
-       {/* Alert Toast (Fixed Top) */}
        {message && (
-         <div className="position-fixed top-0 start-50 translate-middle-x mt-4 z-index-toast" style={{ zIndex: 1050 }}>
-            <div className={`alert ${message.includes('Error') || message.includes('ผิดพลาด') ? 'alert-danger' : 'alert-success'} shadow-lg d-flex align-items-center py-2 px-4 rounded-pill border-0`}>
-             <i className={`bi ${message.includes('Error') ? 'bi-x-circle-fill' : 'bi-check-circle-fill'} me-2 fs-5`}></i>
+         <div className="position-fixed top-0 start-50 translate-middle-x mt-4" style={{ zIndex: 1050 }}>
+            <div className={`alert ${message.includes('ผิดพลาด') ? 'alert-danger' : 'alert-success'} shadow-lg d-flex align-items-center py-2 px-4 rounded-pill border-0`}>
+             <i className={`bi ${message.includes('ผิดพลาด') ? 'bi-x-circle-fill' : 'bi-check-circle-fill'} me-2 fs-5`}></i>
              <span className="fw-bold">{message}</span>
            </div>
          </div>
       )}
 
-      {/* 2. Content Area */}
       <div className="animate-fade-in">
-        
-        {/* TAB 1: Inventory List */}
         {activeTab === 'inventory' && (
             <div className="card shadow-sm border-0 mb-5 overflow-hidden" style={{ backgroundColor: 'var(--bg-card)' }}>
                 <div className="card-header bg-transparent border-bottom py-3">
@@ -217,25 +237,14 @@ export default function SuppliesPage() {
                             <h6 className="mb-0 fw-bold" style={{ color: 'var(--text-primary)' }}>รายการคงคลังทั้งหมด ({supplies.length})</h6>
                         </div>
                         <div className="col-12 col-md-4">
-                            <select 
-                                className="form-select form-select-sm border-theme shadow-sm"
-                                value={selectedCategory}
-                                onChange={(e) => setSelectedCategory(e.target.value)}
-                            >
-                                {categories.map(cat => (
-                                <option key={cat} value={cat}>{cat}</option>
-                                ))}
+                            <select className="form-select form-select-sm border-theme shadow-sm" value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
+                                {categories.map(cat => (<option key={cat} value={cat}>{cat}</option>))}
                             </select>
                         </div>
                         <div className="col-12 col-md-4">
                             <div className="position-relative">
                                 <i className="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-secondary"></i>
-                                <input 
-                                type="text" 
-                                className="form-control form-control-sm ps-5 border-theme shadow-sm" 
-                                placeholder="ค้นหาชื่อสิ่งของ / ศูนย์..."
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                />
+                                <input type="text" className="form-control form-control-sm ps-5 border-theme shadow-sm" placeholder="ค้นหาชื่อสิ่งของ / ศูนย์..." onChange={(e) => setSearchTerm(e.target.value)} />
                             </div>
                         </div>
                     </div>
@@ -247,7 +256,7 @@ export default function SuppliesPage() {
                                 <th className="ps-4">ชื่อสิ่งของ</th>
                                 <th>หมวดหมู่</th>
                                 <th className="text-center">จำนวน</th>
-                                <th className="d-none d-md-table-cell">ศูนย์พักพิง</th>
+                                <th className="d-none d-md-table-cell">ศูนย์พักพิง/สถานที่เก็บ</th>
                                 <th className="d-none d-lg-table-cell">ผู้บริจาค</th>
                                 <th className="text-end pe-4">ดำเนินการ</th>
                             </tr>
@@ -259,47 +268,28 @@ export default function SuppliesPage() {
                                     <div className="fw-bold text-primary-theme">{s.name}</div>
                                     {s.description && <div className="small text-secondary">{s.description}</div>}
                                 </td>
-                                <td>
-                                    <span className="badge bg-secondary-subtle text-secondary border border-secondary fw-normal">{s.category}</span>
-                                </td>
+                                <td><span className="badge bg-secondary-subtle text-secondary border border-secondary fw-normal">{s.category}</span></td>
                                 <td className="text-center">
                                     <span className={`badge ${s.quantity === 0 ? 'bg-danger' : s.quantity < 10 ? 'bg-warning text-dark' : 'bg-success'} rounded-pill px-3`}>
                                         {s.quantity} {s.unit}
                                     </span>
                                 </td>
                                 <td className="d-none d-md-table-cell text-secondary small">
-                                    {s.shelterName || '-'}
+                                    <span className={!s.shelterId ? 'text-primary fw-bold' : ''}>
+                                      {!s.shelterId ? '🏢 คลังกลาง' : `📍 ${s.shelterName}`}
+                                    </span>
                                 </td>
-                                <td className="d-none d-lg-table-cell text-secondary small">
-                                    {s.supplier || '-'}
-                                </td>
+                                <td className="d-none d-lg-table-cell text-secondary small">{s.supplier || '-'}</td>
                                 <td className="text-end pe-4">
                                     <div className="btn-group btn-group-sm">
-                                        <button 
-                                        className="btn btn-outline-primary" 
-                                        onClick={() => handleUpdateQuantity(s._id, s.quantity, s.name)}
-                                        title="แก้ไขจำนวน"
-                                        >
-                                            <i className="bi bi-pencil"></i>
-                                        </button>
-                                        <button 
-                                        className="btn btn-outline-danger" 
-                                        onClick={() => handleDelete(s._id, s.name)}
-                                        title="ลบ"
-                                        >
-                                            <i className="bi bi-trash"></i>
-                                        </button>
+                                        <button className="btn btn-outline-primary" onClick={() => handleUpdateQuantity(s._id, s.quantity, s.name)} title="แก้ไขจำนวน"><i className="bi bi-pencil"></i></button>
+                                        <button className="btn btn-outline-danger" onClick={() => handleDelete(s._id, s.name)} title="ลบ"><i className="bi bi-trash"></i></button>
                                     </div>
                                 </td>
                             </tr>
                             ))}
                             {filteredSupplies.length === 0 && (
-                                <tr>
-                                    <td colSpan={6} className="text-center py-5 text-secondary">
-                                        <i className="bi bi-inbox fs-1 d-block mb-3 opacity-50"></i>
-                                        ไม่พบข้อมูลสิ่งของ
-                                    </td>
-                                </tr>
+                                <tr><td colSpan={6} className="text-center py-5 text-secondary"><i className="bi bi-inbox fs-1 d-block mb-3 opacity-50"></i>ไม่พบข้อมูลสิ่งของ</td></tr>
                             )}
                         </tbody>
                     </table>
@@ -307,10 +297,8 @@ export default function SuppliesPage() {
             </div>
         )}
 
-        {/* TAB 2: Management (Add/Import) */}
         {activeTab === 'management' && (
             <div className="row g-4">
-                {/* Manual Add */}
                 <div className="col-lg-7">
                     <div className="card border-0 shadow-sm h-100" style={{ backgroundColor: 'var(--bg-card)' }}>
                         <div className="card-header bg-transparent border-bottom py-3 px-4">
@@ -320,76 +308,41 @@ export default function SuppliesPage() {
                             <form onSubmit={handleManualSubmit}>
                                 <div className="row g-3">
                                     <div className="col-12">
-                                        <label className="form-label small fw-bold text-secondary">ชื่อสิ่งของ</label>
-                                        <input 
-                                            type="text" 
-                                            className="form-control border" 
-                                            value={manualForm.name} 
-                                            onChange={(e) => setManualForm({...manualForm, name: e.target.value})} 
-                                            required 
-                                            placeholder="เช่น ข้าวสาร 5 กก., ยาพารา..."
-                                        />
+                                        <label className="form-label small fw-bold text-secondary">ชื่อสิ่งของ (รายการมาตรฐาน)</label>
+                                        <select className="form-select border" value={manualForm.name} onChange={(e) => handleItemNameChange(e.target.value)} required>
+                                            <option value="">-- โปรดเลือกสิ่งของ --</option>
+                                            {availableItems.map(item => (<option key={item.name} value={item.name}>{item.name}</option>))}
+                                            <option value="อื่นๆ">อื่นๆ (ระบุในรายละเอียด)</option>
+                                        </select>
                                     </div>
                                     <div className="col-md-6">
                                         <label className="form-label small fw-bold text-secondary">หมวดหมู่</label>
-                                        <select 
-                                            className="form-select border" 
-                                            value={manualForm.category} 
-                                            onChange={(e) => setManualForm({...manualForm, category: e.target.value as SupplyCategory})}
-                                        >
-                                            {Object.values(SupplyCategory).filter(c => c !== 'ทั้งหมด').map(cat => (
-                                                <option key={cat} value={cat}>{cat}</option>
-                                            ))}
+                                        <select className="form-select border" value={manualForm.category} onChange={(e) => setManualForm({...manualForm, category: e.target.value as SupplyCategory})}>
+                                            {Object.values(SupplyCategory).filter(c => c !== 'ทั้งหมด').map(cat => (<option key={cat} value={cat}>{cat}</option>))}
                                         </select>
                                     </div>
                                     <div className="col-md-3">
                                         <label className="form-label small fw-bold text-secondary">จำนวน</label>
-                                        <input 
-                                            type="number" 
-                                            className="form-control border" 
-                                            value={manualForm.quantity} 
-                                            onChange={(e) => setManualForm({...manualForm, quantity: Number(e.target.value)})} 
-                                        />
+                                        <input type="number" className="form-control border" value={manualForm.quantity} onChange={(e) => setManualForm({...manualForm, quantity: Number(e.target.value)})} />
                                     </div>
                                     <div className="col-md-3">
                                         <label className="form-label small fw-bold text-secondary">หน่วย</label>
-                                        <input 
-                                            type="text" 
-                                            className="form-control border" 
-                                            value={manualForm.unit} 
-                                            onChange={(e) => setManualForm({...manualForm, unit: e.target.value})} 
-                                            placeholder="ชิ้น, กล่อง..."
-                                        />
+                                        <input type="text" className="form-control border bg-light" value={manualForm.unit} readOnly />
+                                    </div>
+                                    <div className="col-12">
+                                        <label className="form-label small fw-bold text-secondary">สถานที่เก็บสินค้า</label>
+                                        <select className="form-select border fw-bold text-primary" value={manualForm.shelterId} onChange={(e) => handleShelterChange(e.target.value)}>
+                                            <option value="">🏢 คลังกลาง (Central Hub)</option>
+                                            {shelters.map(s => (<option key={s._id} value={s._id}>📍 {s.name}</option>))}
+                                        </select>
                                     </div>
                                     <div className="col-12">
                                         <label className="form-label small fw-bold text-secondary">รายละเอียดเพิ่มเติม</label>
-                                        <input 
-                                            type="text" 
-                                            className="form-control border" 
-                                            value={manualForm.description} 
-                                            onChange={(e) => setManualForm({...manualForm, description: e.target.value})} 
-                                            placeholder="ระบุรายละเอียด เช่น วันหมดอายุ..."
-                                        />
+                                        <input type="text" className="form-control border" value={manualForm.description} onChange={(e) => setManualForm({...manualForm, description: e.target.value})} placeholder="ระบุรายละเอียด เช่น วันหมดอายุ..." />
                                     </div>
-                                    <div className="col-md-6">
-                                        <label className="form-label small fw-bold text-secondary">ศูนย์พักพิง</label>
-                                        <input 
-                                            type="text" 
-                                            className="form-control border" 
-                                            value={manualForm.shelterName} 
-                                            onChange={(e) => setManualForm({...manualForm, shelterName: e.target.value})} 
-                                            placeholder="ระบุชื่อศูนย์ (ถ้ามี)"
-                                        />
-                                    </div>
-                                    <div className="col-md-6">
+                                    <div className="col-md-12">
                                         <label className="form-label small fw-bold text-secondary">ผู้บริจาค</label>
-                                        <input 
-                                            type="text" 
-                                            className="form-control border" 
-                                            value={manualForm.supplier} 
-                                            onChange={(e) => setManualForm({...manualForm, supplier: e.target.value})} 
-                                            placeholder="ระบุชื่อผู้บริจาค..."
-                                        />
+                                        <input type="text" className="form-control border" value={manualForm.supplier} onChange={(e) => setManualForm({...manualForm, supplier: e.target.value})} placeholder="ระบุชื่อผู้บริจาค..." />
                                     </div>
                                     <div className="col-12 mt-4 pt-2">
                                         <button type="submit" className="btn btn-primary w-100 py-2 rounded-3 fw-bold shadow-sm" disabled={loading}>
@@ -402,7 +355,6 @@ export default function SuppliesPage() {
                     </div>
                 </div>
 
-                {/* Import File */}
                 <div className="col-lg-5">
                     <div className="card border-0 shadow-sm h-100" style={{ backgroundColor: 'var(--bg-card)' }}>
                          <div className="card-header bg-transparent border-bottom py-3 px-4">
@@ -413,19 +365,8 @@ export default function SuppliesPage() {
                                 <i className="bi bi-cloud-arrow-up-fill text-success" style={{ fontSize: '3rem', opacity: 0.8 }}></i>
                                 <h5 className="mt-3 fw-bold" style={{ color: 'var(--text-primary)' }}>ลากไฟล์มาวาง หรือ คลิกเพื่อเลือกไฟล์</h5>
                                 <p className="text-secondary small">รองรับไฟล์มาตรฐาน .xlsx และ .json</p>
-                                <button className="btn btn-outline-success btn-sm rounded-pill px-4 mt-2">
-                                    Browse Files
-                                </button>
+                                <button className="btn btn-outline-success btn-sm rounded-pill px-4 mt-2">Browse Files</button>
                                 <input type="file" id="fileIn" className="d-none" accept=".json,.xlsx" onChange={handleFileUpload} />
-                            </div>
-                            <div className="alert alert-light border small text-start gap-2">
-                                <div className="d-flex align-items-center mb-1">
-                                    <i className="bi bi-info-circle text-primary me-2"></i>
-                                    <span className="fw-bold">รูปแบบไฟล์ Excel Column:</span>
-                                </div>
-                                <div className="text-secondary ms-4" style={{ fontSize: '0.85rem' }}>
-                                    ชื่อ | หมวดหมู่ | จำนวน | หน่วย | รายละเอียด | ศูนย์พักพิง | ผู้บริจาค
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -436,26 +377,14 @@ export default function SuppliesPage() {
 
       <style jsx>{`
         .cursor-pointer { cursor: pointer; }
-        .upload-box {
-            border: 2px dashed var(--border-color);
-            background-color: var(--bg-secondary);
-        }
-        .upload-box:hover {
-            border-color: #198754;
-            background-color: rgba(25, 135, 84, 0.05);
-             transform: translateY(-2px);
-        }
-        .dark-mode-bg {
-             background-color: var(--bg-card) !important;
-        }
+        .upload-box { border: 2px dashed var(--border-color); background-color: var(--bg-secondary); }
+        .upload-box:hover { border-color: #198754; background-color: rgba(25, 135, 84, 0.05); transform: translateY(-2px); }
+        .dark-mode-bg { background-color: var(--bg-card) !important; }
         .border-theme { border: 1px solid var(--border-color); }
         .border-bottom-theme { border-bottom: 1px solid var(--border-color); }
         .text-primary-theme { color: var(--text-primary); }
         .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(5px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
     </div>
   );
