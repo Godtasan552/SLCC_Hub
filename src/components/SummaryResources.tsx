@@ -48,7 +48,7 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
 
     setLoadingId(resourceId);
 
-    const res = await fetch(`/api/requests/${resourceId}`, {
+    const res = await fetch(`/api/shelters/${shelterId}/resources/${resourceId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ shelterId, resourceId })
