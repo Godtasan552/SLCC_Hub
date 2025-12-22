@@ -1,37 +1,76 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import Shelter from '@/models/Shelter';
+import Supply from '@/models/Supply';
 
 export async function PATCH(
   req: Request,
   { params }: { params: { id: string; rid: string } }
 ) {
-  console.log('🔵 PATCH /api/shelters/[id]/resources/[rid]');
+  try {
+    await dbConnect();
+    const { id, rid } = await params;
+    const body = await req.json();
+    const { status } = body;
 
-  await dbConnect();
-  const { id, rid } = await params;
-  const shelter = await Shelter.findOneAndUpdate(
-    {
-      _id: id,
-      'resources._id': rid,
-      'resources.status': 'Pending'
-    },
-    {
-      $set: { 'resources.$.status': 'Approved' }
-    },
-    { new: true }
-  );
+    if (!status) {
+      return NextResponse.json({ success: false, message: 'กรุณาระบุสถานะ' }, { status: 400 });
+    }
 
-  if (!shelter) {
-
-    return NextResponse.json(
-      { success: false, message: 'ไม่พบคำร้องหรือสถานะไม่ถูกต้อง' },
-      { status: 404 }
+    // 1. Update the status in Shelter model
+    const shelter = await Shelter.findOneAndUpdate(
+      {
+        _id: id,
+        'resources._id': rid,
+      },
+      {
+        $set: { 'resources.$.status': status }
+      },
+      { new: true }
     );
-  }
 
-  return NextResponse.json({
-    success: true,
-    message: 'อนุมัติคำร้องเรียบร้อย'
-  });
+    if (!shelter) {
+      return NextResponse.json(
+        { success: false, message: 'ไม่พบคำร้อง' },
+        { status: 404 }
+      );
+    }
+
+    // 2. If status is 'Received', increment targeted shelter's supply
+    if (status === 'Received') {
+      const resource = shelter.resources.id(rid);
+      if (resource) {
+        // Find existing supply in this shelter or create new
+        const existingSupply = await Supply.findOne({
+          shelterId: id,
+          name: resource.itemName,
+          category: resource.category
+        });
+
+        if (existingSupply) {
+          existingSupply.quantity += resource.amount;
+          await existingSupply.save();
+        } else {
+          await Supply.create({
+            name: resource.itemName,
+            category: resource.category,
+            quantity: resource.amount,
+            unit: resource.unit,
+            shelterId: id,
+            shelterName: shelter.name,
+            description: 'ได้รับจากการเบิกจ่ายส่วนกลาง (Disbursement)'
+          });
+        }
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `เปลี่ยนสถานะเป็น "${status}" เรียบร้อยแล้ว`
+    });
+
+  } catch (error: unknown) {
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ success: false, message: errorMsg }, { status: 500 });
+  }
 }
