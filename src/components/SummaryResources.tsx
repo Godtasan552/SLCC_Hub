@@ -32,7 +32,7 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
   const [filterUrgency, setFilterUrgency] = useState<string>('All');
 
   // 🔹 รวมคำขอจากทุกศูนย์
-  const allRequests = useMemo(() => {
+  const initialRequests = useMemo(() => {
     return allShelters.flatMap(s =>
       (s.resources || []).map(r => ({
         ...r,
@@ -46,57 +46,87 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
     );
   }, [allShelters]);
 
+  // State สำหรับอัปเดตหลัง approve
+  const [allRequestsState, setAllRequestsState] = useState(initialRequests);
+
   // 🔍 Filter สำหรับแสดงผล
   const filteredRequests = useMemo(() => {
-    return allRequests.filter(r => {
+    return allRequestsState.filter(r => {
       const statusMatch = filterStatus === 'All' || r.status === filterStatus;
       const categoryMatch = filterCategory === 'All' || r.category === filterCategory;
       const urgencyMatch = filterUrgency === 'All' || r.urgency === filterUrgency;
       return statusMatch && categoryMatch && urgencyMatch;
     });
-  }, [allRequests, filterStatus, filterCategory, filterUrgency]);
+  }, [allRequestsState, filterStatus, filterCategory, filterUrgency]);
 
   // 📊 สถิติตามสถานะ
   const statusStats = useMemo(() => ({
-    pending: allRequests.filter(r => r.status === 'Pending').length,
-    approved: allRequests.filter(r => r.status === 'Approved').length,
-    shipped: allRequests.filter(r => r.status === 'Shipped').length,
-    received: allRequests.filter(r => r.status === 'Received').length
-  }), [allRequests]);
+    pending: allRequestsState.filter(r => r.status === 'Pending').length,
+    approved: allRequestsState.filter(r => r.status === 'Approved').length,
+    shipped: allRequestsState.filter(r => r.status === 'Shipped').length,
+    received: allRequestsState.filter(r => r.status === 'Received').length
+  }), [allRequestsState]);
 
   // 📊 สถิติตามประเภท
   const categoryStats = useMemo(() => {
     const stats: Record<string, number> = {};
-    allRequests.forEach(r => {
+    allRequestsState.forEach(r => {
       stats[r.category] = (stats[r.category] || 0) + 1;
     });
     return stats;
-  }, [allRequests]);
+  }, [allRequestsState]);
 
-  // 📊 สถิติตามความเร่งด่วน
+  // 📊 สถิติตามความเร่งด่วน (รอการอนุมัติ)
   const urgencyStats = useMemo(() => ({
-    high: allRequests.filter(r => r.urgency === 'high' && r.status === 'Pending').length,
-    medium: allRequests.filter(r => r.urgency === 'medium' && r.status === 'Pending').length,
-    low: allRequests.filter(r => r.urgency === 'low' && r.status === 'Pending').length
-  }), [allRequests]);
+    high: allRequestsState.filter(r => r.urgency === 'high' && r.status === 'Pending').length,
+    medium: allRequestsState.filter(r => r.urgency === 'medium' && r.status === 'Pending').length,
+    low: allRequestsState.filter(r => r.urgency === 'low' && r.status === 'Pending').length
+  }), [allRequestsState]);
+
+  // 📊 สถิติการอนุมัติแยกตามประเภท ⭐ สำคัญ!
+  const approvedByCategory = useMemo(() => {
+    const approved = allRequestsState.filter(r => r.status === 'Approved');
+    const stats: Record<string, number> = {};
+    approved.forEach(r => {
+      stats[r.category] = (stats[r.category] || 0) + 1;
+    });
+    return stats;
+  }, [allRequestsState]);
+
+  // 📊 สถิติการอนุมัติแยกตามความเร่งด่วน ⭐ สำคัญ!
+  const approvedByUrgency = useMemo(() => ({
+    high: allRequestsState.filter(r => r.urgency === 'high' && r.status === 'Approved').length,
+    medium: allRequestsState.filter(r => r.urgency === 'medium' && r.status === 'Approved').length,
+    low: allRequestsState.filter(r => r.urgency === 'low' && r.status === 'Approved').length
+  }), [allRequestsState]);
 
   const approveRequest = async (shelterId: string, resourceId?: string) => {
     if (!resourceId) return;
 
     setLoadingId(resourceId);
 
-    const res = await fetch(
-      `/api/shelters/${shelterId}/resources/${resourceId}`,
-      { method: 'PATCH' }
-    );
+    try {
+      const res = await fetch(
+        `/api/shelters/${shelterId}/resources/${resourceId}`,
+        { method: 'PATCH' }
+      );
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (!res.ok) {
-      alert(data.message || 'ไม่สามารถอนุมัติได้');
-    } else {
-      alert('อนุมัติคำขอเรียบร้อยแล้ว');
-      location.reload();
+      if (!res.ok) {
+        alert(data.message || 'ไม่สามารถอนุมัติได้');
+      } else {
+        // อัปเดต local state แทน reload
+        setAllRequestsState(prev =>
+          prev.map(r =>
+            r._id === resourceId ? { ...r, status: 'Approved' } : r
+          )
+        );
+        alert('อนุมัติคำขอเรียบร้อยแล้ว');
+      }
+    } catch (error) {
+      console.error('Error approving request:', error);
+      alert('เกิดข้อผิดพลาดในการอนุมัติ');
     }
 
     setLoadingId(null);
@@ -178,7 +208,7 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
             <div className="card-body">
               <h6 className="card-title text-danger">💊 Medical (ยา)</h6>
               <h3 className="mb-0">{categoryStats.Medical || 0}</h3>
-              <small className="text-muted">รายการ</small>
+              <small className="text-muted">รายการทั้งหมด</small>
             </div>
           </div>
         </div>
@@ -188,7 +218,7 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
             <div className="card-body">
               <h6 className="card-title text-success">🍚 Food (อาหาร)</h6>
               <h3 className="mb-0">{categoryStats.Food || 0}</h3>
-              <small className="text-muted">รายการ</small>
+              <small className="text-muted">รายการทั้งหมด</small>
             </div>
           </div>
         </div>
@@ -198,7 +228,7 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
             <div className="card-body">
               <h6 className="card-title text-primary">📦 Supplies (ของใช้)</h6>
               <h3 className="mb-0">{categoryStats.Supplies || 0}</h3>
-              <small className="text-muted">รายการ</small>
+              <small className="text-muted">รายการทั้งหมด</small>
             </div>
           </div>
         </div>
@@ -208,7 +238,7 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
             <div className="card-body">
               <h6 className="card-title text-secondary">📌 Others (อื่นๆ)</h6>
               <h3 className="mb-0">{categoryStats.Others || 0}</h3>
-              <small className="text-muted">รายการ</small>
+              <small className="text-muted">รายการทั้งหมด</small>
             </div>
           </div>
         </div>
@@ -247,8 +277,108 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
         </div>
       </div>
 
+      {/* 📊 สถิติการอนุมัติตามประเภท ⭐ */}
+      <h5 className="mb-3">📈 สถิติการอนุมัติแล้ว</h5>
+      <div className="row mb-3">
+        <div className="col-md-3 col-sm-6 mb-3">
+          <div className="card border-danger bg-light h-100">
+            <div className="card-body">
+              <div className="d-flex justify-content-between align-items-center">
+                <div>
+                  <h6 className="card-title text-danger mb-1">💊 ยา</h6>
+                  <h4 className="mb-0">{approvedByCategory.Medical || 0}</h4>
+                  <small className="text-muted">อนุมัติแล้ว</small>
+                </div>
+                <div className="fs-1 text-danger opacity-25">✅</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="col-md-3 col-sm-6 mb-3">
+          <div className="card border-success bg-light h-100">
+            <div className="card-body">
+              <div className="d-flex justify-content-between align-items-center">
+                <div>
+                  <h6 className="card-title text-success mb-1">🍚 อาหาร</h6>
+                  <h4 className="mb-0">{approvedByCategory.Food || 0}</h4>
+                  <small className="text-muted">อนุมัติแล้ว</small>
+                </div>
+                <div className="fs-1 text-success opacity-25">✅</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="col-md-3 col-sm-6 mb-3">
+          <div className="card border-primary bg-light h-100">
+            <div className="card-body">
+              <div className="d-flex justify-content-between align-items-center">
+                <div>
+                  <h6 className="card-title text-primary mb-1">📦 ของใช้</h6>
+                  <h4 className="mb-0">{approvedByCategory.Supplies || 0}</h4>
+                  <small className="text-muted">อนุมัติแล้ว</small>
+                </div>
+                <div className="fs-1 text-primary opacity-25">✅</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="col-md-3 col-sm-6 mb-3">
+          <div className="card border-secondary bg-light h-100">
+            <div className="card-body">
+              <div className="d-flex justify-content-between align-items-center">
+                <div>
+                  <h6 className="card-title text-secondary mb-1">📌 อื่นๆ</h6>
+                  <h4 className="mb-0">{approvedByCategory.Others || 0}</h4>
+                  <small className="text-muted">อนุมัติแล้ว</small>
+                </div>
+                <div className="fs-1 text-secondary opacity-25">✅</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 📊 สถิติการอนุมัติตามความเร่งด่วน ⭐ */}
+      <div className="row mb-4">
+        <div className="col-md-4 mb-3">
+          <div className="card bg-success text-white h-100">
+            <div className="card-body">
+              <h6 className="card-title">✅ อนุมัติ - ด่วนมาก</h6>
+              <h3 className="mb-0">{approvedByUrgency.high}</h3>
+              <small>รายการที่อนุมัติแล้ว</small>
+            </div>
+          </div>
+        </div>
+
+        <div className="col-md-4 mb-3">
+          <div className="card bg-success text-white h-100">
+            <div className="card-body">
+              <h6 className="card-title">✅ อนุมัติ - ด่วน</h6>
+              <h3 className="mb-0">{approvedByUrgency.medium}</h3>
+              <small>รายการที่อนุมัติแล้ว</small>
+            </div>
+          </div>
+        </div>
+
+        <div className="col-md-4 mb-3">
+          <div className="card bg-success text-white h-100">
+            <div className="card-body">
+              <h6 className="card-title">✅ อนุมัติ - ปกติ</h6>
+              <h3 className="mb-0">{approvedByUrgency.low}</h3>
+              <small>รายการที่อนุมัติแล้ว</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* 🔍 Filters */}
       <div className="card mb-3">
+        <div className="card-header bg-primary text-white">
+          <h6 className="mb-0">🔍 กรองข้อมูล</h6>
+        </div>
         <div className="card-body">
           <div className="row g-3">
             <div className="col-md-4">
@@ -259,10 +389,10 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
                 onChange={e => setFilterStatus(e.target.value as any)}
               >
                 <option value="All">ทั้งหมด</option>
-                <option value="Pending">รออนุมัติ</option>
-                <option value="Approved">อนุมัติแล้ว</option>
-                <option value="Shipped">กำลังจัดส่ง</option>
-                <option value="Received">ได้รับแล้ว</option>
+                <option value="Pending">⏳ รออนุมัติ</option>
+                <option value="Approved">✅ อนุมัติแล้ว</option>
+                <option value="Shipped">🚚 กำลังจัดส่ง</option>
+                <option value="Received">📥 ได้รับแล้ว</option>
               </select>
             </div>
 
@@ -295,6 +425,47 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
               </select>
             </div>
           </div>
+
+          {/* แสดงสถานะ Filter ปัจจุบัน */}
+          <div className="mt-3">
+            <div className="d-flex flex-wrap gap-2">
+              {filterStatus !== 'All' && (
+                <span className="badge bg-primary">
+                  สถานะ: {
+                    filterStatus === 'Pending' ? 'รออนุมัติ' :
+                    filterStatus === 'Approved' ? 'อนุมัติแล้ว' :
+                    filterStatus === 'Shipped' ? 'กำลังจัดส่ง' : 'ได้รับแล้ว'
+                  }
+                </span>
+              )}
+              {filterCategory !== 'All' && (
+                <span className="badge bg-info">
+                  ประเภท: {filterCategory}
+                </span>
+              )}
+              {filterUrgency !== 'All' && (
+                <span className="badge bg-warning text-dark">
+                  ความด่วน: {
+                    filterUrgency === 'high' ? 'ด่วนมาก' :
+                    filterUrgency === 'medium' ? 'ด่วน' : 'ปกติ'
+                  }
+                </span>
+              )}
+              {(filterStatus !== 'All' || filterCategory !== 'All' || filterUrgency !== 'All') && (
+                <button
+                  className="badge bg-danger border-0"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => {
+                    setFilterStatus('All');
+                    setFilterCategory('All');
+                    setFilterUrgency('All');
+                  }}
+                >
+                  ✕ ล้าง Filter ทั้งหมด
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -302,7 +473,7 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h3>📋 รายการคำขอทรัพยากร</h3>
         <span className="badge bg-primary fs-6">
-          แสดง {filteredRequests.length} / {allRequests.length} รายการ
+          แสดง {filteredRequests.length} / {allRequestsState.length} รายการ
         </span>
       </div>
 
