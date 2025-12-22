@@ -25,9 +25,12 @@ export default async function RequestsSummaryPage() {
   await dbConnect();
 
   // Fetch all shelters with their resources
-  const shelters = (await Shelter.find({
+  const sheltersRaw = await Shelter.find({
     'resources.0': { $exists: true }
-  }).select('name resources').lean()) as unknown as Shelter[];
+  }).select('name resources').lean();
+
+  // Serialize to plain objects to avoid ObjectId/Date serialization issues in Client Components
+  const shelters = JSON.parse(JSON.stringify(sheltersRaw)) as Shelter[];
 
   return (
     <div className="container py-4">
