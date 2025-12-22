@@ -5,17 +5,17 @@ import SummaryResources from '@/components/SummaryResources';
 export const dynamic = 'force-dynamic';
 
 interface Resource {
-  _id?: string;
+  _id: string;
   category: string;
   itemName: string;
   amount: number;
   unit: string;
   urgency: 'low' | 'medium' | 'high';
-  status: string;
+  status: 'Pending' | 'Approved' | 'Shipped' | 'Received';
   requestedAt: Date | string;
 }
 
-interface Shelter {
+interface ShelterSummary {
   _id: string;
   name: string;
   resources: Resource[];
@@ -24,17 +24,32 @@ interface Shelter {
 export default async function RequestsSummaryPage() {
   await dbConnect();
 
-  // Fetch all shelters with their resources
-  const sheltersRaw = await Shelter.find({
-    'resources.0': { $exists: true }
-  }).select('name resources').lean();
+  /**
+   * ดึงเฉพาะ resource ที่มี status = Pending
+   * เพื่อให้ตรงกับหน้าสรุปคำร้องที่รอการอนุมัติ
+   */
+  const sheltersRaw = await Shelter.find(
+    { 'resources.status': 'Pending' },
+    {
+      name: 1,
+      resources: {
+        $filter: {
+          input: '$resources',
+          as: 'res',
+          cond: { $eq: ['$$res.status', 'Pending'] }
+        }
+      }
+    }
+  ).lean();
 
-  // Serialize to plain objects to avoid ObjectId/Date serialization issues in Client Components
-  const shelters = JSON.parse(JSON.stringify(sheltersRaw)) as Shelter[];
+  // serialize สำหรับส่งเข้า Client Component
+  const shelters = JSON.parse(JSON.stringify(sheltersRaw)) as ShelterSummary[];
 
   return (
     <div className="container py-4">
+      <h4 className="mb-3">สรุปรายการคำร้องขอทรัพยากร (รอการอนุมัติ)</h4>
       <SummaryResources allShelters={shelters} />
     </div>
   );
 }
+
