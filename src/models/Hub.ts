@@ -22,7 +22,7 @@ const HubSchema = new Schema({
 
 // Force delete model cache to ensure schema updates are applied in development
 if (models && models.Hub) {
-  delete (models as Record<string, any>).Hub;
+  delete (models as { [key: string]: unknown }).Hub;
 }
 
 export default models.Hub || model('Hub', HubSchema);
