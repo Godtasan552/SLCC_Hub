@@ -1,5 +1,6 @@
 import dbConnect from '@/lib/dbConnect';
 import Shelter from '@/models/Shelter';
+import Hub from '@/models/Hub';
 import SummaryResources from '@/components/SummaryResources';
 
 export const dynamic = 'force-dynamic';
@@ -19,31 +20,48 @@ interface ShelterSummary {
   _id: string;
   name: string;
   resources: Resource[];
+  isHub?: boolean;
 }
 
 export default async function RequestsSummaryPage() {
   await dbConnect();
 
-  /**
-   * ดึงเฉพาะ resource ที่มี status = Pending
-   * เพื่อให้ตรงกับหน้าสรุปคำร้องที่รอการอนุมัติ
-   */
-  const sheltersRaw = await Shelter.find(
-    { 'resources.status': 'Pending' },
-    {
-      name: 1,
-      resources: {
-        $filter: {
-          input: '$resources',
-          as: 'res',
-          cond: { $eq: ['$$res.status', 'Pending'] }
+  const [sheltersRaw, hubsRaw] = await Promise.all([
+    Shelter.find(
+      { 'resources.status': 'Pending' },
+      {
+        name: 1,
+        resources: {
+          $filter: {
+            input: '$resources',
+            as: 'res',
+            cond: { $eq: ['$$res.status', 'Pending'] }
+          }
         }
       }
-    }
-  ).lean();
+    ).lean(),
+    Hub.find(
+      { 'resources.status': 'Pending' },
+      {
+        name: 1,
+        resources: {
+          $filter: {
+            input: '$resources',
+            as: 'res',
+            cond: { $eq: ['$$res.status', 'Pending'] }
+          }
+        }
+      }
+    ).lean()
+  ]);
 
-  // serialize สำหรับส่งเข้า Client Component
-  const shelters = JSON.parse(JSON.stringify(sheltersRaw)) as ShelterSummary[];
+  // Combine and serialize
+  const merged = [
+    ...(sheltersRaw as unknown as ShelterSummary[]).map(s => ({ ...s, isHub: false })),
+    ...(hubsRaw as unknown as ShelterSummary[]).map(h => ({ ...h, isHub: true }))
+  ];
+
+  const shelters = JSON.parse(JSON.stringify(merged)) as ShelterSummary[];
 
   return (
     <div className="container py-4">

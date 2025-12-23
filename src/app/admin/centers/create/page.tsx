@@ -27,10 +27,12 @@ export default function CreateCenterPage() {
         phoneNumbers: formData.phoneNumbers.filter(p => p.trim() !== '')
       };
 
-      const res = await axios.post('/api/shelters', cleanedData);
+      const endpoint = formData.type === 'Hub' ? '/api/hubs' : '/api/shelters';
+      const res = await axios.post(endpoint, cleanedData);
+      
       if (res.data.success) {
-        alert('สร้างศูนย์ใหม่เรียบร้อยแล้ว');
-        router.push('/admin/import');
+        alert(`สร้าง${formData.type === 'Hub' ? 'คลังกลาง' : 'ศูนย์พักพิง'}เรียบร้อยแล้ว`);
+        router.push(formData.type === 'Hub' ? '/requests/create' : '/admin/import');
       }
     } catch (error: unknown) {
       const message = axios.isAxiosError(error) ? error.response?.data?.error : (error as Error).message;
