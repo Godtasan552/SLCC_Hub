@@ -60,16 +60,20 @@ export async function POST(req: Request) {
       console.log('🏗️ ระบบกำลังค้นหาสต็อกเฉพาะในคลังที่สร้างเอง (Hubs)...');
       console.log('📍 Hub IDs ทั้งหมด:', hubIds.length, 'แห่ง');
 
-      // คันหา Supply เฉพาะที่ผูกกับ Hub IDs เหล่านี้เท่านั้น
+      // Escape reg-exp special characters from itemName
+      const escapedItemName = resource.itemName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      
+      // ค้นหา Supply เฉพาะที่ผูกกับ Hub IDs เหล่านี้เท่านั้น
+      // หมายเหตุ: ตัด category filter ออกเพื่อป้องกันปัญหาเรื่อง English/Thai category mismatch 
+      // เนื่องจากเราใช้ itemName ที่ตรงกัน (case-insensitive) แทนแล้ว
       const hubSupplies = await Supply.find({
-        name: { $regex: new RegExp(`^${resource.itemName}$`, 'i') },
-        category: resource.category,
+        name: { $regex: new RegExp(`^${escapedItemName}$`, 'i') },
         quantity: { $gt: 0 },
-        shelterId: { $in: hubIds } // ✅ เอาเฉพาะคลังที่สร้างเอง
+        shelterId: { $in: hubIds } 
       }).sort({ createdAt: 1 }); // FIFO
 
-      console.log('🔍 Searching for:', resource.itemName, 'Category:', resource.category);
-      console.log('📦 Found supplies in your created hubs:', hubSupplies.length, 'items');
+      console.log(`🔍 Searching for: "${resource.itemName}" (Escaped: "${escapedItemName}")`);
+      console.log('📦 Found supplies in hubs:', hubSupplies.length, 'items');
       
       hubSupplies.forEach(s => {
         console.log(`   - ${s.name}: ${s.quantity} ${s.unit} (In Hub: ${s.shelterName || s.shelterId})`);

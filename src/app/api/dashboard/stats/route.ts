@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import ShelterModel from '@/models/Shelter';
+import HubModel from '@/models/Hub';
 import Supply from '@/models/Supply';
 import { Shelter as ShelterType, DailyLog } from '@/types/shelter';
 
@@ -14,17 +15,45 @@ export async function GET() {
     const criticalSheltersCount = await ShelterModel.countDocuments({ capacityStatus: 'ล้นศูนย์' });
     const warningSheltersCount = await ShelterModel.countDocuments({ capacityStatus: 'ใกล้เต็ม' });
 
-    const shelterStats = await ShelterModel.aggregate([
-      {
-        $group: {
-          _id: null,
-          totalCapacity: { $sum: '$capacity' },
-          totalOccupancy: { $sum: '$currentOccupancy' },
-          totalResourceRequests: { $sum: { $size: { $ifNull: ['$resources', []] } } }
+    const [shelterStats, hubStats] = await Promise.all([
+      ShelterModel.aggregate([
+        {
+          $group: {
+            _id: null,
+            totalCapacity: { $sum: '$capacity' },
+            totalOccupancy: { $sum: '$currentOccupancy' },
+            resources: { $push: '$resources' }
+          }
         }
-      }
+      ]),
+      HubModel.aggregate([
+        {
+          $group: {
+            _id: null,
+            resources: { $push: '$resources' }
+          }
+        }
+      ])
     ]);
-    const { totalCapacity, totalOccupancy, totalResourceRequests } = shelterStats[0] || { totalCapacity: 0, totalOccupancy: 0, totalResourceRequests: 0 };
+    
+    const sStats = shelterStats[0] || { totalCapacity: 0, totalOccupancy: 0, resources: [] };
+    const hStats = hubStats[0] || { resources: [] };
+
+    const totalCapacity = sStats.totalCapacity;
+    const totalOccupancy = sStats.totalOccupancy;
+
+    // Flatten all resources from both collections
+    const allResources = [...sStats.resources.flat(), ...hStats.resources.flat()];
+    const totalResourceRequests = allResources.length;
+
+    // Status counts
+    const requestStats = {
+      pending: allResources.filter(r => r.status === 'Pending').length,
+      approved: allResources.filter(r => r.status === 'Approved').length,
+      shipped: allResources.filter(r => r.status === 'Shipped').length,
+      received: allResources.filter(r => r.status === 'Received').length,
+      rejected: allResources.filter(r => r.status === 'Rejected').length
+    };
 
     const totalSupplies = await Supply.countDocuments({});
     const outOfStockSupplies = await Supply.countDocuments({ quantity: 0 });
@@ -76,6 +105,7 @@ export async function GET() {
       lowStockSupplies,
       outOfStockSupplies,
       criticalList,
+      requestStats,
       trendData: trendData.reverse(),
       movementData: movementData.reverse()
     };
