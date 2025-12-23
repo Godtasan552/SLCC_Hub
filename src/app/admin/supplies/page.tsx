@@ -75,12 +75,18 @@ export default function SuppliesPage() {
         ]);
         
         // Combine both for selection, marking hubs clearly
-        const combined = [
-          ...shelterRes.data.data.map((s: Shelter) => ({ ...s, isHub: false })),
-          ...hubRes.data.data.map((h: Shelter) => ({ ...h, isHub: true }))
-        ];
+        const combined = hubRes.data.data.map((h: Shelter) => ({ ...h, isHub: true }));
         
         setShelters(combined);
+        
+        // Auto-select the first hub if it's currently empty
+        if (combined.length > 0 && !manualForm.shelterId) {
+          setManualForm(prev => ({ 
+            ...prev, 
+            shelterId: combined[0]._id, 
+            shelterName: combined[0].name 
+          }));
+        }
       } catch (err) {
         console.error('Fetch locations failed:', err);
       }
@@ -98,11 +104,9 @@ export default function SuppliesPage() {
   };
 
   const handleShelterChange = (id: string) => {
-    if (!id) {
-      setManualForm({ ...manualForm, shelterId: '', shelterName: 'คลังกลาง (Central Hub)' });
-    } else {
-      const shelter = shelters.find(s => s._id === id);
-      setManualForm({ ...manualForm, shelterId: id, shelterName: shelter?.name || '' });
+    const shelter = shelters.find(s => s._id === id);
+    if (shelter) {
+      setManualForm({ ...manualForm, shelterId: id, shelterName: shelter.name });
     }
   };
 
@@ -358,15 +362,9 @@ export default function SuppliesPage() {
                                                 onChange={(e) => handleShelterChange(e.target.value)}
                                                 required
                                             >
-                                                <option value="">🏢 คลังกลาง (กองกลาง/ไม่ระบุศูนย์)</option>
-                                                <optgroup label="🏗️ คลังกลางบริหารจัดการ (Hubs)">
-                                                  {shelters.filter((s) => s.isHub).map((s) => (
+                                                <optgroup label="🏗️ เลือกคลังกลางบริหารจัดการ (ของคุณ)">
+                                                  {shelters.map((s) => (
                                                       <option key={s._id} value={s._id}>📦 {s.name}</option>
-                                                  ))}
-                                                </optgroup>
-                                                <optgroup label="🏠 ศูนย์พักพิง (Shelters)">
-                                                  {shelters.filter((s) => !s.isHub).map((s) => (
-                                                      <option key={s._id} value={s._id}>📍 {s.name}</option>
                                                   ))}
                                                 </optgroup>
                                             </select>

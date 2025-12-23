@@ -78,9 +78,15 @@ export default function CreateRequestClient() {
   };
 
   const updateCartQuantity = (id: string, qty: number) => {
-    setCart(prev => prev.map(item => 
-      item._id === id ? { ...item, requestQuantity: Math.max(1, qty) } : item
-    ));
+    setCart(prev => prev.map(item => {
+      if (item._id === id) {
+        const maxAvailable = item.quantity || 0;
+        // ปรับจำนวนไม่ให้ต่ำกว่า 1 และไม่ให้เกินจำนวนที่มีในสต็อก
+        const safeQty = Math.max(1, Math.min(qty, maxAvailable));
+        return { ...item, requestQuantity: safeQty };
+      }
+      return item;
+    }));
   };
 
   const handleSubmit = async () => {
@@ -230,8 +236,13 @@ export default function CreateRequestClient() {
                                 {isSelected && <div className="position-absolute top-0 end-0 p-2"><i className="bi bi-check-circle-fill text-primary fs-5"></i></div>}
                                 <div className="small text-muted mb-1" style={{ fontSize: '0.65rem' }}>{supply.category}</div>
                                 <div className="fw-bold small mb-2">{supply.name}</div>
-                                <div className="mt-auto">
-                                  <span className="badge bg-white text-dark border fw-normal small">คงเหลือ: {supply.quantity} {supply.unit}</span>
+                                <div className="mt-auto pt-2 border-top mt-2">
+                                  <div className="d-flex justify-content-between align-items-center">
+                                    <span className="small text-muted">คงเหลือ:</span>
+                                    <span className={`fw-bold ${supply.quantity > 0 ? 'text-success' : 'text-danger'}`}>
+                                      {supply.quantity} {supply.unit}
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -365,11 +376,29 @@ export default function CreateRequestClient() {
                                     <div className="d-flex align-items-center">
                                         <div className="input-group input-group-sm w-75">
                                             <button className="btn btn-outline-secondary" onClick={() => updateCartQuantity(item._id!, item.requestQuantity - 1)}>-</button>
-                                            <input type="number" className="form-control text-center" value={item.requestQuantity} onChange={(e) => updateCartQuantity(item._id!, parseInt(e.target.value) || 1)} />
-                                            <button className="btn btn-outline-secondary" onClick={() => updateCartQuantity(item._id!, item.requestQuantity + 1)}>+</button>
+                                            <input 
+                                              type="number" 
+                                              className="form-control text-center fw-bold" 
+                                              value={item.requestQuantity} 
+                                              max={item.quantity}
+                                              onChange={(e) => updateCartQuantity(item._id!, parseInt(e.target.value) || 1)} 
+                                            />
+                                            <button 
+                                              className="btn btn-outline-secondary" 
+                                              onClick={() => updateCartQuantity(item._id!, item.requestQuantity + 1)}
+                                              disabled={item.requestQuantity >= (item.quantity || 0)}
+                                            >
+                                              +
+                                            </button>
                                         </div>
-                                        <span className="ms-auto small text-muted">{item.unit}</span>
+                                        <span className="ms-auto small text-muted text-end" style={{ minWidth: '40px' }}>{item.unit}</span>
                                     </div>
+                                    {item.requestQuantity >= (item.quantity || 0) && (
+                                      <div className="text-danger" style={{ fontSize: '0.65rem', marginTop: '4px' }}>
+                                        <i className="bi bi-exclamation-circle me-1"></i>
+                                        ถึงขีดจำกัดจำนวนที่มีในคลังแล้ว
+                                      </div>
+                                    )}
                                 </div>
                             </div>
                         ))}
