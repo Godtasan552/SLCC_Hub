@@ -14,6 +14,7 @@ export default function Sidebar() {
       items: [
         { name: 'จัดการศูนย์พักพิง', href: '/admin/import', icon: 'bi-list-ul' },
         { name: 'เพิ่มศูนย์/คลังใหม่', href: '/admin/centers/create', icon: 'bi-plus-circle' },
+        { name: 'ศูนย์บริหารจัดการคลัง', href: '/admin/hubs', icon: 'bi-building-gear' },
         { name: 'จัดการคลังสิ่งของ', href: '/admin/supplies', icon: 'bi-box-seam' },
         { name: 'คำร้องขอสิ่งของ', href: '/requests', icon: 'bi-folder2-open' },
       ],

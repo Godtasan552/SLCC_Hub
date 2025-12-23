@@ -15,12 +15,14 @@ interface Resource {
   requestedAt: Date | string;
   shelterId?: string;
   shelterName?: string;
+  isHub?: boolean; // NEW: To distinguish source
 }
 
 interface Shelter {
   _id: string;
   name: string;
   resources: Resource[];
+  isHub?: boolean; // NEW: To distinguish source
 }
 
 interface SummaryResourcesProps {
@@ -39,8 +41,9 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
     const fetchHubSupplies = async () => {
       try {
         const res = await axios.get('/api/supplies');
-        // Filter those that are in hub (no shelterId)
-        setHubSupplies(res.data.data.filter((s: Supply) => !s.shelterId));
+        // Filter those that are in hub (no shelterId OR linked to a Hub object)
+        // We'll also look for hubs in the Supply records
+        setHubSupplies(res.data.data.filter((s: Supply) => !s.shelterId || s.description?.includes('คลังกลาง')));
       } catch (err) {
         console.error('Failed to fetch hub supplies:', err);
       }
@@ -61,7 +64,8 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
       (s.resources || []).map(r => ({
         ...r,
         shelterId: s._id,
-        shelterName: s.name
+        shelterName: s.name,
+        isHub: s.isHub // Pass down the hub status
       }))
     ).sort(
       (a, b) =>
@@ -115,7 +119,7 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
         );
         // Refresh hub stock
         const freshSupplies = await axios.get('/api/supplies');
-        setHubSupplies(freshSupplies.data.data.filter((s: Supply) => !s.shelterId));
+        setHubSupplies(freshSupplies.data.data.filter((s: Supply) => !s.shelterId || s.description?.includes('คลังกลาง')));
         alert('ตัดสต็อกและสถานะเปลี่ยนเป็น "กำลังจัดส่ง" เรียบร้อยแล้ว');
       }
     } catch (err: unknown) {
@@ -126,18 +130,20 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
     }
   };
 
-  // NEW: Receive function (Add to shelter stock)
-  const handleReceive = async (shelterId: string, resourceId: string) => {
-    if (!confirm('ยืนยันว่าได้รับของชิ้นนี้แล้ว? (ยอดจะไปเพิ่มในสต็อกของศูนย์ปลายทาง)')) return;
+  // NEW: Receive function (Add to shelter/hub stock)
+  const handleReceive = async (targetId: string, resourceId: string, isHub: boolean) => {
+    const msg = isHub ? 'ยืนยันการรับของบริจาคเข้าสู่คลังกลาง?' : 'ยืนยันว่าได้รับของชิ้นนี้แล้ว? (ยอดจะไปเพิ่มในสต็อกของศูนย์ปลายทาง)';
+    if (!confirm(msg)) return;
     
     setLoadingId(resourceId);
     try {
-      const res = await axios.patch(`/api/shelters/${shelterId}/resources/${resourceId}`, { status: 'Received' });
+      const endpoint = isHub ? `/api/hubs/${targetId}/resources/${resourceId}` : `/api/shelters/${targetId}/resources/${resourceId}`;
+      const res = await axios.patch(endpoint, { status: 'Received' });
       if (res.data.success) {
         setAllRequestsState(prev =>
           prev.map(r => r._id === resourceId ? { ...r, status: 'Received' } : r)
         );
-        alert('ยืนยันการรับของเรียบร้อย ยอดคงเหลือถูกเพิ่มเข้าสู่ศูนย์แล้ว');
+        alert('ยืนยันการรับของเรียบร้อย ยอดคงเหลือถูกเพิ่มเข้าสู่ระบบแล้ว');
       }
     } catch (err: unknown) {
       const errorMsg = axios.isAxiosError(err) ? err.response?.data?.message : (err as Error).message;
@@ -291,7 +297,7 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
                       </span>
                     </td>
                     <td>
-                      {req.status === 'Pending' ? (
+                      {req.status === 'Pending' && !req.isHub ? (
                         <div className={`fw-bold ${hasEnough ? 'text-success' : 'text-danger'}`}>
                           {stockAvailable} {req.unit} 
                           {hasEnough ? <i className="bi bi-check-circle ms-1"></i> : <i className="bi bi-x-circle ms-1"></i>}
@@ -300,22 +306,36 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
                         <span className="text-muted">-</span>
                       )}
                     </td>
-                    <td><div className="small text-secondary fw-bold px-2 py-1 bg-light rounded d-inline-block">{req.shelterName}</div></td>
+                    <td>
+                      <div className={`small fw-bold px-2 py-1 rounded d-inline-block ${req.isHub ? 'bg-primary bg-opacity-10 text-primary border border-primary' : 'bg-light text-secondary'}`}>
+                        {req.isHub ? '🏗️ ' : '🏠 '}{req.shelterName}
+                      </div>
+                    </td>
                     <td>{getUrgencyBadge(req.urgency)}</td>
                     <td className="text-end pe-4">
                       {req.status === 'Pending' ? (
-                        <button 
-                          className={`btn btn-sm px-3 rounded-pill fw-bold ${hasEnough ? 'btn-primary' : 'btn-outline-danger'}`}
-                          disabled={loadingId === req._id || !hasEnough}
-                          onClick={() => handleDisburse(req.shelterId!, req._id!)}
-                        >
-                          {loadingId === req._id ? 'กำลังส่ง...' : hasEnough ? '🚀 ตัดจ่ายตอนนี้' : '🚩 ของไม่พอ'}
-                        </button>
+                        req.isHub ? (
+                          <button 
+                            className="btn btn-sm btn-success px-3 rounded-pill fw-bold"
+                            disabled={loadingId === req._id}
+                            onClick={() => handleReceive(req.shelterId!, req._id!, true)}
+                          >
+                            {loadingId === req._id ? 'กำลังรับ...' : '📥 รับบริจาค'}
+                          </button>
+                        ) : (
+                          <button 
+                            className={`btn btn-sm px-3 rounded-pill fw-bold ${hasEnough ? 'btn-primary' : 'btn-outline-danger'}`}
+                            disabled={loadingId === req._id || !hasEnough}
+                            onClick={() => handleDisburse(req.shelterId!, req._id!)}
+                          >
+                            {loadingId === req._id ? 'กำลังส่ง...' : hasEnough ? '🚀 ตัดจ่ายตอนนี้' : '🚩 ของไม่พอ'}
+                          </button>
+                        )
                       ) : req.status === 'Shipped' ? (
                         <button 
                           className="btn btn-sm btn-success px-3 rounded-pill fw-bold"
                           disabled={loadingId === req._id}
-                          onClick={() => handleReceive(req.shelterId!, req._id!)}
+                          onClick={() => handleReceive(req.shelterId!, req._id!, false)}
                         >
                           {loadingId === req._id ? 'กำลังบันทึก...' : '📥 ยืนยันรับของ'}
                         </button>

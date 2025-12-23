@@ -2,15 +2,22 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import ExcelJS from 'exceljs';
+import Link from 'next/link';
 import { SupplyCategory, Supply, SupplyData } from '@/types/supply';
 import { getItemsByCategory } from '@/constants/standardItems';
 
 interface Shelter {
   _id: string;
   name: string;
+  isHub?: boolean; // Add this
 }
 
+import { useSearchParams } from 'next/navigation';
+
 export default function SuppliesPage() {
+  const searchParams = useSearchParams();
+  const hubFilter = searchParams.get('hub');
+  
   const [activeTab, setActiveTab] = useState<'inventory' | 'management'>('inventory');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -25,10 +32,20 @@ export default function SuppliesPage() {
     quantity: 0,
     unit: 'ชิ้น',
     description: '',
-    shelterId: '', // Empty means Central Hub
+    shelterId: hubFilter || '', // Pre-fill if hub param exists
     shelterName: 'คลังกลาง (Central Hub)',
     supplier: ''
   });
+
+  // Pre-fill shelterName if hubFilter exists
+  useEffect(() => {
+    if (hubFilter && shelters.length > 0) {
+        const found = shelters.find(h => h._id === hubFilter);
+        if (found) {
+            setManualForm(prev => ({ ...prev, shelterId: found._id, shelterName: found.name }));
+        }
+    }
+  }, [hubFilter, shelters]);
 
   const availableItems = useMemo(() => 
     getItemsByCategory(manualForm.category as SupplyCategory),
@@ -50,15 +67,25 @@ export default function SuppliesPage() {
 
   useEffect(() => {
     fetchSupplies();
-    const fetchShelters = async () => {
+    const fetchLocations = async () => {
       try {
-        const res = await axios.get('/api/shelters');
-        setShelters(res.data.data);
+        const [shelterRes, hubRes] = await Promise.all([
+          axios.get('/api/shelters'),
+          axios.get('/api/hubs')
+        ]);
+        
+        // Combine both for selection, marking hubs clearly
+        const combined = [
+          ...shelterRes.data.data.map((s: Shelter) => ({ ...s, isHub: false })),
+          ...hubRes.data.data.map((h: Shelter) => ({ ...h, isHub: true }))
+        ];
+        
+        setShelters(combined);
       } catch (err) {
-        console.error('Fetch shelters failed:', err);
+        console.error('Fetch locations failed:', err);
       }
     };
-    fetchShelters();
+    fetchLocations();
   }, [fetchSupplies]);
 
   const handleCategoryChange = (category: SupplyCategory) => {
@@ -192,10 +219,12 @@ export default function SuppliesPage() {
     }
   };
 
-  const filteredSupplies = supplies.filter(s => 
-    s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    (s.shelterName && s.shelterName.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredSupplies = supplies.filter(s => {
+    const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         (s.shelterName && s.shelterName.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesHub = hubFilter ? s.shelterId === hubFilter : true;
+    return matchesSearch && matchesHub;
+  });
 
   const categories = ['ทั้งหมด', ...Object.values(SupplyCategory).filter(c => c !== SupplyCategory.ALL)];
 
@@ -233,18 +262,29 @@ export default function SuppliesPage() {
             <div className="card shadow-sm border-0 mb-5 overflow-hidden" style={{ backgroundColor: 'var(--bg-card)' }}>
                 <div className="card-header bg-transparent border-bottom py-3">
                     <div className="row g-3 align-items-center">
-                        <div className="col-12 col-md-4">
-                            <h6 className="mb-0 fw-bold" style={{ color: 'var(--text-primary)' }}>รายการคงคลังทั้งหมด ({supplies.length})</h6>
+                        <div className="col-12 col-md-5">
+                            <h6 className="mb-0 fw-bold d-flex align-items-center" style={{ color: 'var(--text-primary)' }}>
+                                <i className="bi bi-box-fill me-2 text-primary"></i>
+                                รายการคงคลัง ({filteredSupplies.length})
+                                {hubFilter && (
+                                    <Link href="/admin/supplies" className="ms-2 badge bg-primary text-white text-decoration-none shadow-sm pb-1">
+                                        <i className="bi bi-x-circle me-1"></i>เฉพาะคลังนี้ (กดเพื่อล้างการกรอง)
+                                    </Link>
+                                )}
+                            </h6>
                         </div>
-                        <div className="col-12 col-md-4">
-                            <select className="form-select form-select-sm border-theme shadow-sm" value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
-                                {categories.map(cat => (<option key={cat} value={cat}>{cat}</option>))}
-                            </select>
+                        <div className="col-12 col-md-3">
+                            <div className="input-group input-group-sm">
+                                <span className="input-group-text bg-light border-theme"><i className="bi bi-funnel"></i></span>
+                                <select className="form-select border-theme shadow-sm fw-bold" value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
+                                    {categories.map(cat => (<option key={cat} value={cat}>{cat}</option>))}
+                                </select>
+                            </div>
                         </div>
                         <div className="col-12 col-md-4">
                             <div className="position-relative">
                                 <i className="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-secondary"></i>
-                                <input type="text" className="form-control form-control-sm ps-5 border-theme shadow-sm" placeholder="ค้นหาชื่อสิ่งของ / ศูนย์..." onChange={(e) => setSearchTerm(e.target.value)} />
+                                <input type="text" className="form-control form-control-sm ps-5 border-theme shadow-sm" placeholder="ค้นหาชื่อสิ่งของ..." onChange={(e) => setSearchTerm(e.target.value)} />
                             </div>
                         </div>
                     </div>
@@ -308,7 +348,30 @@ export default function SuppliesPage() {
                             <form onSubmit={handleManualSubmit}>
                                 <div className="row g-3">
                                     <div className="col-12">
-                                        <label className="form-label small fw-bold text-secondary">ชื่อสิ่งของ</label>
+                                        <div className="p-3 rounded-3 bg-primary bg-opacity-10 border border-primary border-opacity-25 mb-2">
+                                            <label className="form-label small fw-bold text-primary"><i className="bi bi-geo-alt-fill me-1"></i>ขั้นตอนที่ 1: เลือกสถานที่รับ/เก็บสินค้า</label>
+                                            <select 
+                                                className="form-select border-primary border-opacity-50 fw-bold text-primary" 
+                                                value={manualForm.shelterId} 
+                                                onChange={(e) => handleShelterChange(e.target.value)}
+                                                required
+                                            >
+                                                <option value="">🏢 คลังกลาง (กองกลาง/ไม่ระบุศูนย์)</option>
+                                                <optgroup label="🏗️ คลังกลางบริหารจัดการ (Hubs)">
+                                                  {shelters.filter((s) => s.isHub).map((s) => (
+                                                      <option key={s._id} value={s._id}>📦 {s.name}</option>
+                                                  ))}
+                                                </optgroup>
+                                                <optgroup label="🏠 ศูนย์พักพิง (Shelters)">
+                                                  {shelters.filter((s) => !s.isHub).map((s) => (
+                                                      <option key={s._id} value={s._id}>📍 {s.name}</option>
+                                                  ))}
+                                                </optgroup>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div className="col-12 mt-2">
+                                        <label className="form-label small fw-bold text-secondary">ขั้นตอนที่ 2: ระบุรายละเอียดสิ่งของ</label>
                                         <input 
                                             type="text" 
                                             className="form-control border" 
@@ -324,6 +387,7 @@ export default function SuppliesPage() {
                                             ))}
                                         </datalist>
                                     </div>
+
                                     <div className="col-md-6">
                                         <label className="form-label small fw-bold text-secondary">หมวดหมู่</label>
                                         <select className="form-select border" value={manualForm.category} onChange={(e) => handleCategoryChange(e.target.value as SupplyCategory)}>
@@ -341,25 +405,8 @@ export default function SuppliesPage() {
                                             className="form-control border" 
                                             value={manualForm.unit} 
                                             onChange={(e) => setManualForm({...manualForm, unit: e.target.value})} 
-                                            placeholder="เช่น ชื้น, ถุง, กล่อง"
+                                            placeholder="เช่น ชิ้น, ถุง, กล่อง"
                                         />
-                                    </div>
-                                    <div className="col-12">
-                                        <label className="form-label small fw-bold text-secondary">สถานที่รับสินค้า (คลังกลาง)</label>
-                                        <select 
-                                            className="form-select border fw-bold text-primary" 
-                                            value={manualForm.shelterId} 
-                                            onChange={(e) => handleShelterChange(e.target.value)}
-                                        >
-                                            <option value="">🏢 คลังกลาง (สต็อกส่วนกลาง)</option>
-                                            {shelters.filter(s => s.name.includes('คลังกลาง')).map(s => (
-                                                <option key={s._id} value={s._id}>📍 {s.name}</option>
-                                            ))}
-                                        </select>
-                                        <div className="form-text small text-info">
-                                            <i className="bi bi-info-circle me-1"></i>
-                                            สินค้าใหม่จะต้องลงทะเบียนเข้า **คลังกลาง** เท่านั้น เพื่อรอการกระจายไปยังศูนย์ต่างๆ
-                                        </div>
                                     </div>
                                     <div className="col-12">
                                         <label className="form-label small fw-bold text-secondary">รายละเอียดเพิ่มเติม</label>

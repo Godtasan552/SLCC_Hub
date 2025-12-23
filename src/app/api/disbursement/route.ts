@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import Shelter from '@/models/Shelter';
+import Hub from '@/models/Hub';
 import Supply from '@/models/Supply';
 import { Supply as SupplyType } from '@/types/supply';
 
@@ -28,12 +29,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Request is not in Pending status' }, { status: 400 });
     }
 
-    // 2. Find matching items in Central Hub (shelterId is null)
-    // We match by name (case-insensitive) and category
+    // 2. Find matching items in any Hub
+    // First, get all Hub IDs to include their supplies
+    const hubs = await Hub.find({}, { _id: 1 });
+    const hubIds = hubs.map((h: { _id: unknown }) => h._id);
+
     const hubSupplies = await Supply.find({
       name: { $regex: new RegExp(`^${resourceRequest.itemName}$`, 'i') },
       category: resourceRequest.category,
-      $or: [{ shelterId: null }, { shelterName: { $regex: /คลังกลาง|Hub/i } }]
+      $or: [
+        { shelterId: null }, 
+        { shelterId: { $in: hubIds } },
+        { shelterName: { $regex: /คลังกลาง|Hub/i } }
+      ]
     });
 
     const totalAvailable = hubSupplies.reduce((sum: number, s: SupplyType) => sum + s.quantity, 0);
