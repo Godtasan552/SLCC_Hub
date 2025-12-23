@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 
 interface TrendData {
   date: string;
@@ -15,6 +15,13 @@ type FilterRange = '1D' | '3D' | '7D' | '14D' | '30D' | '60D' | '90D';
 
 export default function OccupancyTrends({ data }: OccupancyTrendsProps) {
   const [range, setRange] = useState<FilterRange>('7D');
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    // Delay setting mounted to avoid synchronous state update warning during hydration
+    const timer = setTimeout(() => setMounted(true), 0);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Sort data by date just in case
   const sortedFullData = useMemo(() => {
@@ -114,64 +121,70 @@ export default function OccupancyTrends({ data }: OccupancyTrendsProps) {
       
       <div className="card-body px-0 pb-4 overflow-hidden">
         <div className="table-responsive custom-scrollbar px-4" style={{ overflowX: 'auto' }}>
-            <svg width={graphWidth} height={height} style={{ minWidth: '100%', overflow: 'visible' }}>
-                <defs>
-                    <linearGradient id="gradientArea" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="var(--bs-primary)" stopOpacity="0.3" />
-                        <stop offset="100%" stopColor="var(--bs-primary)" stopOpacity="0" />
-                    </linearGradient>
-                </defs>
+            {!mounted ? (
+                <div className="d-flex align-items-center justify-content-center" style={{ height: '300px' }}>
+                   <div className="spinner-border text-secondary opacity-25" role="status"></div>
+                </div>
+            ) : (
+                <svg width={graphWidth} height={height} style={{ minWidth: '100%', overflow: 'visible' }}>
+                    <defs>
+                        <linearGradient id="gradientArea" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="var(--bs-primary)" stopOpacity="0.3" />
+                            <stop offset="100%" stopColor="var(--bs-primary)" stopOpacity="0" />
+                        </linearGradient>
+                    </defs>
 
-                {/* Grid */}
-                {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
-                    const y = padding + ratio * (height - 2 * padding);
-                    const val = Math.round(maxOccupancy - ratio * maxOccupancy);
-                    return (
-                        <g key={ratio}>
-                             <line x1={padding} y1={y} x2={graphWidth - padding} y2={y} stroke="var(--text-secondary)" strokeOpacity="0.1" strokeDasharray="4" />
-                             <text x={padding - 10} y={y + 4} textAnchor="end" fontSize="10" fill="var(--text-secondary)">{val}</text>
-                        </g>
-                    );
-                })}
-
-                {filteredData.length > 1 ? (
-                    <>
-                        <path d={areaPath} fill="url(#gradientArea)" />
-                        <path d={`M${points}`} fill="none" stroke="var(--bs-primary)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" 
-                              style={{ filter: 'drop-shadow(0 4px 6px rgba(13, 110, 253, 0.2))' }}/>
-                    </>
-                ) : filteredData.length === 1 ? (
-                     // Single point representation (Today)
-                     <g>
-                        <line x1={padding} y1={getY(filteredData[0].occupancy)} x2={graphWidth - padding} y2={getY(filteredData[0].occupancy)} 
-                              stroke="var(--bs-primary)" strokeWidth="1" strokeDasharray="4" opacity="0.5" />
-                     </g>
-                ) : null}
-
-                {/* Points */}
-                {filteredData.map((d, i) => (
-                    <g key={i} className="point-group">
-                        <circle cx={getX(i)} cy={getY(d.occupancy)} r={range === '90D' || range === '60D' ? 3 : 5} 
-                                fill="var(--bg-card)" stroke="var(--bs-primary)" strokeWidth="3" 
-                                style={{ transition: 'all 0.3s ease' }} />
-                        
-                        {/* Tooltip (Only show periodic data or last point if high density) */}
-                         {((filteredData.length < 15) || i === filteredData.length - 1 || i % Math.ceil(filteredData.length / 10) === 0) && (
-                            <g transform={`translate(${getX(i)}, ${getY(d.occupancy) - 15})`}>
-                                <rect x="-20" y="-22" width="40" height="20" rx="4" fill="var(--bs-primary)" opacity="0.9" />
-                                <text x="0" y="-8" textAnchor="middle" fill="white" fontSize="11" fontWeight="bold">{d.occupancy}</text>
+                    {/* Grid */}
+                    {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+                        const y = padding + ratio * (height - 2 * padding);
+                        const val = Math.round(maxOccupancy - ratio * maxOccupancy);
+                        return (
+                            <g key={ratio}>
+                                <line x1={padding} y1={y} x2={graphWidth - padding} y2={y} stroke="var(--text-secondary)" strokeOpacity="0.1" strokeDasharray="4" />
+                                <text x={padding - 10} y={y + 4} textAnchor="end" fontSize="10" fill="var(--text-secondary)">{val}</text>
                             </g>
-                         )}
+                        );
+                    })}
 
-                        {/* X Axis Labels */}
-                        {((filteredData.length < 15) || i === filteredData.length - 1 || i % Math.ceil(filteredData.length / 8) === 0) && (
-                            <text x={getX(i)} y={height - padding + 20} textAnchor="middle" fontSize="10" fill="var(--text-primary)" opacity="0.8">
-                                {new Date(d.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
-                            </text>
-                        )}
-                    </g>
-                ))}
-            </svg>
+                    {filteredData.length > 1 ? (
+                        <>
+                            <path d={areaPath} fill="url(#gradientArea)" />
+                            <path d={`M${points}`} fill="none" stroke="var(--bs-primary)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" 
+                                style={{ filter: 'drop-shadow(0 4px 6px rgba(13, 110, 253, 0.2))' }}/>
+                        </>
+                    ) : filteredData.length === 1 ? (
+                        // Single point representation (Today)
+                        <g>
+                            <line x1={padding} y1={getY(filteredData[0].occupancy)} x2={graphWidth - padding} y2={getY(filteredData[0].occupancy)} 
+                                stroke="var(--bs-primary)" strokeWidth="1" strokeDasharray="4" opacity="0.5" />
+                        </g>
+                    ) : null}
+
+                    {/* Points */}
+                    {filteredData.map((d, i) => (
+                        <g key={i} className="point-group">
+                            <circle cx={getX(i)} cy={getY(d.occupancy)} r={range === '90D' || range === '60D' ? 3 : 5} 
+                                    fill="var(--bg-card)" stroke="var(--bs-primary)" strokeWidth="3" 
+                                    style={{ transition: 'all 0.3s ease' }} />
+                            
+                            {/* Tooltip (Only show periodic data or last point if high density) */}
+                            {((filteredData.length < 15) || i === filteredData.length - 1 || i % Math.ceil(filteredData.length / 10) === 0) && (
+                                <g transform={`translate(${getX(i)}, ${getY(d.occupancy) - 15})`}>
+                                    <rect x="-20" y="-22" width="40" height="20" rx="4" fill="var(--bs-primary)" opacity="0.9" />
+                                    <text x="0" y="-8" textAnchor="middle" fill="white" fontSize="11" fontWeight="bold">{d.occupancy}</text>
+                                </g>
+                            )}
+
+                            {/* X Axis Labels */}
+                            {((filteredData.length < 15) || i === filteredData.length - 1 || i % Math.ceil(filteredData.length / 8) === 0) && (
+                                <text x={getX(i)} y={height - padding + 20} textAnchor="middle" fontSize="10" fill="var(--text-primary)" opacity="0.8">
+                                    {new Date(d.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
+                                </text>
+                            )}
+                        </g>
+                    ))}
+                </svg>
+            )}
         </div>
       </div>
     </div>

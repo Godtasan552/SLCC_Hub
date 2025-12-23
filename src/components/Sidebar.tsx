@@ -29,13 +29,7 @@ export default function Sidebar() {
         { name: 'รายการเบิกจ่าย', href: '/requests/summary', icon: 'bi-hexagon' },
       ],
     },
-    {
-      title: 'ระบบ',
-      icon: 'bi-gear',
-      items: [
-        { name: 'ตั้งค่าระบบ', href: '#', icon: 'bi-sliders' },
-      ],
-    }
+
   ];
 
   return (
