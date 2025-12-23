@@ -1,10 +1,11 @@
 import mongoose from 'mongoose';
 const { Schema, model, models } = mongoose;
 import dotenv from 'dotenv';
+import path from 'path';
 
-// Load env vars
-dotenv.config({ path: '.env' });
-dotenv.config({ path: '.env.local' });
+// Load environment variables
+dotenv.config({ path: path.join(process.cwd(), '.env') });
+dotenv.config({ path: path.join(process.cwd(), '.env.local') });
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
@@ -13,91 +14,100 @@ if (!MONGODB_URI) {
   process.exit(1);
 }
 
-// ---- DEFINE SCHEMAS LOCALLY TO AVOID IMPORT ISSUES ----
+// ---- Local Schema Definitions to avoid Next.js import errors in standalone script ----
 
 const DailyOccupancySchema = new Schema({
-  date: { type: String, required: true },
+  date: { type: String, required: true }, // Format "YYYY-MM-DD"
   checkIn: { type: Number, default: 0 },
   checkOut: { type: Number, default: 0 }
 });
 
 const ShelterSchema = new Schema({
   name: { type: String, required: true },
+  type: { type: String, enum: ['Hub', 'Shelter'], default: 'Shelter' },
   district: { type: String, required: true },
   subdistrict: { type: String },
   capacity: { type: Number, default: 0 },
-  currentOccupancy: { type: Number, default: 0 }, 
-  phoneNumbers: [String],
+  currentOccupancy: { type: Number, default: 0 },
   capacityStatus: { type: String },
   dailyLogs: [DailyOccupancySchema],
   updatedAt: { type: Date, default: Date.now }
 });
 
-// Use existing model if available to prevent overwrite error, but since this is standalone script, it's fine.
-// We need to match the collection name 'shelters' (lowercase plural is default)
 const Shelter = models.Shelter || model('Shelter', ShelterSchema);
 
 // -------------------------------------------------------
 
-async function seedDailyLogs() {
-  console.log('🔄 Connecting to Database...');
+async function seedData() {
+  console.log('🌱 [Seed] Starting Population Simulation...');
+  
   try {
-     await mongoose.connect(MONGODB_URI as string);
-     console.log('✅ Connected.');
-  } catch (err) {
-     console.error('❌ DB Connection Failed:', err);
-     process.exit(1);
-  }
+    console.log('🔄 Connecting to MongoDB...');
+    await mongoose.connect(MONGODB_URI as string);
+    console.log('✅ Connected.');
 
-  try {
-    const shelters = await Shelter.find({});
-    console.log(`📊 Found ${shelters.length} shelters. Starting data simulation...`);
+    // Fetch all records from the shelters collection
+    console.log('🔎 Searching for records in "Shelter" model...');
+    const allCenters = await Shelter.find({});
+    console.log(`🔍 Total records in 'shelters' collection: ${allCenters.length}`);
+
+    const shelters = allCenters.filter(c => !c.type || c.type === 'Shelter');
+    console.log(`📊 Found ${shelters.length} active Shelters to process. Starting simulation...`);
+
+    if (shelters.length === 0) {
+      console.log('⚠️ No shelters found to update. Check your database collection name or content.');
+      return;
+    }
 
     let totalUpdated = 0;
 
     for (const shelter of shelters) {
-      if (!shelter.capacity) continue; // Skip shelters with no capacity/undefined
-
-      const dailyLogs = [];
-      // เริ่มต้นที่ประมาณ 0-15% ของความจุ
-      let currentOccupancy = Math.floor(Math.random() * (shelter.capacity * 0.15));
+      // Default capacity if not set to prevent math errors
+      const capacity = shelter.capacity || 100;
       
-      const daysHistory = 30;
+      const dailyLogs = [];
+      // Start with a small random number of people (5-15% of capacity)
+      let runningOccupancy = Math.floor(Math.random() * (capacity * 0.1)) + Math.floor(capacity * 0.05);
+      
+      const daysHistory = 30; // 30 days of data
       
       for (let i = daysHistory; i >= 0; i--) {
         const date = new Date();
         date.setDate(date.getDate() - i);
-        // ใช้ Local Time (en-CA จะได้ format YYYY-MM-DD) เพื่อให้ตรงกับ Frontend
-        const dateStr = date.toLocaleDateString('en-CA');
+        const dateStr = date.toLocaleDateString('en-CA'); // YYYY-MM-DD format
 
-        const isBigShelter = shelter.capacity > 500;
-        const activityLevel = isBigShelter ? 15 : 3;
+        // Simulation parameters
+        const isBigShelter = capacity > 300;
+        const activityScale = isBigShelter ? 15 : 5;
 
-        // Random In
+        // 1. Check In: Random influx
         let checkIn = 0;
-        // Event spike random
-        if (Math.random() > 0.85) {
-          checkIn = Math.floor(Math.random() * activityLevel * 4); 
+        const rand = Math.random();
+        if (rand > 0.8) { // Busy day (event/rain)
+          checkIn = Math.floor(Math.random() * activityScale * 3);
         } else {
-          checkIn = Math.floor(Math.random() * activityLevel);
+          checkIn = Math.floor(Math.random() * activityScale);
         }
 
-        // Random Out
-        const maxOut = currentOccupancy + checkIn;
+        // 2. Check Out: People leaving
         let checkOut = 0;
+        const canLeave = runningOccupancy + checkIn;
         
-        if (i > 15) {
-             checkOut = Math.floor(Math.random() * (maxOut * 0.2)); 
+        // As we get closer to today (i=0), simulation might have more checkouts (recovery phase)
+        if (i < 7) {
+          checkOut = Math.floor(Math.random() * (canLeave * 0.3));
         } else {
-             checkOut = Math.floor(Math.random() * (maxOut * 0.5)); 
+          checkOut = Math.floor(Math.random() * (canLeave * 0.1));
         }
 
-        currentOccupancy = currentOccupancy + checkIn - checkOut;
-        if (currentOccupancy < 0) currentOccupancy = 0;
+        runningOccupancy = runningOccupancy + checkIn - checkOut;
         
-        // Cap at 120% capacity roughly
-        if (currentOccupancy > shelter.capacity * 1.2) {
-             currentOccupancy = Math.floor(shelter.capacity * 1.2);
+        // Constraints
+        if (runningOccupancy < 0) runningOccupancy = 0;
+        
+        // Peak capacity simulation (can go up to 120% in emergencies)
+        if (runningOccupancy > capacity * 1.2) {
+          runningOccupancy = Math.floor(capacity * 1.2);
         }
 
         dailyLogs.push({
@@ -107,11 +117,12 @@ async function seedDailyLogs() {
         });
       }
 
-      // Update Fields
+      // Final update to the shelter document
       shelter.dailyLogs = dailyLogs;
-      shelter.currentOccupancy = currentOccupancy;
+      shelter.currentOccupancy = runningOccupancy;
       
-      const occupancyRate = (currentOccupancy / shelter.capacity) * 100;
+      // Update Status String
+      const occupancyRate = (runningOccupancy / capacity) * 100;
       if (occupancyRate >= 100) {
         shelter.capacityStatus = 'ล้นศูนย์';
       } else if (occupancyRate >= 80) {
@@ -120,23 +131,25 @@ async function seedDailyLogs() {
         shelter.capacityStatus = 'รองรับได้';
       }
 
+      shelter.updatedAt = new Date();
       await shelter.save();
       totalUpdated++;
       
-       if (totalUpdated % 50 === 0) {
-        console.log(`⏳ Processed ${totalUpdated}/${shelters.length}...`);
+      if (totalUpdated % 10 === 0) {
+        console.log(`⏳ Progress: ${totalUpdated}/${shelters.length} centers updated...`);
       }
     }
 
-    console.log(`🎉 Success! Updated ${totalUpdated} shelters.`);
+    console.log(`\n✨ Success! Generated 30-day history for ${totalUpdated} centers.`);
+    console.log('📈 All charts should now display randomized data trends.');
 
   } catch (error) {
-    console.error('❌ Error seeding logs:', error);
+    console.error('❌ Seeding Error:', error);
   } finally {
     await mongoose.disconnect();
-    console.log('👋 Disconnected.');
+    console.log('👋 Database connection closed.');
     process.exit();
   }
 }
 
-seedDailyLogs();
+seedData();
