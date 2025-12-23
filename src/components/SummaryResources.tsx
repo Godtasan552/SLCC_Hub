@@ -31,11 +31,13 @@ interface SummaryResourcesProps {
 
 const fetcher = (url: string) => axios.get(url).then(res => res.data.data);
 
+type RequestStatus = 'All' | 'Pending' | 'Approved' | 'Received' | 'Rejected';
+
 export default function SummaryResources({ allShelters }: SummaryResourcesProps) {
   const [loadingId, setLoadingId] = useState<string | null>(null);
-  const [filterStatus, setFilterStatus] = useState<'All' | 'Pending' | 'Approved' | 'Shipped' | 'Received' | 'Rejected'>('Pending');
+  const [filterStatus, setFilterStatus] = useState<RequestStatus>('Pending');
   const [filterCategory, setFilterCategory] = useState<string>('All');
-  const [filterUrgency, setFilterUrgency] = useState<string>('All');
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
   // 🔹 Fetch real-time data using SWR
   const { data: latestShelters, mutate } = useSWR<Shelter[]>('/api/requests/summary', fetcher, {
@@ -65,10 +67,12 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
     return allRequestsState.filter((r: Resource) => {
       const statusMatch = filterStatus === 'All' || r.status === filterStatus;
       const categoryMatch = filterCategory === 'All' || r.category === filterCategory;
-      const urgencyMatch = filterUrgency === 'All' || r.urgency === filterUrgency;
-      return statusMatch && categoryMatch && urgencyMatch;
+      const searchMatch = !searchTerm || 
+        r.itemName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        r.shelterName?.toLowerCase().includes(searchTerm.toLowerCase());
+      return statusMatch && categoryMatch && searchMatch;
     });
-  }, [allRequestsState, filterStatus, filterCategory, filterUrgency]);
+  }, [allRequestsState, filterStatus, filterCategory, searchTerm]);
 
   const statusStats = useMemo(() => ({
     pending: allRequestsState.filter((r: Resource) => r.status === 'Pending').length,
@@ -85,11 +89,7 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
     return stats;
   }, [allRequestsState]);
 
-  const urgencyStats = useMemo(() => ({
-    high: allRequestsState.filter((r: Resource) => r.urgency === 'high' && r.status === 'Pending').length,
-    medium: allRequestsState.filter((r: Resource) => r.urgency === 'medium' && r.status === 'Pending').length,
-    low: allRequestsState.filter((r: Resource) => r.urgency === 'low' && r.status === 'Pending').length
-  }), [allRequestsState]);
+
 
   // NEW: Receive function
   const handleReceive = async (targetId: string, resourceId: string, isHub: boolean) => {
@@ -185,112 +185,98 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
     <div className="animate-fade-in">
       {/* 📊 Summary Cards */}
       <div className="row g-3 mb-4">
-        <div className="col-md-2">
-          <div className="card shadow-sm border-0 h-100 bg-warning bg-opacity-10">
-            <div className="card-body">
-              <div className="d-flex justify-content-between align-items-center mb-2">
-                <span className="badge bg-warning text-dark">⏳ รออนุมัติ</span>
-                <i className="bi bi-clock-history fs-4 text-warning"></i>
+        {[
+          { label: '⏳ รออนุมัติ', id: 'Pending', count: statusStats.pending, color: 'warning', sub: 'รายการคำร้องขอใหม่' },
+          { label: '✅ อนุมัติ', id: 'Approved', count: statusStats.approved, color: 'success', sub: 'อนุมัติแล้ว' },
+          { label: '📥 ได้รับแล้ว', id: 'Received', count: statusStats.received, color: 'info', sub: 'ของถึงที่หมายเรียบร้อย' },
+          { label: '❌ ปฏิเสธ', id: 'Rejected', count: statusStats.rejected, color: 'danger', sub: 'ปฏิเสธแล้ว' },
+        ].map((item) => (
+          <div className="col-md-3" key={item.id}>
+            <div 
+              className={`card shadow-sm border-0 h-100 cursor-pointer transition-all ${filterStatus === item.id ? 'ring-active' : ''}`}
+              style={{ backgroundColor: `var(--bg-card)`, border: filterStatus === item.id ? '2px solid var(--bs-' + item.color + ')' : '1px solid var(--border-color)' }}
+              onClick={() => setFilterStatus(item.id as RequestStatus)}
+            >
+              <div className="card-body">
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                  <span className={`badge bg-${item.color} bg-opacity-25 text-${item.color}`}>{item.label}</span>
+                  <i className={`bi bi-circle-fill fs-6 text-${item.color}`} style={{ opacity: filterStatus === item.id ? 1 : 0.2 }}></i>
+                </div>
+                <h2 className="fw-bold mb-0" style={{ color: 'var(--text-primary)' }}>{item.count}</h2>
+                <small className="text-secondary opacity-75">{item.sub}</small>
               </div>
-              <h2 className="fw-bold mb-0">{statusStats.pending}</h2>
-              <small className="text-secondary">รายการคำร้องขอใหม่</small>
             </div>
           </div>
-        </div>
-        <div className="col-md-2">
-          <div className="card shadow-sm border-0 h-100 bg-success bg-opacity-10">
-            <div className="card-body">
-              <div className="d-flex justify-content-between align-items-center mb-2">
-                <span className="badge bg-success">✅ อนุมัติ</span>
-                <i className="bi bi-check-circle fs-4 text-success"></i>
-              </div>
-              <h2 className="fw-bold mb-0">{statusStats.approved}</h2>
-              <small className="text-secondary">อนุมัติแล้ว</small>
-            </div>
-          </div>
-        </div>
-
-        <div className="col-md-2">
-          <div className="card shadow-sm border-0 h-100 bg-info bg-opacity-10">
-            <div className="card-body">
-              <div className="d-flex justify-content-between align-items-center mb-2">
-                <span className="badge bg-info">📥 ได้รับแล้ว</span>
-                <i className="bi bi-check-circle-fill fs-4 text-info"></i>
-              </div>
-              <h2 className="fw-bold mb-0">{statusStats.received}</h2>
-              <small className="text-secondary">ของถึงที่หมายเรียบร้อย</small>
-            </div>
-          </div>
-        </div>
-        <div className="col-md-2">
-          <div className="card shadow-sm border-0 h-100 bg-danger bg-opacity-10">
-            <div className="card-body">
-              <div className="d-flex justify-content-between align-items-center mb-2">
-                <span className="badge bg-danger">❌ ปฏิเสธ</span>
-                <i className="bi bi-x-circle-fill fs-4 text-danger"></i>
-              </div>
-              <h2 className="fw-bold mb-0">{statusStats.rejected}</h2>
-              <small className="text-secondary">ปฏิเสธแล้ว</small>
-            </div>
-          </div>
-        </div>
-        <div className="col-md-2">
-          <div className="card shadow-sm border-2 border-warning h-100">
-            <div className="card-body text-center d-flex flex-column justify-content-center">
-              <h6 className="text-warning fw-bold mb-1">🚨 ของด่วนมาก</h6>
-              <h2 className="text-warning fw-bold mb-0">{urgencyStats.high}</h2>
-            </div>
-          </div>
-        </div>
+        ))}
       </div>
 
-      {/* 🔍 Filters */}
-      <div className="card shadow-sm mb-4" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
-        <div className="card-body">
-          <div className="row g-3 align-items-center">
-            <div className="col-md-4">
+      {/* 🔍 Advanced Filter Bar */}
+      <div className="card shadow-sm mb-4 border-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-card)' }}>
+        <div className="card-body p-3">
+          <div className="row g-2 align-items-center">
+            {/* Status Tabs */}
+            <div className="col-12 col-xl-5">
+              <div className="btn-group btn-group-sm p-1 rounded-pill bg-secondary bg-opacity-10" style={{ border: '1px solid var(--border-color)' }}>
+                {[
+                  { id: 'All', label: 'ทั้งหมด' },
+                  { id: 'Pending', label: 'รออนุมัติ' },
+                  { id: 'Approved', label: 'อนุมัติแล้ว' },
+                  { id: 'Received', label: 'ได้รับแล้ว' },
+                  { id: 'Rejected', label: 'ปฏิเสธ' }
+                ].map((s) => (
+                  <button 
+                    key={s.id}
+                    className={`btn px-3 rounded-pill border-0 fw-bold ${filterStatus === s.id ? 'btn-primary shadow-sm' : 'text-secondary'}`}
+                    onClick={() => setFilterStatus(s.id as RequestStatus)}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Category Filter */}
+            <div className="col-12 col-md-4 col-xl-3">
               <div className="input-group input-group-sm">
-                <span className="input-group-text" style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)' }}>
-                  <i className="bi bi-funnel"></i>
+                <span className="input-group-text bg-transparent border-end-0 text-secondary" style={{ borderColor: 'var(--border-color)' }}>
+                  <i className="bi bi-tag"></i>
                 </span>
                 <select 
-                  className="form-select shadow-none" 
-                  style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderLeft: 'none' }}
-                  value={filterStatus} 
-                  onChange={e => setFilterStatus(e.target.value as typeof filterStatus)}
+                  className="form-select border-start-0 shadow-none fw-bold" 
+                  style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)', borderColor: 'var(--border-color)' }}
+                  value={filterCategory} 
+                  onChange={e => setFilterCategory(e.target.value)}
                 >
-                  <option value="All">ทุกสถานะ</option>
-                  <option value="Pending">⏳ รออนุมัติ</option>
-                  <option value="Approved">✅ อนุมัติแล้ว</option>
-                  <option value="Received">📥 ได้รับแล้ว</option>
-                  <option value="Rejected">❌ ปฏิเสธแล้ว</option>
+                  <option value="All">ทุกหมวดหมู่ ({allRequestsState.length})</option>
+                  {Object.entries(categoryStats).map(([cat, count]) => (
+                    <option key={cat} value={cat}>{cat} ({count})</option>
+                  ))}
                 </select>
               </div>
             </div>
-            <div className="col-md-4">
-              <select 
-                className="form-select form-select-sm shadow-none" 
-                style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
-                value={filterCategory} 
-                onChange={e => setFilterCategory(e.target.value)}
-              >
-                <option value="All">ทุกหมวดหมู่</option>
-                {Object.keys(categoryStats).map(cat => <option key={cat} value={cat}>{cat}</option>)}
-              </select>
-            </div>
-            <div className="col-md-4 text-end">
-              <button 
-                className="btn btn-sm" 
-                style={{ 
-                  backgroundColor: 'var(--bg-card)', 
-                  color: 'var(--text-secondary)',
-                  border: '1px solid var(--border-color)',
-                  padding: '4px 12px'
-                }}
-                onClick={() => {setFilterStatus('All'); setFilterCategory('All'); setFilterUrgency('All');}}
-              >
-                ล้างตัวกรอง
-              </button>
+
+            {/* Keyword Search */}
+            <div className="col-12 col-md-8 col-xl-4">
+              <div className="input-group input-group-sm">
+                <span className="input-group-text bg-transparent border-end-0 text-secondary" style={{ borderColor: 'var(--border-color)' }}>
+                  <i className="bi bi-search"></i>
+                </span>
+                <input 
+                  type="text" 
+                  className="form-control border-start-0 shadow-none" 
+                  style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)', borderColor: 'var(--border-color)' }}
+                  placeholder="ค้นหาชื่อสิ่งของ หรือ ศูนย์พักพิง..." 
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                />
+                <button 
+                  className="btn btn-outline-secondary border-start-0" 
+                  style={{ borderColor: 'var(--border-color)' }}
+                  onClick={() => {setFilterStatus('All'); setFilterCategory('All'); setSearchTerm('');}}
+                >
+                  <i className="bi bi-x-lg"></i>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -388,6 +374,16 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
           </table>
         </div>
       </div>
+      <style jsx>{`
+        .cursor-pointer { cursor: pointer; }
+        .transition-all { transition: all 0.2s ease; }
+        .transition-all:hover { transform: translateY(-3px); }
+        .ring-active { box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.2); }
+        .bg-card { background-color: var(--bg-card); }
+        .border-theme { border-color: var(--border-color) !important; }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+      `}</style>
     </div>
   );
 }
