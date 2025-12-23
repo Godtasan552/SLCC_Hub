@@ -1,35 +1,44 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { useSidebar } from '@/contexts/SidebarContext';
+
+interface UserWithRole {
+  name?: string | null;
+  email?: string | null;
+  image?: string | null;
+  role?: string;
+}
 
 export default function Sidebar() {
   const pathname = usePathname();
   const { isOpen, closeSidebar } = useSidebar();
+  const { data: session } = useSession();
+  const role = (session?.user as UserWithRole)?.role;
 
   const menuGroups = [
     {
       title: 'ศูนย์อำนวยการ',
       icon: 'bi-building',
       items: [
-        { name: 'จัดการศูนย์พักพิง', href: '/admin/import', icon: 'bi-list-ul' },
-        { name: 'เพิ่มศูนย์/คลังใหม่', href: '/admin/centers/create', icon: 'bi-plus-circle' },
-        { name: 'ศูนย์บริหารจัดการคลัง', href: '/admin/hubs', icon: 'bi-building-gear' },
-        { name: 'จัดการคลังสิ่งของ', href: '/admin/supplies', icon: 'bi-box-seam' },
-        { name: 'คำร้องขอสิ่งของ', href: '/requests', icon: 'bi-folder2-open' },
+        { name: 'จัดการศูนย์พักพิง', href: '/admin/import', icon: 'bi-list-ul', roles: ['admin', 'staff'] },
+        { name: 'เพิ่มศูนย์/คลังใหม่', href: '/admin/centers/create', icon: 'bi-plus-circle', roles: ['admin'] },
+        { name: 'ศูนย์บริหารจัดการคลัง', href: '/admin/hubs', icon: 'bi-building-gear', roles: ['admin'] },
+        { name: 'จัดการคลังสิ่งของ', href: '/admin/supplies', icon: 'bi-box-seam', roles: ['admin'] },
+        { name: 'คำร้องขอสิ่งของ', href: '/requests', icon: 'bi-folder2-open', roles: ['admin'] },
       ],
     },
     {
       title: 'ศูนย์พักพิง',
       icon: 'bi-hospital',
       items: [
-        { name: 'รายชื่อศูนย์', href: '/', icon: 'bi-list-task' },
-        { name: 'รายการสิ่งของ', href: '/supplies', icon: 'bi-box' },
-        { name: 'สร้างคำร้องขอ', href: '/requests/create', icon: 'bi-plus-square' },
-        { name: 'รายการเบิกจ่าย', href: '/requests/summary', icon: 'bi-hexagon' },
+        { name: 'รายชื่อศูนย์', href: '/', icon: 'bi-list-task', roles: ['admin', 'staff', 'user'] },
+        { name: 'รายการสิ่งของ', href: '/supplies', icon: 'bi-box', roles: ['admin', 'staff', 'user'] },
+        { name: 'สร้างคำร้องขอ', href: '/requests/create', icon: 'bi-plus-square', roles: ['admin', 'staff'] },
+        { name: 'รายการเบิกจ่าย', href: '/requests/summary', icon: 'bi-hexagon', roles: ['admin', 'staff'] },
       ],
     },
-
   ];
 
   return (
@@ -61,34 +70,45 @@ export default function Sidebar() {
         </div>
 
         <div className="px-3 pb-3">
-          {menuGroups.map((group) => (
-            <div key={group.title} className="mb-3">
-              {/* Group Header */}
-              <div className="d-flex align-items-center mb-2 px-2" style={{ color: 'var(--text-primary)' }}>
-                <i className={`bi ${group.icon} me-2`}></i>
-                <span className="fw-semibold">{group.title}</span>
-              </div>
+          {menuGroups.map((group) => {
+            // Filter items based on role
+            const visibleItems = group.items.filter(item => {
+              if (!item.roles) return true; 
+              if (!role) return false; 
+              return item.roles.includes(role);
+            });
 
-              {/* Group Items with Left Border Line */}
-              <div className="d-flex flex-column" style={{ marginLeft: '11px', borderLeft: '2px solid rgba(128, 128, 128, 0.3)', paddingLeft: '15px' }}>
-                {group.items.map((item) => {
-                  const isActive = pathname === item.href;
-                  return (
-                    <Link 
-                      key={item.name}
-                      href={item.href} 
-                      className={`d-flex align-items-center mb-2 text-decoration-none ${isActive ? 'text-primary' : 'text-theme-secondary'}`}
-                      style={{ padding: '6px 0', fontSize: '0.95rem', transition: 'all 0.2s ease' }}
-                      onClick={closeSidebar}
-                    >
-                      <i className={`bi ${item.icon} me-2 ${isActive ? 'fw-bold' : ''}`} style={{ fontSize: '1.1rem' }}></i>
-                      <span className={isActive ? 'fw-bold' : ''}>{item.name}</span>
-                    </Link>
-                  );
-                })}
+            if (visibleItems.length === 0) return null;
+
+            return (
+              <div key={group.title} className="mb-3">
+                {/* Group Header */}
+                <div className="d-flex align-items-center mb-2 px-2" style={{ color: 'var(--text-primary)' }}>
+                  <i className={`bi ${group.icon} me-2`}></i>
+                  <span className="fw-semibold">{group.title}</span>
+                </div>
+
+                {/* Group Items with Left Border Line */}
+                <div className="d-flex flex-column" style={{ marginLeft: '11px', borderLeft: '2px solid rgba(128, 128, 128, 0.3)', paddingLeft: '15px' }}>
+                  {visibleItems.map((item) => {
+                    const isActive = pathname === item.href;
+                    return (
+                      <Link 
+                        key={item.name}
+                        href={item.href} 
+                        className={`d-flex align-items-center mb-2 text-decoration-none ${isActive ? 'text-primary' : 'text-theme-secondary'}`}
+                        style={{ padding: '6px 0', fontSize: '0.95rem', transition: 'all 0.2s ease' }}
+                        onClick={closeSidebar}
+                      >
+                        <i className={`bi ${item.icon} me-2 ${isActive ? 'fw-bold' : ''}`} style={{ fontSize: '1.1rem' }}></i>
+                        <span className={isActive ? 'fw-bold' : ''}>{item.name}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="mt-auto border-top border-secondary pt-3 pb-3 px-3 mx-2">

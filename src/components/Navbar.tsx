@@ -20,7 +20,7 @@ export default function Navbar() {
           >
             <i className="bi bi-list fs-3"></i>
           </button>
-          <Link href="/" className="navbar-brand text-theme fw-bold">
+          <Link href="/dashboard" className="navbar-brand text-theme fw-bold">
             SLCC Hub
           </Link>
         </div>
