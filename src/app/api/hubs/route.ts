@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import Hub from '@/models/Hub';
+// Import Hub above ensures schema cache is cleared if updated
 
 export async function GET() {
   await dbConnect();

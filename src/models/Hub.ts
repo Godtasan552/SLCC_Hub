@@ -15,8 +15,14 @@ const HubSchema = new Schema({
   name: { type: String, required: true, unique: true },
   district: { type: String },
   subdistrict: { type: String },
+  phoneNumbers: [String],
   resources: [HubResourceRequestSchema], // รายการที่คลังนี้ "ต้องการ" (เพื่อรับบริจาค)
   updatedAt: { type: Date, default: Date.now }
 });
+
+// Force delete model cache to ensure schema updates are applied in development
+if (models && models.Hub) {
+  delete (models as Record<string, any>).Hub;
+}
 
 export default models.Hub || model('Hub', HubSchema);

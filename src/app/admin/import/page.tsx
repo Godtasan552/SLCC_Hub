@@ -175,10 +175,10 @@ export default function AdminPage() {
       <div className="d-flex flex-column flex-md-row justify-content-between align-items-end mb-4 gap-3">
         <div>
            <div className="d-flex align-items-center mb-2">
-                <span className="badge bg-primary rounded-circle p-2 me-2"><i className="bi bi-shield-lock-fill fs-5 text-white"></i></span>
-                <h4 className="fw-bold mb-0" style={{ color: 'var(--text-primary)' }}>ระบบจัดการศูนย์พักพิง</h4>
+                <span className="badge bg-success rounded-circle p-2 me-2"><i className="bi bi-house-door-fill fs-5 text-white"></i></span>
+                <h4 className="fw-bold mb-0" style={{ color: 'var(--text-primary)' }}>จัดการศูนย์พักพิง (Shelters Management)</h4>
            </div>
-           <p className="text-secondary small mb-0 ps-1">ระบบบริหารจัดการข้อมูลผู้ประสบภัยและทรัพยากร</p>
+           <p className="text-secondary small mb-0 ps-1">ระบบบริหารจัดการข้อมูลผู้อพยพรายวันและการรองรับของศูนย์พักพิง</p>
         </div>
         
         {/* Tab Navigation */}

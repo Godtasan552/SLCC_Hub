@@ -32,7 +32,7 @@ export default function CreateCenterPage() {
       
       if (res.data.success) {
         alert(`สร้าง${formData.type === 'Hub' ? 'คลังกลาง' : 'ศูนย์พักพิง'}เรียบร้อยแล้ว`);
-        router.push(formData.type === 'Hub' ? '/requests/create' : '/admin/import');
+        router.push(formData.type === 'Hub' ? '/admin/hubs' : '/admin/import');
       }
     } catch (error: unknown) {
       const message = axios.isAxiosError(error) ? error.response?.data?.error : (error as Error).message;
