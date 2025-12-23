@@ -79,86 +79,66 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-primary);
 }
 
-/* Theme-aware card styles */
+/* Theme-aware card styles - Premium Look */
 .card {
   background-color: var(--bg-card) !important;
-  border-color: var(--border-color) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 12px !important;
   color: var(--text-primary) !important;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04) !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease !important;
 }
 
-/* Theme-aware navbar/sidebar */
-.bg-dark-theme {
-  background-color: var(--bg-secondary) !important;
+[data-theme="dark"] .card {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25) !important;
 }
 
-.text-theme {
-  color: var(--text-primary) !important;
+.card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08) !important;
 }
 
-.text-theme-secondary {
-  color: var(--text-secondary) !important;
+[data-theme="dark"] .card:hover {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4) !important;
 }
 
-.border-theme {
-  border-color: var(--border-color) !important;
-}
-
-/* Additional pagination theme support */
-.pagination .page-link {
-  background-color: var(--bg-card);
-  color: var(--text-primary);
-  border-color: var(--border-color);
-}
-
-.pagination .page-link:hover {
-  background-color: var(--table-hover);
-  color: var(--text-primary);
-  border-color: var(--border-color);
-}
-
-.pagination .page-item.active .page-link {
-  background-color: #0d6efd;
-  border-color: #0d6efd;
-  color: #fff;
-}
-
-.pagination .page-item.disabled .page-link {
-  background-color: var(--bg-card);
-  color: var(--text-secondary);
-  border-color: var(--border-color);
-}
-
-/* Form theme support */
+/* Form theme support - Premium Dropdowns */
 .form-control,
 .form-select {
   background-color: var(--bg-card) !important;
   color: var(--text-primary) !important;
-  border-color: var(--border-color) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 8px !important;
+  padding: 0.6rem 1rem !important;
+  font-size: 0.9rem !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease !important;
+}
+
+.form-select {
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%236c757d' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.75rem center !important;
+  background-size: 16px 12px !important;
+  padding-right: 2.5rem !important;
+}
+
+[data-theme="dark"] .form-select {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ced4da' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
 }
 
 .form-control:focus,
 .form-select:focus {
-  background-color: var(--bg-card) !important;
-  color: var(--text-primary) !important;
   border-color: #0d6efd !important;
-  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+  box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.15) !important;
+  outline: none !important;
 }
 
-.form-control::placeholder {
-  color: var(--text-secondary) !important;
-  opacity: 0.7;
-}
-
-.form-control:disabled,
-.form-control[readonly] {
-  background-color: var(--bg-secondary) !important;
-  opacity: 0.6;
-}
-
-/* Fix for Select options background in dark mode */
+/* Select options styling */
 select option {
   background-color: var(--bg-card);
   color: var(--text-primary);
+  padding: 10px;
 }
 
 /* Fix for browser autofill */
