@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import axios from 'axios';
+import useSWR from 'swr';
 
 interface Resource {
   _id?: string;
@@ -14,19 +15,21 @@ interface Resource {
   requestedAt: Date | string;
   shelterId?: string;
   shelterName?: string;
-  isHub?: boolean; // NEW: To distinguish source
+  isHub?: boolean;
 }
 
 interface Shelter {
   _id: string;
   name: string;
   resources: Resource[];
-  isHub?: boolean; // NEW: To distinguish source
+  isHub?: boolean;
 }
 
 interface SummaryResourcesProps {
   allShelters: Shelter[];
 }
+
+const fetcher = (url: string) => axios.get(url).then(res => res.data.data);
 
 export default function SummaryResources({ allShelters }: SummaryResourcesProps) {
   const [loadingId, setLoadingId] = useState<string | null>(null);
@@ -34,26 +37,32 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
   const [filterCategory, setFilterCategory] = useState<string>('All');
   const [filterUrgency, setFilterUrgency] = useState<string>('All');
 
+  // 🔹 Fetch real-time data using SWR
+  const { data: latestShelters, mutate } = useSWR<Shelter[]>('/api/requests/summary', fetcher, {
+    fallbackData: allShelters,
+    refreshInterval: 10000, // Refresh every 10 seconds
+    revalidateOnFocus: true
+  });
+
   // 🔹 รวมคำขอจากทุกศูนย์
-  const initialRequests = useMemo(() => {
-    return allShelters.flatMap(s =>
-      (s.resources || []).map(r => ({
+  const allRequestsState = useMemo(() => {
+    const currentData = latestShelters || allShelters;
+    return currentData.flatMap((s: Shelter) =>
+      (s.resources || []).map((r: Resource) => ({
         ...r,
         shelterId: s._id,
         shelterName: s.name,
-        isHub: s.isHub // Pass down the hub status
+        isHub: s.isHub
       }))
     ).sort(
-      (a, b) =>
+      (a: Resource, b: Resource) =>
         new Date(b.requestedAt || 0).getTime() -
         new Date(a.requestedAt || 0).getTime()
     );
-  }, [allShelters]);
-
-  const [allRequestsState, setAllRequestsState] = useState(initialRequests);
+  }, [latestShelters, allShelters]);
 
   const filteredRequests = useMemo(() => {
-    return allRequestsState.filter(r => {
+    return allRequestsState.filter((r: Resource) => {
       const statusMatch = filterStatus === 'All' || r.status === filterStatus;
       const categoryMatch = filterCategory === 'All' || r.category === filterCategory;
       const urgencyMatch = filterUrgency === 'All' || r.urgency === filterUrgency;
@@ -62,28 +71,28 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
   }, [allRequestsState, filterStatus, filterCategory, filterUrgency]);
 
   const statusStats = useMemo(() => ({
-    pending: allRequestsState.filter(r => r.status === 'Pending').length,
-    approved: allRequestsState.filter(r => r.status === 'Approved').length,
-    shipped: allRequestsState.filter(r => r.status === 'Shipped').length,
-    received: allRequestsState.filter(r => r.status === 'Received').length,
-    rejected: allRequestsState.filter(r => r.status === 'Rejected').length
+    pending: allRequestsState.filter((r: Resource) => r.status === 'Pending').length,
+    approved: allRequestsState.filter((r: Resource) => r.status === 'Approved').length,
+    shipped: allRequestsState.filter((r: Resource) => r.status === 'Shipped').length,
+    received: allRequestsState.filter((r: Resource) => r.status === 'Received').length,
+    rejected: allRequestsState.filter((r: Resource) => r.status === 'Rejected').length
   }), [allRequestsState]);
 
   const categoryStats = useMemo(() => {
     const stats: Record<string, number> = {};
-    allRequestsState.forEach(r => {
+    allRequestsState.forEach((r: Resource) => {
       stats[r.category] = (stats[r.category] || 0) + 1;
     });
     return stats;
   }, [allRequestsState]);
 
   const urgencyStats = useMemo(() => ({
-    high: allRequestsState.filter(r => r.urgency === 'high' && r.status === 'Pending').length,
-    medium: allRequestsState.filter(r => r.urgency === 'medium' && r.status === 'Pending').length,
-    low: allRequestsState.filter(r => r.urgency === 'low' && r.status === 'Pending').length
+    high: allRequestsState.filter((r: Resource) => r.urgency === 'high' && r.status === 'Pending').length,
+    medium: allRequestsState.filter((r: Resource) => r.urgency === 'medium' && r.status === 'Pending').length,
+    low: allRequestsState.filter((r: Resource) => r.urgency === 'low' && r.status === 'Pending').length
   }), [allRequestsState]);
 
-  // NEW: Approve function (Admin only)
+  // NEW: Receive function
   const handleReceive = async (targetId: string, resourceId: string, isHub: boolean) => {
     const msg = isHub ? 'ยืนยันการรับของบริจาคเข้าสู่คลังกลาง?' : 'ยืนยันว่าได้รับของชิ้นนี้แล้ว? (ยอดจะไปเพิ่มในสต็อกของศูนย์ปลายทาง)';
     if (!confirm(msg)) return;
@@ -93,9 +102,8 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
       const endpoint = isHub ? `/api/hubs/${targetId}/resources/${resourceId}` : `/api/shelters/${targetId}/resources/${resourceId}`;
       const res = await axios.patch(endpoint, { status: 'Received' });
       if (res.data.success) {
-        setAllRequestsState(prev =>
-          prev.map(r => r._id === resourceId ? { ...r, status: 'Received' } : r)
-        );
+        // อัปเดตข้อมูลผ่าน SWR Mutate
+        mutate();
         alert('ยืนยันการรับของเรียบร้อย ยอดคงเหลือถูกเพิ่มเข้าสู่ระบบแล้ว');
       }
     } catch (err: unknown) {
@@ -120,9 +128,7 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
       });
       
       if (res.data.success) {
-        setAllRequestsState(prev =>
-          prev.map(r => r._id === resourceId ? { ...r, status: 'Approved' } : r)
-        );
+        mutate();
         alert(`✅ ${res.data.message}\nตัดสต็อก: ${res.data.stockDeducted} หน่วย`);
       }
     } catch (err: unknown) {
@@ -147,9 +153,7 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
       });
       
       if (res.data.success) {
-        setAllRequestsState(prev =>
-          prev.map(r => r._id === resourceId ? { ...r, status: 'Rejected' } : r)
-        );
+        mutate();
         alert('❌ ปฏิเสธคำร้องขอเรียบร้อย');
       }
     } catch (err: unknown) {
@@ -169,8 +173,6 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
     }
   };
 
-
-
   const getCategoryIcon = (category: string) => {
     switch (category) {
       case 'Medical': case 'ยา และเวชภัณฑ์': return '💊';
@@ -181,9 +183,9 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
   };
 
   return (
-    <div className="mt-4 pb-5">
+    <div className="animate-fade-in">
       {/* 📊 Summary Cards */}
-      <div className="row mb-4 g-3">
+      <div className="row g-3 mb-4">
         <div className="col-md-2">
           <div className="card shadow-sm border-0 h-100 bg-warning bg-opacity-10">
             <div className="card-body">
@@ -305,48 +307,46 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
               </tr>
             </thead>
             <tbody>
-              {filteredRequests.map(req => {
+              {filteredRequests.map((req: Resource) => {
                 return (
-                  <tr key={req._id} className="border-bottom">
-                    <td className="ps-4 py-3">
+                  <tr key={req._id}>
+                    <td className="ps-4">
                       <div className="d-flex align-items-center">
-                        <span className="fs-4 me-2">{getCategoryIcon(req.category)}</span>
+                        <span className="fs-4 me-3">{getCategoryIcon(req.category)}</span>
                         <div>
-                          <div className="small fw-bold">{req.category}</div>
-                          <div className="text-muted" style={{ fontSize: '0.75rem' }}>
+                          <div className="small fw-bold text-dark">{req.category}</div>
+                          <div className="text-secondary" style={{ fontSize: '0.75rem' }}>
                             {new Date(req.requestedAt).toLocaleDateString('th-TH')}
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="fw-bold fs-6">{req.itemName}</td>
                     <td>
-                      <span className="badge bg-light text-theme border px-3 py-2">
-                        {req.amount} {req.unit}
-                      </span>
+                      <div className="fw-bold text-dark">{req.itemName}</div>
                     </td>
                     <td>
-                      <div className={`small fw-bold px-2 py-1 rounded d-inline-block ${req.isHub ? 'bg-primary bg-opacity-25 text-primary border border-primary' : 'bg-secondary bg-opacity-25 text-theme-secondary border'}`}>
-                        {req.isHub ? '🏗️ ' : '🏠 '}{req.shelterName}
-                      </div>
+                      <span className="fw-bold text-primary">{req.amount}</span> {req.unit}
+                    </td>
+                    <td>
+                      <span className="badge bg-light text-dark fw-normal border shadow-sm">
+                        {req.isHub ? '📦' : '🏠'} {req.shelterName}
+                      </span>
                     </td>
                     <td>{getUrgencyBadge(req.urgency)}</td>
                     <td className="text-end pe-4">
                       {req.status === 'Pending' ? (
-                        <div className="d-flex gap-2 justify-content-end">
+                        <div className="btn-group btn-group-sm">
                           <button 
-                            className="btn btn-sm btn-success px-3 rounded-pill fw-bold"
+                            className="btn btn-success px-3 rounded-start-pill fw-bold"
                             disabled={loadingId === req._id}
-                            onClick={() => handleApprove(req.shelterId!, req._id!, req.isHub || false)}
-                            title="อนุมัติและตัดสต็อก"
+                            onClick={() => handleApprove(req.shelterId!, req._id!, !!req.isHub)}
                           >
                             {loadingId === req._id ? '⏳' : '✅ อนุมัติ'}
                           </button>
                           <button 
-                            className="btn btn-sm btn-outline-danger px-3 rounded-pill fw-bold"
+                            className="btn btn-danger px-3 rounded-end-pill fw-bold"
                             disabled={loadingId === req._id}
-                            onClick={() => handleReject(req.shelterId!, req._id!, req.isHub || false)}
-                            title="ปฏิเสธคำร้องขอ"
+                            onClick={() => handleReject(req.shelterId!, req._id!, !!req.isHub)}
                           >
                             {loadingId === req._id ? '⏳' : '❌ ปฏิเสธ'}
                           </button>
@@ -359,7 +359,7 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
                         <button 
                           className="btn btn-sm btn-success px-3 rounded-pill fw-bold"
                           disabled={loadingId === req._id}
-                          onClick={() => handleReceive(req.shelterId!, req._id!, false)}
+                          onClick={() => handleReceive(req.shelterId!, req._id!, !!req.isHub)}
                         >
                           {loadingId === req._id ? 'กำลังบันทึก...' : '📥 ยืนยันรับของ'}
                         </button>
@@ -396,6 +396,13 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
         .btn-white {
           background: white;
           border: 1px solid #eee;
+        }
+        .animate-fade-in {
+          animation: fadeIn 0.4s ease-out;
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
     </div>
