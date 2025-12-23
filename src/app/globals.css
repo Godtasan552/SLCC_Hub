@@ -2,12 +2,12 @@
 
 /* Theme Variables */
 :root[data-theme="dark"] {
-  --bg-primary: #121416;         /* Slightly darker for better background separation */
+  --bg-primary: #121416;
   --bg-secondary: #1a1d21;
   --bg-card: #22262b;
-  --text-primary: #ffffff;       /* Pure white for maximum contrast */
-  --text-secondary: #ced4da;     /* Lighter grey for better readability */
-  --border-color: #3d4349;
+  --text-primary: #ffffff;
+  --text-secondary: #ced4da;
+  --border-color: #2d3238; /* Subtler border for dark mode */
   --table-hover: #2c3036;
 }
 
@@ -99,6 +99,24 @@ h1, h2, h3, h4, h5, h6 {
 
 [data-theme="dark"] .card:hover {
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Theme Utility Classes */
+.bg-dark-theme {
+  background-color: var(--bg-secondary) !important;
+}
+
+.text-theme {
+  color: var(--text-primary) !important;
+}
+
+.text-theme-secondary {
+  color: var(--text-secondary) !important;
+}
+
+.border-theme {
+  border-color: var(--border-color) !important;
+  border-width: 1px !important;
 }
 
 /* Form theme support - Premium Dropdowns */
