@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Shelter } from "@/types/shelter";
 import { getAggregatedMovement, getCapacityStatus } from "@/utils/shelter-utils";
 
@@ -27,11 +27,26 @@ export default function ShelterList({
   onDelete
 }: ShelterListProps) {
   const [currentPage, setCurrentPage] = useState(1);
+  const [filterCapacity, setFilterCapacity] = useState('All');
+  const [filterDistrict, setFilterDistrict] = useState('All');
 
-  const filteredShelters = shelters.filter(s => 
-    (s.name?.toLowerCase().includes(searchTerm.toLowerCase())) || 
-    (s.district?.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const districts = useMemo(() => {
+    return ['All', ...new Set(shelters.map(s => s.district).filter(Boolean))];
+  }, [shelters]);
+
+  const filteredShelters = useMemo(() => {
+    return shelters.filter(s => {
+      const matchSearch = (s.name?.toLowerCase().includes(searchTerm.toLowerCase())) || 
+                          (s.district?.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      const status = getCapacityStatus(s.currentOccupancy, s.capacity);
+      const matchCapacity = filterCapacity === 'All' || status.text === filterCapacity;
+      
+      const matchDistrict = filterDistrict === 'All' || s.district === filterDistrict;
+      
+      return matchSearch && matchCapacity && matchDistrict;
+    });
+  }, [shelters, searchTerm, filterCapacity, filterDistrict]);
 
   const totalPages = Math.ceil(filteredShelters.length / ITEMS_PER_PAGE);
   const paginatedShelters = filteredShelters.slice(
@@ -41,47 +56,127 @@ export default function ShelterList({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, filterCapacity, filterDistrict]);
 
   const hasActions = onAction || onEdit || onDelete;
 
   return (
-    <div className="card shadow-sm border-0 mb-3" style={{ backgroundColor: 'var(--bg-card)' }}>
-      <div className="card-header bg-transparent border-bottom py-3">
-        {/* Header */}
-        <div className="row g-3 align-items-center">
-          <div className="col-12 col-xl-4 text-center text-xl-start">
-            <h5 className="mb-0 fw-bold" style={{ color: 'var(--text-primary)' }}>
-              {(onAction || onEdit) ? '🛠️ จัดการข้อมูลรายศูนย์' : `📍 ความเคลื่อนไหวรายศูนย์ ${timeRange === 1 ? '(วันนี้)' : `(ย้อนหลัง ${timeRange} วัน)`}`}
-            </h5>
-          </div>
-          <div className="col-12 col-md-7 col-xl-4 d-flex justify-content-center">
-            <div className="btn-group btn-group-sm p-1 rounded-pill overflow-auto w-100 w-md-auto" style={{ backgroundColor: 'rgba(0,0,0,0.05)', whiteSpace: 'nowrap' }}>
-              {[1, 3, 7, 14, 30].map((range) => (
-                <button 
-                  key={range}
-                  className={`btn px-3 rounded-pill border-0 ${timeRange === range ? 'btn-primary shadow-sm' : 'text-secondary'}`}
-                  onClick={() => setTimeRange(range)}
+    <div className="w-100">
+      {/* 🔍 Advanced Filter Bar */}
+      <div className="card shadow-sm mb-3 border-0" style={{ backgroundColor: 'var(--bg-card)' }}>
+        <div className="card-body p-3">
+          <div className="row g-2 align-items-center">
+            {/* Capacity Filter */}
+            <div className="col-12 col-md-3">
+              <div className="input-group">
+                <span className="input-group-text bg-transparent border-end-0 border-theme">
+                  <i className="bi bi-bar-chart-fill text-primary"></i>
+                </span>
+                <select 
+                  className="form-select border-start-0 border-theme shadow-none"
+                  value={filterCapacity}
+                  onChange={(e) => setFilterCapacity(e.target.value)}
                 >
-                  {range === 1 ? 'วันนี้' : `${range} วัน`}
-                </button>
-              ))}
+                  <option value="All">ทุกสถานะความจุ</option>
+                  <option value="ล้นศูนย์">⚠️ ล้นศูนย์</option>
+                  <option value="ใกล้เต็ม">🟠 ใกล้เต็ม</option>
+                  <option value="รองรับได้">🟢 รองรับได้</option>
+                </select>
+              </div>
             </div>
-          </div>
-          <div className="col-12 col-md-5 col-xl-4">
-            <div className="position-relative">
-              <i className="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-secondary"></i>
-              <input 
-                type="text" 
-                className="form-control form-control-sm ps-5 border-theme" 
-                placeholder="ค้นหาชื่อศูนย์/สถานที่..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+
+            {/* District Filter */}
+            <div className="col-12 col-md-3">
+              <div className="input-group">
+                <span className="input-group-text bg-transparent border-end-0 border-theme">
+                  <i className="bi bi-geo-alt-fill text-danger"></i>
+                </span>
+                <select 
+                  className="form-select border-start-0 border-theme shadow-none"
+                  value={filterDistrict}
+                  onChange={(e) => setFilterDistrict(e.target.value)}
+                >
+                  <option value="All">ทุกอำเภอ</option>
+                  {districts.filter(d => d !== 'All').map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Keyword Search */}
+            <div className="col-12 col-md-4">
+              <div className="input-group">
+                <span className="input-group-text bg-transparent border-end-0 border-theme">
+                  <i className="bi bi-search text-secondary"></i>
+                </span>
+                <input 
+                  type="text" 
+                  className="form-control border-start-0 border-theme shadow-none" 
+                  placeholder="ค้นหาชื่อศูนย์/สถานที่..." 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="col-12 col-md-2 d-flex gap-2">
+              <button className="btn btn-primary fw-bold flex-grow-1 shadow-sm px-3 border-0">
+                ค้นหา
+              </button>
+              <button 
+                className="btn btn-outline-secondary shadow-sm"
+                onClick={() => {
+                  setSearchTerm('');
+                  setFilterCapacity('All');
+                  setFilterDistrict('All');
+                }}
+                title="ล้างตัวกรอง"
+              >
+                <i className="bi bi-arrow-clockwise"></i>
+              </button>
             </div>
           </div>
         </div>
       </div>
+
+      {/* 📊 Summary Bar */}
+      <div className="card shadow-sm mb-3 border-0" style={{ backgroundColor: 'var(--bg-card)' }}>
+        <div className="card-body p-2 px-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <div className="d-flex align-items-center gap-2">
+            <span className="text-secondary small">จำนวนศูนย์พักพิงที่พบ:</span>
+            <span className="badge bg-primary px-3 py-2 rounded-3">{filteredShelters.length} รายการ</span>
+          </div>
+          <div className="text-secondary small">
+            หน้า <span className="fw-bold text-primary">{currentPage}</span> จาก <span className="fw-bold">{totalPages || 1}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="card shadow-sm border-0 mb-3" style={{ backgroundColor: 'var(--bg-card)' }}>
+        <div className="card-header bg-transparent border-bottom py-3">
+          <div className="row g-3 align-items-center">
+            <div className="col-12 col-xl-4 text-center text-xl-start">
+              <h6 className="mb-0 fw-bold" style={{ color: 'var(--text-primary)' }}>
+                {(onAction || onEdit) ? '🛠️ รายการศูนย์พักพิงทั้งหมด' : `📍 ความเคลื่อนไหวรายศูนย์ ${timeRange === 1 ? '(วันนี้)' : `(ย้อนหลัง ${timeRange} วัน)`}`}
+              </h6>
+            </div>
+            <div className="col-12 col-md-12 col-xl-8 d-flex justify-content-center justify-content-xl-end">
+              <div className="btn-group btn-group-sm p-1 rounded-pill overflow-auto" style={{ backgroundColor: 'rgba(0,0,0,0.05)', whiteSpace: 'nowrap' }}>
+                {[1, 3, 7, 14, 30].map((range) => (
+                  <button 
+                    key={range}
+                    className={`btn px-3 rounded-pill border-0 ${timeRange === range ? 'btn-primary shadow-sm' : 'text-secondary'}`}
+                    onClick={() => setTimeRange(range)}
+                  >
+                    {range === 1 ? 'วันนี้' : `${range} วัน`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       
       <div className="table-responsive">
         <table className="table table-hover align-middle mb-0 text-theme" style={{ fontSize: '0.9rem' }}>
@@ -178,33 +273,34 @@ export default function ShelterList({
           </tbody>
         </table>
       </div>
+    </div>
 
-      {totalPages > 1 && (
-        <div className="d-flex justify-content-center mt-4 mb-4">
-          <nav className="custom-pagination">
-            <div className="pagination-container d-flex align-items-center">
-              <button className="pag-btn" onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>«</button>
-              <button className="pag-btn" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>‹</button>
-              {(() => {
-                const pages = [];
-                const showRange = 2;
-                for (let i = 1; i <= totalPages; i++) {
-                  if (i === 1 || i === totalPages || (i >= currentPage - showRange && i <= currentPage + showRange)) {
-                    pages.push(
-                      <button key={i} className={`pag-btn ${currentPage === i ? 'active' : ''}`} onClick={() => setCurrentPage(i)}>{i}</button>
-                    );
-                  } else if (i === currentPage - showRange - 1 || i === currentPage + showRange + 1) {
-                    pages.push(<span key={i} className="pag-ellipsis">...</span>);
-                  }
+    {totalPages > 1 && (
+      <div className="d-flex justify-content-center mt-4 mb-4">
+        <nav className="custom-pagination">
+          <div className="pagination-container d-flex align-items-center">
+            <button className="pag-btn" onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>«</button>
+            <button className="pag-btn" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>‹</button>
+            {(() => {
+              const pages = [];
+              const showRange = 2;
+              for (let i = 1; i <= totalPages; i++) {
+                if (i === 1 || i === totalPages || (i >= currentPage - showRange && i <= currentPage + showRange)) {
+                  pages.push(
+                    <button key={i} className={`pag-btn ${currentPage === i ? 'active' : ''}`} onClick={() => setCurrentPage(i)}>{i}</button>
+                  );
+                } else if (i === currentPage - showRange - 1 || i === currentPage + showRange + 1) {
+                  pages.push(<span key={i} className="pag-ellipsis">...</span>);
                 }
-                return pages;
-              })()}
-              <button className="pag-btn" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>›</button>
-              <button className="pag-btn" onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages}>»</button>
-            </div>
-          </nav>
-        </div>
-      )}
+              }
+              return pages;
+            })()}
+            <button className="pag-btn" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>›</button>
+            <button className="pag-btn" onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages}>»</button>
+          </div>
+        </nav>
+      </div>
+    )}
 
       <style jsx>{`
         .pagination-container {

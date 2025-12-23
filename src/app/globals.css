@@ -106,12 +106,37 @@ h1, h2, h3, h4, h5, h6 {
 .form-select {
   background-color: var(--bg-card) !important;
   color: var(--text-primary) !important;
-  border: 1px solid var(--border-color) !important;
-  border-radius: 8px !important;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
   padding: 0.6rem 1rem !important;
   font-size: 0.9rem !important;
   font-weight: 500 !important;
   transition: all 0.2s ease !important;
+}
+
+/* Fix for input-group connection */
+.input-group > .form-control,
+.input-group > .form-select,
+.input-group > .input-group-text {
+  border-radius: 8px; /* Default */
+}
+
+.input-group > :not(:last-child) {
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+  border-right-width: 0 !important;
+}
+
+.input-group > :not(:first-child) {
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  border-left-width: 0 !important;
+}
+
+.input-group-text {
+  background-color: var(--bg-card) !important;
+  border: 1px solid var(--border-color) !important;
+  color: var(--text-secondary) !important;
 }
 
 .form-select {
