@@ -1,10 +1,11 @@
-'use client'
+'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import ExcelJS from 'exceljs';
 import ShelterList from '@/components/dashboard/ShelterList';
 import { Shelter } from "@/types/shelter";
 import { Modal } from 'bootstrap';
+import { useSession } from 'next-auth/react';
 
 interface ShelterData {
   name: string;
@@ -14,7 +15,15 @@ interface ShelterData {
   phoneNumbers?: string[];
 }
 
+interface UserWithRole {
+  role?: string;
+}
+
 export default function AdminPage() {
+  const { data: session } = useSession();
+  const role = (session?.user as UserWithRole)?.role;
+  const isAdmin = role === 'admin';
+
   // --- States ---
   const [activeTab, setActiveTab] = useState<'daily' | 'management'>('daily');
   const [loading, setLoading] = useState(false);
@@ -23,7 +32,7 @@ export default function AdminPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [timeRange, setTimeRange] = useState(1);
   
-  // Modal State
+  // Action Modal State (In/Out)
   const [modalState, setModalState] = useState<{ isOpen: boolean, shelter: Shelter | null, action: 'in' | 'out', amount: number }>({
     isOpen: false,
     shelter: null,
@@ -32,6 +41,11 @@ export default function AdminPage() {
   });
   const modalRef = useRef<HTMLDivElement>(null);
   const bsModalRef = useRef<Modal | null>(null);
+
+  // Edit Modal State (Admin Only)
+  const [editingShelter, setEditingShelter] = useState<Shelter | null>(null);
+  const editModalRef = useRef<HTMLDivElement>(null);
+  const bsEditModalRef = useRef<Modal | null>(null);
 
   // Form State
   const [manualForm, setManualForm] = useState({
@@ -56,36 +70,29 @@ export default function AdminPage() {
     fetchShelters();
   }, [fetchShelters]);
 
-  // --- Modal Logic ---
+  // --- Bootstrap Modals ---
   useEffect(() => {
-    if (modalRef.current) {
-        if (typeof window !== 'undefined') {
-          import('bootstrap').then((bootstrap) => {
-             bsModalRef.current = new bootstrap.Modal(modalRef.current!);
-          });
-        }
+    if (console) console.log('Initializing Modals'); // Debug
+    if (typeof window !== 'undefined') {
+      import('bootstrap').then((bootstrap) => {
+         if (modalRef.current) bsModalRef.current = new bootstrap.Modal(modalRef.current);
+         if (editModalRef.current) bsEditModalRef.current = new bootstrap.Modal(editModalRef.current);
+      });
     }
   }, []);
 
+  // --- Actions ---
   const openActionModal = (id: string, action: 'in' | 'out') => {
     const targetShelter = shelters.find(s => s._id === id);
     if (!targetShelter) return;
-    
-    setModalState({
-        isOpen: true,
-        shelter: targetShelter,
-        action,
-        amount: 1
-    });
+    setModalState({ isOpen: true, shelter: targetShelter, action, amount: 1 });
     bsModalRef.current?.show();
   };
 
   const confirmAction = async () => {
     if (!modalState.shelter) return;
-    
     setLoading(true);
     bsModalRef.current?.hide();
-    
     try {
       await axios.put(`/api/shelters/${modalState.shelter._id}`, { 
           action: modalState.action, 
@@ -101,9 +108,47 @@ export default function AdminPage() {
     }
   };
 
-  // --- Handlers ---
+  // --- CRUD Handlers ---
+  const handleEdit = (shelter: Shelter) => {
+    setEditingShelter(shelter);
+    bsEditModalRef.current?.show();
+  };
+
+  const saveEdit = async () => {
+    if (!editingShelter) return;
+    setLoading(true);
+    bsEditModalRef.current?.hide();
+    try {
+        await axios.put(`/api/shelters/${editingShelter._id}`, editingShelter);
+        showToast(`แก้ไขข้อมูล "${editingShelter.name}" เรียบร้อย`);
+        fetchShelters();
+    } catch (err) {
+        console.error(err);
+        showToast('แก้ไขข้อมูลล้มเหลว');
+    } finally {
+        setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('คุณแน่ใจหรือไม่ที่จะลบศูนย์พักพิงนี้? การกระทำนี้ไม่สามารถย้อนกลับได้')) return;
+    setLoading(true);
+    try {
+        await axios.delete(`/api/shelters/${id}`);
+        showToast('ลบข้อมูลเรียบร้อย');
+        // Optimistic update
+        setShelters(prev => prev.filter(s => s._id !== id));
+        fetchShelters();
+    } catch (err) {
+        console.error(err);
+        showToast('ลบข้อมูลล้มเหลว');
+    } finally {
+        setLoading(false);
+    }
+  };
+
   const showToast = (msg: string) => {
-    setMessage(msg); // In a real app, use a proper Toast component
+    setMessage(msg);
     setTimeout(() => setMessage(''), 3000);
   };
 
@@ -115,9 +160,9 @@ export default function AdminPage() {
       showToast(`เพิ่มศูนย์ "${manualForm.name}" เรียบร้อย`);
       setManualForm({ name: '', district: '', subdistrict: '', capacity: 0, currentOccupancy: 0 });
       fetchShelters();
-    } catch (err) {
-       // @ts-expect-error: Error response type is not strictly typed
-      const errorMessage = err.response?.data?.error || err.message;
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { error?: string } }; message: string };
+      const errorMessage = error.response?.data?.error || error.message;
       showToast(`Error: ${errorMessage}`);
     } finally {
       setLoading(false);
@@ -201,8 +246,8 @@ export default function AdminPage() {
       {/* Alert Toast (Fixed Top) */}
       {message && (
          <div className="position-fixed top-0 start-50 translate-middle-x mt-4 z-index-toast" style={{ zIndex: 1050 }}>
-            <div className={`alert ${message.includes('Error') || message.includes('ผิดพลาด') ? 'alert-danger' : 'alert-success'} shadow-lg d-flex align-items-center py-2 px-4 rounded-pill border-0`}>
-             <i className={`bi ${message.includes('Error') ? 'bi-x-circle-fill' : 'bi-check-circle-fill'} me-2 fs-5`}></i>
+            <div className={`alert ${message.includes('Error') || message.includes('ผิดพลาด') || message.includes('ล้มเหลว') ? 'alert-danger' : 'alert-success'} shadow-lg d-flex align-items-center py-2 px-4 rounded-pill border-0`}>
+             <i className={`bi ${message.includes('Error') || message.includes('ผิดพลาด') || message.includes('ล้มเหลว') ? 'bi-x-circle-fill' : 'bi-check-circle-fill'} me-2 fs-5`}></i>
              <span className="fw-bold">{message}</span>
            </div>
          </div>
@@ -223,6 +268,8 @@ export default function AdminPage() {
                         searchTerm={searchTerm}
                         setSearchTerm={setSearchTerm}
                         onAction={openActionModal}
+                        onEdit={isAdmin ? handleEdit : undefined}
+                        onDelete={isAdmin ? handleDelete : undefined}
                     />
                 </div>
             </div>
@@ -290,7 +337,7 @@ export default function AdminPage() {
         )}
       </div>
 
-      {/* 3. Action Modal */}
+      {/* 3. Action Modal (In/Out) */}
       <div className="modal fade" id="actionModal" ref={modalRef} tabIndex={-1} aria-hidden="true">
         <div className="modal-dialog modal-dialog-centered modal-sm">
             <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden" style={{ backgroundColor: 'var(--bg-card)' }}>
@@ -315,6 +362,45 @@ export default function AdminPage() {
                     <button onClick={confirmAction} className={`btn w-100 py-2 fw-bold rounded-3 ${modalState.action === 'in' ? 'btn-success' : 'btn-danger'}`} disabled={loading}>
                         {loading ? 'กำลังบันทึก...' : 'ยืนยันรายการ'}
                     </button>
+                </div>
+            </div>
+        </div>
+      </div>
+
+      {/* 4. Edit Modal (Admin Only) */}
+      <div className="modal fade" id="editModal" ref={editModalRef} tabIndex={-1} aria-hidden="true">
+        <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden" style={{ backgroundColor: 'var(--bg-card)' }}>
+                <div className="modal-header border-0 py-3 bg-primary text-white">
+                    <h5 className="modal-title fw-bold"><i className="bi bi-pencil-square me-2"></i>แก้ไขข้อมูลศูนย์</h5>
+                    <button type="button" className="btn-close btn-close-white" onClick={() => bsEditModalRef.current?.hide()}></button>
+                </div>
+                <div className="modal-body p-4">
+                   <div className="mb-3">
+                        <label className="form-label small fw-bold text-secondary">ชื่อศูนย์พักพิง</label>
+                        <input type="text" className="form-control" value={editingShelter?.name || ''} 
+                            onChange={(e) => setEditingShelter(prev => prev ? {...prev, name: e.target.value} : null)} />
+                   </div>
+                   <div className="row g-3 mb-3">
+                       <div className="col-6">
+                            <label className="form-label small fw-bold text-secondary">อำเภอ</label>
+                            <input type="text" className="form-control" value={editingShelter?.district || ''} 
+                                onChange={(e) => setEditingShelter(prev => prev ? {...prev, district: e.target.value} : null)} />
+                       </div>
+                       <div className="col-6">
+                            <label className="form-label small fw-bold text-secondary">ตำบล</label>
+                            <input type="text" className="form-control" value={editingShelter?.subdistrict || ''} 
+                                onChange={(e) => setEditingShelter(prev => prev ? {...prev, subdistrict: e.target.value} : null)} />
+                       </div>
+                   </div>
+                   <div className="mb-4">
+                        <label className="form-label small fw-bold text-secondary">ความจุ (คน)</label>
+                        <input type="number" className="form-control" value={editingShelter?.capacity || 0} 
+                            onChange={(e) => setEditingShelter(prev => prev ? {...prev, capacity: Number(e.target.value)} : null)} />
+                   </div>
+                   <button onClick={saveEdit} className="btn btn-primary w-100 py-2 fw-bold rounded-3" disabled={loading}>
+                       {loading ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}
+                   </button>
                 </div>
             </div>
         </div>
