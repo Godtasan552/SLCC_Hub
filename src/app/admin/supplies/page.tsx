@@ -19,12 +19,14 @@ export default function SuppliesPage() {
   const hubFilter = searchParams.get('hub');
   
   const [activeTab, setActiveTab] = useState<'inventory' | 'management'>('inventory');
+  const [viewMode, setViewMode] = useState<'hubs' | 'shelters' | 'all'>('hubs');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [supplies, setSupplies] = useState<Supply[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ทั้งหมด');
-  const [shelters, setShelters] = useState<Shelter[]>([]);
+  const [hubs, setHubs] = useState<Shelter[]>([]);
+  const [allLocations, setAllLocations] = useState<Shelter[]>([]);
   
   const [manualForm, setManualForm] = useState({
     name: '',
@@ -39,13 +41,13 @@ export default function SuppliesPage() {
 
   // Pre-fill shelterName if hubFilter exists
   useEffect(() => {
-    if (hubFilter && shelters.length > 0) {
-        const found = shelters.find(h => h._id === hubFilter);
+    if (hubFilter && hubs.length > 0) {
+        const found = hubs.find(h => h._id === hubFilter);
         if (found) {
             setManualForm(prev => ({ ...prev, shelterId: found._id, shelterName: found.name }));
         }
     }
-  }, [hubFilter, shelters]);
+  }, [hubFilter, hubs]);
 
   const availableItems = useMemo(() => 
     getItemsByCategory(manualForm.category as SupplyCategory),
@@ -74,17 +76,18 @@ export default function SuppliesPage() {
           axios.get('/api/hubs')
         ]);
         
-        // Combine both for selection, marking hubs clearly
-        const combined = hubRes.data.data.map((h: Shelter) => ({ ...h, isHub: true }));
+        const hubList = hubRes.data.data.map((h: Shelter) => ({ ...h, isHub: true }));
+        const shelterList = shelterRes.data.data.map((s: Shelter) => ({ ...s, isHub: false }));
         
-        setShelters(combined);
+        setHubs(hubList);
+        setAllLocations([...hubList, ...shelterList]);
         
         // Auto-select the first hub if it's currently empty
-        if (combined.length > 0 && !manualForm.shelterId) {
+        if (hubList.length > 0 && !manualForm.shelterId) {
           setManualForm(prev => ({ 
             ...prev, 
-            shelterId: combined[0]._id, 
-            shelterName: combined[0].name 
+            shelterId: hubList[0]._id, 
+            shelterName: hubList[0].name 
           }));
         }
       } catch (err) {
@@ -92,7 +95,7 @@ export default function SuppliesPage() {
       }
     };
     fetchLocations();
-  }, [fetchSupplies]);
+  }, [fetchSupplies, manualForm.shelterId]);
 
   const handleCategoryChange = (category: SupplyCategory) => {
     setManualForm({
@@ -104,9 +107,9 @@ export default function SuppliesPage() {
   };
 
   const handleShelterChange = (id: string) => {
-    const shelter = shelters.find(s => s._id === id);
-    if (shelter) {
-      setManualForm({ ...manualForm, shelterId: id, shelterName: shelter.name });
+    const loc = allLocations.find(s => s._id === id);
+    if (loc) {
+      setManualForm({ ...manualForm, shelterId: id, shelterName: loc.name });
     }
   };
 
@@ -223,12 +226,30 @@ export default function SuppliesPage() {
     }
   };
 
-  const filteredSupplies = supplies.filter(s => {
-    const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         (s.shelterName && s.shelterName.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesHub = hubFilter ? s.shelterId === hubFilter : true;
-    return matchesSearch && matchesHub;
-  });
+  const hubIds = useMemo(() => new Set(hubs.map(h => h._id)), [hubs]);
+
+  const filteredSupplies = useMemo(() => {
+    return supplies.filter(s => {
+      // 1. Search filter
+      const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                           (s.shelterName && s.shelterName.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      // 2. Deep Hub ID filter (from query param)
+      const matchesUrlHub = hubFilter ? s.shelterId === hubFilter : true;
+      
+      // 3. View Mode filter (The fix for disbursed items confusion)
+      let matchesViewMode = true;
+      const isActuallyHub = !s.shelterId || hubIds.has(s.shelterId) || !!(s.shelterName && /คลังกลาง|Hub/i.test(s.shelterName));
+      
+      if (viewMode === 'hubs') {
+        matchesViewMode = isActuallyHub;
+      } else if (viewMode === 'shelters') {
+        matchesViewMode = !isActuallyHub;
+      }
+      
+      return matchesSearch && matchesUrlHub && matchesViewMode;
+    });
+  }, [supplies, searchTerm, hubFilter, viewMode, hubIds]);
 
   const categories = ['ทั้งหมด', ...Object.values(SupplyCategory).filter(c => c !== SupplyCategory.ALL)];
 
@@ -268,29 +289,33 @@ export default function SuppliesPage() {
             <div className="card shadow-sm border-0 mb-5 overflow-hidden" style={{ backgroundColor: 'var(--bg-card)' }}>
                 <div className="card-header bg-transparent border-bottom py-3">
                     <div className="row g-3 align-items-center">
-                        <div className="col-12 col-md-5">
+                        <div className="col-12 col-md-3">
                             <h6 className="mb-0 fw-bold d-flex align-items-center" style={{ color: 'var(--text-primary)' }}>
                                 <i className="bi bi-box-fill me-2 text-primary"></i>
-                                รายการคงคลัง ({filteredSupplies.length})
+                                รายการ ({filteredSupplies.length})
                                 {hubFilter && (
                                     <Link href="/admin/supplies" className="ms-2 badge bg-primary text-white text-decoration-none shadow-sm pb-1">
-                                        <i className="bi bi-x-circle me-1"></i>เฉพาะคลังนี้ (กดเพื่อล้างการกรอง)
+                                        <i className="bi bi-x-circle me-1"></i>เฉพาะคลังนี้
                                     </Link>
                                 )}
                             </h6>
                         </div>
-                        <div className="col-12 col-md-3">
-                            <div className="input-group input-group-sm">
-                                <span className="input-group-text bg-light border-theme"><i className="bi bi-funnel"></i></span>
-                                <select className="form-select border-theme shadow-sm fw-bold" value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
-                                    {categories.map(cat => (<option key={cat} value={cat}>{cat}</option>))}
-                                </select>
+                        <div className="col-12 col-md-5 d-flex gap-2">
+                            {/* View Mode Toggle */}
+                            <div className="btn-group btn-group-sm p-1 bg-light rounded-pill border">
+                                <button className={`btn btn-sm rounded-pill px-3 ${viewMode === 'hubs' ? 'btn-primary shadow-sm' : 'text-secondary'}`} onClick={() => setViewMode('hubs')}>🏢 คลังกลาง</button>
+                                <button className={`btn btn-sm rounded-pill px-3 ${viewMode === 'shelters' ? 'btn-primary shadow-sm' : 'text-secondary'}`} onClick={() => setViewMode('shelters')}>📍 ศูนย์พักพิง</button>
+                                <button className={`btn btn-sm rounded-pill px-3 ${viewMode === 'all' ? 'btn-primary shadow-sm' : 'text-secondary'}`} onClick={() => setViewMode('all')}>ทั้งหมด</button>
                             </div>
+                            
+                            <select className="form-select form-select-sm border-theme shadow-sm fw-bold w-auto rounded-pill" value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
+                                {categories.map(cat => (<option key={cat} value={cat}>{cat}</option>))}
+                            </select>
                         </div>
                         <div className="col-12 col-md-4">
                             <div className="position-relative">
                                 <i className="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-secondary"></i>
-                                <input type="text" className="form-control form-control-sm ps-5 border-theme shadow-sm" placeholder="ค้นหาชื่อสิ่งของ..." onChange={(e) => setSearchTerm(e.target.value)} />
+                                <input type="text" className="form-control form-control-sm ps-5 border-theme shadow-sm rounded-pill" placeholder="ค้นหาชื่อสิ่งของ..." onChange={(e) => setSearchTerm(e.target.value)} />
                             </div>
                         </div>
                     </div>
@@ -362,9 +387,14 @@ export default function SuppliesPage() {
                                                 onChange={(e) => handleShelterChange(e.target.value)}
                                                 required
                                             >
-                                                <optgroup label="🏗️ เลือกคลังกลางบริหารจัดการ (ของคุณ)">
-                                                  {shelters.map((s) => (
-                                                      <option key={s._id} value={s._id}>📦 {s.name}</option>
+                                                <optgroup label="🏢 คลังกลาง (Central Hubs)">
+                                                  {hubs.map((h) => (
+                                                      <option key={h._id} value={h._id}>📦 {h.name}</option>
+                                                  ))}
+                                                </optgroup>
+                                                <optgroup label="📍 ศูนย์พักพิง (Shelters)">
+                                                  {allLocations.filter(loc => !loc.isHub).map((s) => (
+                                                      <option key={s._id} value={s._id}>🏠 {s.name}</option>
                                                   ))}
                                                 </optgroup>
                                             </select>

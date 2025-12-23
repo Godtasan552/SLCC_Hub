@@ -74,55 +74,50 @@ export default function CapacityOverview({ stats }: CapacityOverviewProps) {
 
             {/* Right: Supply Overview */}
             <div className="col-12 col-md-6">
-                 <div className="p-3 w-100 h-100 rounded-4 d-flex flex-column justify-content-center" style={{ backgroundColor: 'rgba(0,0,0,0.1)' }}>
-                     <h6 className="fw-bold mb-4 ps-2" style={{ color: 'var(--text-primary)', opacity: 0.9 }}>
-                        <i className="bi bi-box-seam-fill me-2"></i>สถานะคลังสิ่งของ ({totalSupplies} รายการ)
-                     </h6>
+                 <div className="p-4 w-100 h-100 rounded-4 d-flex flex-column" style={{ backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                     <div className="d-flex justify-content-between align-items-center mb-4">
+                        <h6 className="fw-bold mb-0" style={{ color: 'var(--text-primary)', opacity: 0.9 }}>
+                            <i className="bi bi-box-seam-fill me-2 text-primary"></i>สถานะคลังสิ่งของ
+                        </h6>
+                        <span className="badge bg-secondary bg-opacity-25 text-white rounded-pill px-3">{totalSupplies} รายการรวม</span>
+                     </div>
+
+                     {/* 🌈 Unified Composition Ribbon */}
+                     <div className="mb-4">
+                        <div className="progress rounded-pill overflow-hidden shadow-inner" style={{ height: '14px', backgroundColor: 'rgba(0,0,0,0.2)' }}>
+                            <div className="progress-bar bg-danger shadow-sm" style={{ width: `${outRate}%`, transition: 'width 1s ease' }}></div>
+                            <div className="progress-bar bg-warning shadow-sm" style={{ width: `${lowRate}%`, transition: 'width 1s ease' }}></div>
+                            <div className="progress-bar bg-success shadow-sm" style={{ width: `${goodRate}%`, transition: 'width 1s ease' }}></div>
+                        </div>
+                        <div className="d-flex justify-content-between mt-2 x-small text-secondary fw-medium px-1">
+                            <span>0%</span>
+                            <span>อัตราส่วนสต็อกสินค้า</span>
+                            <span>100%</span>
+                        </div>
+                     </div>
                      
-                     {/* Out of Stock */}
-                     <div className="mb-4 px-2">
-                        <div className="d-flex justify-content-between align-items-end mb-2">
-                            <span className="text-danger fw-bold d-flex align-items-center">
-                                <i className="bi bi-x-circle-fill me-2"></i>ของหมด
-                            </span>
-                            <span className="fw-bold" style={{ color: 'var(--text-primary)' }}>{outOfStock} รายการ <span className="small text-secondary font-monospace">({outRate.toFixed(0)}%)</span></span>
-                        </div>
-                        <div className="progress" style={{ height: '8px', backgroundColor: 'rgba(255,255,255,0.1)' }}>
-                            <div className="progress-bar bg-danger" style={{ width: `${outRate}%` }}></div>
-                        </div>
+                     {/* 🏷️ Detailed Status Cards */}
+                     <div className="row g-2 mb-4">
+                        {[
+                            { label: 'ของหมด', count: outOfStock, rate: outRate, color: 'danger', icon: 'bi-x-circle' },
+                            { label: 'เหลือน้อย', count: lowStock, rate: lowRate, color: 'warning', icon: 'bi-exclamation-triangle' },
+                            { label: 'เพียงพอ', count: goodStock, rate: goodRate, color: 'success', icon: 'bi-check-circle' }
+                        ].map((item, idx) => (
+                            <div key={idx} className="col-4">
+                                <div className={`h-100 p-2 rounded-3 text-center transition-all bg-${item.color} bg-opacity-10 border border-${item.color} border-opacity-10`}>
+                                    <i className={`bi ${item.icon} text-${item.color} d-block mb-1 fs-5`}></i>
+                                    <div className="fw-bold fs-5" style={{ color: 'var(--text-primary)' }}>{item.count}</div>
+                                    <div className="x-small text-secondary text-nowrap">{item.label}</div>
+                                </div>
+                            </div>
+                        ))}
                      </div>
 
-                     {/* Low Stock */}
-                     <div className="mb-4 px-2">
-                        <div className="d-flex justify-content-between align-items-end mb-2">
-                            <span className="text-warning fw-bold d-flex align-items-center">
-                                <i className="bi bi-exclamation-triangle-fill me-2"></i>เหลือน้อย
-                            </span>
-                            <span className="fw-bold" style={{ color: 'var(--text-primary)' }}>{lowStock} รายการ <span className="small text-secondary font-monospace">({lowRate.toFixed(0)}%)</span></span>
-                        </div>
-                        <div className="progress" style={{ height: '8px', backgroundColor: 'rgba(255,255,255,0.1)' }}>
-                            <div className="progress-bar bg-warning" style={{ width: `${lowRate}%` }}></div>
-                        </div>
-                     </div>
-
-                     {/* Good Stock */}
-                     <div className="mb-4 px-2">
-                        <div className="d-flex justify-content-between align-items-end mb-2">
-                            <span className="text-success fw-bold d-flex align-items-center">
-                                <i className="bi bi-check-circle-fill me-2"></i>เพียงพอ
-                            </span>
-                            <span className="fw-bold" style={{ color: 'var(--text-primary)' }}>{goodStock} รายการ <span className="small text-secondary font-monospace">({goodRate.toFixed(0)}%)</span></span>
-                        </div>
-                        <div className="progress" style={{ height: '8px', backgroundColor: 'rgba(255,255,255,0.1)' }}>
-                            <div className="progress-bar bg-success" style={{ width: `${goodRate}%` }}></div>
-                        </div>
-                     </div>
-
-                     <div className="mt-auto pt-3 border-top border-secondary border-opacity-25 mx-2">
-                         <div className="d-flex align-items-start gap-2" style={{ opacity: 0.8 }}>
-                            <i className="bi bi-info-circle-fill text-info mt-1"></i>
-                            <span className="small text-secondary" style={{ fontSize: '0.85rem' }}>
-                                ควรตรวจสอบและเติมสต็อกสินค้าที่สถานะ <b>ของหมด</b> หรือ <b>เหลือน้อย</b> เพื่อรับมือเหตุฉุกเฉิน
+                     <div className="mt-auto pt-3 border-top border-secondary border-opacity-10">
+                         <div className="d-flex align-items-start gap-2 p-2 rounded-3" style={{ backgroundColor: 'rgba(13, 110, 253, 0.05)' }}>
+                            <i className="bi bi-info-circle-fill text-primary mt-1"></i>
+                            <span className="small text-secondary" style={{ fontSize: '0.8rem', lineHeight: '1.4' }}>
+                                ระบบแนะนำให้เติมสต็อกในกลุ่ม <b>ของหมด</b> ({outOfStock}) ทันที เพื่อความปลอดภัยของผู้อพยพ
                             </span>
                          </div>
                      </div>
@@ -130,6 +125,11 @@ export default function CapacityOverview({ stats }: CapacityOverviewProps) {
             </div>
         </div>
       </div>
+      <style jsx>{`
+        .x-small { font-size: 0.75rem; }
+        .transition-all { transition: all 0.2s ease; }
+        .transition-all:hover { transform: translateY(-3px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+      `}</style>
     </div>
   );
 }
