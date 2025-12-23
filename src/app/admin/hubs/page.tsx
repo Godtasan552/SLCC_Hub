@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import Link from 'next/link';
+import { Modal } from 'bootstrap';
+import { useSession } from 'next-auth/react';
 
 interface Resource {
   _id: string;
@@ -22,12 +24,25 @@ interface Hub {
   resources: Resource[];
 }
 
+interface UserWithRole {
+  role?: string;
+}
+
 export default function HubsManagementPage() {
+  const { data: session } = useSession();
+  const role = (session?.user as UserWithRole)?.role;
+  const isAdmin = role === 'admin';
+
   const [activeTab, setActiveTab] = useState<'overview' | 'management'>('overview');
   const [hubs, setHubs] = useState<Hub[]>([]);
   const [loading, setLoading] = useState(true);
   const [supplies, setSupplies] = useState<{ shelterId: string }[]>([]);
   const [message, setMessage] = useState('');
+
+  // Edit Modal State
+  const [editingHub, setEditingHub] = useState<Hub | null>(null);
+  const editModalRef = useRef<HTMLDivElement>(null);
+  const bsEditModalRef = useRef<Modal | null>(null);
 
   // Form State
   const [manualForm, setManualForm] = useState({
@@ -36,6 +51,22 @@ export default function HubsManagementPage() {
     subdistrict: '',
     phoneNumbers: [''],
   });
+
+  const [editForm, setEditForm] = useState({
+    name: '',
+    district: '',
+    subdistrict: '',
+    phoneNumbers: [''],
+  });
+
+  // Initialize Bootstrap Modal
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      import('bootstrap').then((bootstrap) => {
+         if (editModalRef.current) bsEditModalRef.current = new bootstrap.Modal(editModalRef.current);
+      });
+    }
+  }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -49,7 +80,6 @@ export default function HubsManagementPage() {
     } catch (err) {
       console.error('Failed to fetch hub data', err);
     } finally {
-      setLoading(true); // Wait for animations if any, but actually false
       setLoading(false);
     }
   }, []);
@@ -77,6 +107,46 @@ export default function HubsManagementPage() {
     } catch (err: unknown) {
       const error = err as { response?: { data?: { error?: string } }; message: string };
       showToast('Error: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
+  const handleEditClick = (hub: Hub) => {
+    setEditingHub(hub);
+    setEditForm({
+      name: hub.name,
+      district: hub.district,
+      subdistrict: hub.subdistrict || '',
+      phoneNumbers: hub.phoneNumbers && hub.phoneNumbers.length > 0 ? hub.phoneNumbers : ['']
+    });
+    bsEditModalRef.current?.show();
+  };
+
+  const handleUpdateHub = async () => {
+    if (!editingHub) return;
+    try {
+      const payload = {
+        ...editForm,
+        phoneNumbers: editForm.phoneNumbers.filter(p => p.trim() !== '')
+      };
+      await axios.put(`/api/hubs/${editingHub._id}`, payload);
+      showToast(`อัปเดตข้อมูล "${editForm.name}" เรียบร้อย`);
+      bsEditModalRef.current?.hide();
+      fetchData();
+    } catch (err: unknown) {
+        const error = err as { response?: { data?: { error?: string } }; message: string };
+        showToast('Error: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
+  const handleDeleteHub = async (id: string, name: string) => {
+    if (!confirm(`คุณต้องการลบ Hub "${name}" ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้`)) return;
+    try {
+      await axios.delete(`/api/hubs/${id}`);
+      showToast(`ลบ Hub "${name}" เรียบร้อย`);
+      fetchData();
+    } catch (err: unknown) {
+        const error = err as { response?: { data?: { error?: string } }; message: string };
+        showToast('Error: ' + (error.response?.data?.error || error.message));
     }
   };
 
@@ -191,16 +261,32 @@ export default function HubsManagementPage() {
                   </div>
                   <div className="card-footer bg-transparent border-0 p-3 pt-0">
                     <div className="row g-2">
-                      <div className="col-6">
-                        <Link href={`/admin/supplies?hub=${hub._id}`} className="btn btn-sm btn-outline-primary w-100 fw-bold">
+                      <div className="col-12 d-flex gap-2">
+                         <Link href={`/admin/supplies?hub=${hub._id}`} className="btn btn-sm btn-outline-primary flex-grow-1 fw-bold">
                           📦 รายการสต็อก
                         </Link>
-                      </div>
-                      <div className="col-6">
-                        <Link href={`/requests/create?hub=${hub._id}`} className="btn btn-sm btn-primary w-100 fw-bold shadow-sm">
+                         <Link href={`/requests/create?hub=${hub._id}`} className="btn btn-sm btn-primary flex-grow-1 fw-bold shadow-sm">
                           📢 ขอรับของ
                         </Link>
                       </div>
+                       {isAdmin && (
+                        <div className="col-12 mt-2 pt-2 border-top d-flex gap-2 justify-content-end">
+                            <button 
+                                onClick={() => handleEditClick(hub)}
+                                className="btn btn-sm btn-light text-secondary hover-bg-light"
+                                title="แก้ไขข้อมูล"
+                            >
+                                <i className="bi bi-pencil-square"></i>
+                            </button>
+                            <button 
+                                onClick={() => handleDeleteHub(hub._id, hub.name)}
+                                className="btn btn-sm btn-light text-danger hover-bg-danger"
+                                title="ลบข้อมูล"
+                            >
+                                <i className="bi bi-trash"></i>
+                            </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -280,6 +366,44 @@ export default function HubsManagementPage() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Edit Modal */}
+      <div className="modal fade" id="editHubModal" ref={editModalRef} tabIndex={-1} aria-hidden="true">
+        <div className="modal-dialog modal-dialog-centered">
+          <div className="modal-content border-0 shadow-lg">
+            <div className="modal-header border-bottom-0">
+              <h5 className="modal-title fw-bold">แก้ไขข้อมูล Hub</h5>
+              <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div className="modal-body">
+              <form>
+                <div className="mb-3">
+                  <label className="form-label small fw-bold text-secondary">ชื่อคลังสินค้า</label>
+                  <input type="text" className="form-control" value={editForm.name || ''} onChange={(e) => setEditForm({...editForm, name: e.target.value})} />
+                </div>
+                <div className="row g-2 mb-3">
+                    <div className="col-6">
+                        <label className="form-label small fw-bold text-secondary">อำเภอ</label>
+                        <input type="text" className="form-control" value={editForm.district || ''} onChange={(e) => setEditForm({...editForm, district: e.target.value})} />
+                    </div>
+                    <div className="col-6">
+                        <label className="form-label small fw-bold text-secondary">ตำบล</label>
+                        <input type="text" className="form-control" value={editForm.subdistrict || ''} onChange={(e) => setEditForm({...editForm, subdistrict: e.target.value})} />
+                    </div>
+                </div>
+                <div className="mb-3">
+                    <label className="form-label small fw-bold text-secondary">เบอร์โทรศัพท์</label>
+                    <input type="text" className="form-control" value={editForm.phoneNumbers[0] || ''} onChange={(e) => setEditForm({...editForm, phoneNumbers: [e.target.value]})} />
+                </div>
+              </form>
+            </div>
+            <div className="modal-footer border-top-0">
+              <button type="button" className="btn btn-light" data-bs-dismiss="modal">ยกเลิก</button>
+              <button type="button" className="btn btn-primary" onClick={handleUpdateHub}>บันทึกการเปลี่ยนแปลง</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <style jsx>{`

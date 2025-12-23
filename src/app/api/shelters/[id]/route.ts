@@ -6,12 +6,21 @@ import Shelter from '@/models/Shelter';
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await dbConnect();
-    const { currentOccupancy, action, amount } = await req.json();
+    const body = await req.json();
+    const { currentOccupancy, action, amount, name, district, subdistrict, capacity, phoneNumbers } = body;
     const { id } = await params;
 
     const shelter = await Shelter.findById(id);
     if (!shelter) return NextResponse.json({ error: 'ไม่พบข้อมูล' }, { status: 404 });
 
+    // --- Update General Info ---
+    if (name) shelter.name = name;
+    if (district) shelter.district = district;
+    if (subdistrict !== undefined) shelter.subdistrict = subdistrict;
+    if (capacity) shelter.capacity = capacity;
+    if (phoneNumbers) shelter.phoneNumbers = phoneNumbers;
+
+    // --- Update Occupancy Logic ---
     // คำนวณวันที่ปัจจุบันประเทศไทย (UTC+7) รูปแบบ YYYY-MM-DD
     const thDate = new Date(new Date().getTime() + (7 * 60 * 60 * 1000)).toISOString().split('T')[0];
 
@@ -55,7 +64,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     // บันทึกสถานะใหม่
     let newStatus = 'รองรับได้';
-    const ratio = (newOccupancy / (shelter.capacity || 1)) * 100;
+    const currentCap = capacity || shelter.capacity || 1;
+    const ratio = (newOccupancy / currentCap) * 100;
     if (ratio >= 100) newStatus = 'ล้นศูนย์';
     else if (ratio >= 80) newStatus = 'ใกล้เต็ม';
 
@@ -67,5 +77,21 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     return NextResponse.json({ success: true, data: shelter });
   } catch (error) {
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 400 });
+  }
+}
+
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    await dbConnect();
+    const { id } = await params;
+    const shelter = await Shelter.findByIdAndDelete(id);
+
+    if (!shelter) {
+      return NextResponse.json({ error: 'ไม่พบข้อมูลที่ต้องการลบ' }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, message: 'ลบข้อมูลเรียบร้อย' });
+  } catch (error) {
+    return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
   }
 }
