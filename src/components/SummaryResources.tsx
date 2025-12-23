@@ -186,25 +186,46 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
       {/* 📊 Summary Cards */}
       <div className="row g-3 mb-4">
         {[
-          { label: '⏳ รออนุมัติ', id: 'Pending', count: statusStats.pending, color: 'warning', sub: 'รายการคำร้องขอใหม่' },
-          { label: '✅ อนุมัติ', id: 'Approved', count: statusStats.approved, color: 'success', sub: 'อนุมัติแล้ว' },
-          { label: '📥 ได้รับแล้ว', id: 'Received', count: statusStats.received, color: 'info', sub: 'ของถึงที่หมายเรียบร้อย' },
-          { label: '❌ ปฏิเสธ', id: 'Rejected', count: statusStats.rejected, color: 'danger', sub: 'ปฏิเสธแล้ว' },
+          { label: 'รออนุมัติ', id: 'Pending', count: statusStats.pending, color: 'warning', icon: 'bi-hourglass-split', sub: 'รายการคำร้องขอใหม่' },
+          { label: 'อนุมัติแล้ว', id: 'Approved', count: statusStats.approved, color: 'success', icon: 'bi-check2-circle', sub: 'ตัดสต็อกพร้อมส่ง' },
+          { label: 'ถึงที่หมาย', id: 'Received', count: statusStats.received, color: 'info', icon: 'bi-house-check', sub: 'ศูนย์ปลายทางยืนยันรับ' },
+          { label: 'ปฏิเสธ', id: 'Rejected', count: statusStats.rejected, color: 'danger', icon: 'bi-x-circle', sub: 'คำร้องไม่สมเหตุสมผล' },
         ].map((item) => (
           <div className="col-md-3" key={item.id}>
             <div 
-              className={`card shadow-sm border-0 h-100 cursor-pointer transition-all ${filterStatus === item.id ? 'ring-active' : ''}`}
-              style={{ backgroundColor: `var(--bg-card)`, border: filterStatus === item.id ? '2px solid var(--bs-' + item.color + ')' : '1px solid var(--border-color)' }}
+              className={`card shadow-sm border-0 h-100 cursor-pointer transition-all position-relative overflow-hidden ${filterStatus === item.id ? 'status-card-active' : 'status-card-inactive'}`}
+              style={{ 
+                backgroundColor: 'var(--bg-card)',
+                borderLeft: `5px solid var(--bs-${item.color})` 
+              }}
               onClick={() => setFilterStatus(item.id as RequestStatus)}
             >
-              <div className="card-body">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                  <span className={`badge bg-${item.color} bg-opacity-25 text-${item.color}`}>{item.label}</span>
-                  <i className={`bi bi-circle-fill fs-6 text-${item.color}`} style={{ opacity: filterStatus === item.id ? 1 : 0.2 }}></i>
-                </div>
-                <h2 className="fw-bold mb-0" style={{ color: 'var(--text-primary)' }}>{item.count}</h2>
-                <small className="text-secondary opacity-75">{item.sub}</small>
+              {/* Subtle background glow */}
+              <div className={`position-absolute top-0 end-0 p-3 opacity-10`} style={{ fontSize: '4rem', transform: 'translate(20%, -20%)' }}>
+                <i className={`bi ${item.icon} text-${item.color}`}></i>
               </div>
+              
+              <div className="card-body position-relative z-1">
+                <div className="d-flex align-items-center mb-2">
+                  <div className={`rounded-circle bg-${item.color} bg-opacity-10 p-2 d-flex align-items-center justify-content-center me-3`} style={{ width: '45px', height: '45px' }}>
+                    <i className={`bi ${item.icon} fs-4 text-${item.color}`}></i>
+                  </div>
+                  <div>
+                    <div className={`small fw-bold text-${item.color} text-uppercase ls-1`}>{item.label}</div>
+                    <div className="text-secondary x-small">{item.sub}</div>
+                  </div>
+                </div>
+                <div className="d-flex align-items-baseline gap-2 mt-3">
+                  <h2 className="fw-bold mb-0" style={{ color: 'var(--text-primary)', fontSize: '2.4rem' }}>{item.count}</h2>
+                  <span className="text-secondary small">รายการ</span>
+                </div>
+              </div>
+              
+              {/* Bottom Status Line Indicator */}
+              <div 
+                className={`position-absolute bottom-0 start-0 end-0 bg-${item.color} ${filterStatus === item.id ? 'opacity-100' : 'opacity-25'}`} 
+                style={{ height: '3px', transition: 'opacity 0.3s ease' }}
+              ></div>
             </div>
           </div>
         ))}
@@ -376,9 +397,19 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
       </div>
       <style jsx>{`
         .cursor-pointer { cursor: pointer; }
-        .transition-all { transition: all 0.2s ease; }
-        .transition-all:hover { transform: translateY(-3px); }
-        .ring-active { box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.2); }
+        .transition-all { transition: all 0.25s ease; }
+        .status-card-inactive:hover { 
+          transform: translateY(-5px); 
+          box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
+          background-color: rgba(255,255,255,0.05) !important;
+        }
+        .status-card-active { 
+          background-color: rgba(255,255,255,0.08) !important;
+          box-shadow: 0 4px 15px rgba(0,0,0,0.2) !important;
+        }
+        .ls-1 { letter-spacing: 0.5px; }
+        .x-small { font-size: 0.7rem; }
+        .z-1 { z-index: 1; }
         .bg-card { background-color: var(--bg-card); }
         .border-theme { border-color: var(--border-color) !important; }
         .animate-fade-in { animation: fadeIn 0.4s ease-out; }

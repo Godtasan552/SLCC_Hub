@@ -92,26 +92,56 @@ export default function RequestListClient({ initialRequests }: RequestListClient
       {/* 📊 Summary Cards */}
       <div className="row g-3 mb-4">
         {[
-          { label: '⏳ รออนุมัติ', count: stats.pending, color: 'warning', sub: 'รายการใหม่' },
-          { label: '✅ อนุมัติ', count: stats.approved, color: 'success', sub: 'อนุมัติแล้ว' },
-          { label: '📥 ได้รับแล้ว', count: stats.received, color: 'info', sub: 'ของถึงที่หมาย' },
-          { label: '❌ ปฏิเสธ', count: stats.rejected, color: 'danger', sub: 'ปฏิเสธแล้ว' },
-        ].map((item, idx) => (
-          <div className="col-md-3 col-lg-2" key={idx}>
-            <div className={`card shadow-sm border-0 h-100 bg-${item.color} bg-opacity-10`}>
-              <div className="card-body">
-                <span className={`badge bg-${item.color} mb-2`}>{item.label}</span>
-                <h2 className="fw-bold mb-0" style={{ color: 'var(--text-primary)' }}>{item.count}</h2>
-                <small className="text-secondary">{item.sub}</small>
+          { label: 'รออนุมัติ', id: 'Pending', count: stats.pending, color: 'warning', icon: 'bi-hourglass-split', sub: 'รายการใหม่' },
+          { label: 'อนุมัติแล้ว', id: 'Approved', count: stats.approved, color: 'success', icon: 'bi-check2-circle', sub: 'พร้อมส่ง' },
+          { label: 'ถึงที่หมาย', id: 'Received', count: stats.received, color: 'info', icon: 'bi-house-check', sub: 'สำเร็จ' },
+          { label: 'ปฏิเสธ', id: 'Rejected', count: stats.rejected, color: 'danger', icon: 'bi-x-circle', sub: 'ยกเลิก' },
+        ].map((item) => (
+          <div className="col-md-3 col-lg-2" key={item.id}>
+            <div 
+              className={`card shadow-sm border-0 h-100 cursor-pointer transition-all position-relative overflow-hidden ${filterStatus === item.id ? 'status-card-active' : 'status-card-inactive'}`}
+              style={{ 
+                backgroundColor: filterStatus === item.id ? `rgba(var(--bs-${item.color}-rgb), 0.12)` : 'var(--bg-card)',
+                borderLeft: `5px solid var(--bs-${item.color})` 
+              }}
+              onClick={() => setFilterStatus(item.id)}
+            >
+              <div className="card-body p-3">
+                <div className={`mb-2 d-flex align-items-center justify-content-center rounded-circle bg-${item.color} bg-opacity-10`} style={{ width: '32px', height: '32px' }}>
+                  <i className={`bi ${item.icon} text-${item.color}`}></i>
+                </div>
+                <h3 className="fw-bold mb-1" style={{ color: 'var(--text-primary)', fontSize: '1.8rem' }}>{item.count}</h3>
+                <div className={`x-small fw-bold text-uppercase ls-1 text-${item.color}`} style={{ opacity: 0.8 }}>{item.label}</div>
               </div>
+              
+              {/* Bottom Status Line Indicator */}
+              <div 
+                className={`position-absolute bottom-0 start-0 end-0 bg-${item.color} ${filterStatus === item.id ? 'opacity-100' : 'opacity-25'}`} 
+                style={{ height: '3px', transition: 'opacity 0.3s ease' }}
+              ></div>
             </div>
           </div>
         ))}
+        
         <div className="col-md-4 col-lg-4">
-          <div className="card shadow-sm border-2 border-warning h-100" style={{ backgroundColor: 'var(--bg-card)' }}>
-            <div className="card-body text-center d-flex flex-column justify-content-center">
-              <h6 className="text-warning fw-bold mb-1">🚨 ของด่วนมาก (รออนุมัติ)</h6>
-              <h2 className="text-warning fw-bold mb-0">{stats.highUrgency}</h2>
+          <div className="card shadow-sm border-0 h-100 position-relative animate-pulse-emergency overflow-hidden" 
+               style={{ 
+                 backgroundColor: 'rgba(255, 193, 7, 0.08)', 
+                 border: '1px solid rgba(255, 193, 7, 0.3)',
+                 borderLeft: '6px solid #ffbc00',
+                 borderRadius: '12px'
+                }}>
+            <div className="card-body d-flex align-items-center py-2 px-3">
+              <div className="d-flex align-items-center justify-content-center rounded-3 bg-warning p-0 me-3 shadow-warning" style={{ width: '56px', height: '56px', minWidth: '56px', backgroundColor: '#ffbc00 !important' }}>
+                <i className="bi bi-bell-fill fs-2 text-dark"></i>
+              </div>
+              <div>
+                <h6 className="text-warning fw-bold mb-0" style={{ fontSize: '0.95rem' }}>ของด่วนมาก (รออนุมัติ)</h6>
+                <div className="d-flex align-items-baseline gap-2">
+                  <h2 className="text-warning fw-bold mb-0" style={{ fontSize: '2.4rem', textShadow: '0 0 12px rgba(255,188,0,0.4)' }}>{stats.highUrgency}</h2>
+                  <span className="text-secondary small fw-medium">รายการค้าง</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -232,6 +262,27 @@ export default function RequestListClient({ initialRequests }: RequestListClient
       </div>
 
       <style jsx>{`
+        .cursor-pointer { cursor: pointer; }
+        .transition-all { transition: all 0.25s ease; }
+        .status-card-inactive:hover { 
+          transform: translateY(-5px); 
+          box-shadow: 0 8px 15px rgba(0,0,0,0.1) !important;
+          background-color: rgba(255,255,255,0.05) !important;
+        }
+        .status-card-active { 
+          background-color: rgba(255,255,255,0.08) !important;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+        }
+        .x-small { font-size: 0.65rem; letter-spacing: 0.5px; }
+        .shadow-warning { box-shadow: 0 0 15px rgba(255, 193, 7, 0.4); }
+        .animate-pulse-emergency {
+          animation: pulseEmergency 2s infinite ease-in-out;
+        }
+        @keyframes pulseEmergency {
+          0% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.4); }
+          70% { box-shadow: 0 0 0 10px rgba(255, 193, 7, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); }
+        }
         .animate-fade-in {
           animation: fadeIn 0.4s ease-out;
         }
