@@ -102,7 +102,7 @@ export default function CreateRequestClient() {
 
       await axios.post(`/api/shelters/${selectedShelterId}/resources`, { resources: requests });
       alert('สร้างคำร้องขอเรียบร้อยแล้ว');
-      window.location.href = '/requests/summary';
+      window.location.href = '/requests';
     } catch (err) {
       console.error(err);
       alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');

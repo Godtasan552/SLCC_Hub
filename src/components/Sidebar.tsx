@@ -26,7 +26,7 @@ export default function Sidebar() {
         { name: 'เพิ่มศูนย์/คลังใหม่', href: '/admin/centers/create', icon: 'bi-plus-circle', roles: ['admin'] },
         { name: 'ศูนย์บริหารจัดการคลัง', href: '/admin/hubs', icon: 'bi-building-gear', roles: ['admin'] },
         { name: 'จัดการคลังสิ่งของ', href: '/admin/supplies', icon: 'bi-box-seam', roles: ['admin'] },
-        { name: 'คำร้องขอสิ่งของ', href: '/requests', icon: 'bi-folder2-open', roles: ['admin'] },
+        { name: 'รายการอนุมัติคำขอ', href: '/requests/summary', icon: 'bi-hexagon', roles: ['admin'] },
       ],
     },
     {
@@ -36,7 +36,8 @@ export default function Sidebar() {
         { name: 'รายชื่อศูนย์', href: '/', icon: 'bi-list-task' },
         { name: 'รายการสิ่งของ', href: '/supplies', icon: 'bi-box' },
         { name: 'สร้างคำร้องขอ', href: '/requests/create', icon: 'bi-plus-square', roles: ['admin', 'staff'] },
-        { name: 'รายการเบิกจ่าย', href: '/requests/summary', icon: 'bi-hexagon', roles: ['admin', 'staff'] },
+        { name: 'คำร้องขอสิ่งของ', href: '/requests', icon: 'bi-folder2-open', roles: ['admin','staff'] },
+
       ],
     },
   ];

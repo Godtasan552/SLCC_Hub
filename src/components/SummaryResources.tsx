@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import axios from 'axios';
-import { Supply } from '@/types/supply';
 
 interface Resource {
   _id?: string;
@@ -31,32 +30,9 @@ interface SummaryResourcesProps {
 
 export default function SummaryResources({ allShelters }: SummaryResourcesProps) {
   const [loadingId, setLoadingId] = useState<string | null>(null);
-  const [filterStatus, setFilterStatus] = useState<'All' | 'Pending' | 'Approved' | 'Shipped' | 'Received'>('Pending');
+  const [filterStatus, setFilterStatus] = useState<'All' | 'Pending' | 'Approved' | 'Shipped' | 'Received' | 'Rejected'>('Pending');
   const [filterCategory, setFilterCategory] = useState<string>('All');
   const [filterUrgency, setFilterUrgency] = useState<string>('All');
-  const [hubSupplies, setHubSupplies] = useState<Supply[]>([]);
-
-  // Fetch hub supplies on mount to check stock availability
-  useEffect(() => {
-    const fetchHubSupplies = async () => {
-      try {
-        const res = await axios.get('/api/supplies');
-        // Filter those that are in hub (no shelterId OR linked to a Hub object)
-        // We'll also look for hubs in the Supply records
-        setHubSupplies(res.data.data.filter((s: Supply) => !s.shelterId || s.description?.includes('คลังกลาง')));
-      } catch (err) {
-        console.error('Failed to fetch hub supplies:', err);
-      }
-    };
-    fetchHubSupplies();
-  }, []);
-
-  // Check how much of a specific item is in hub
-  const getHubStock = (itemName: string, category: string) => {
-    return hubSupplies
-      .filter(s => s.name.toLowerCase() === itemName.toLowerCase() && s.category === category)
-      .reduce((sum, s) => sum + s.quantity, 0);
-  };
 
   // 🔹 รวมคำขอจากทุกศูนย์
   const initialRequests = useMemo(() => {
@@ -89,7 +65,8 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
     pending: allRequestsState.filter(r => r.status === 'Pending').length,
     approved: allRequestsState.filter(r => r.status === 'Approved').length,
     shipped: allRequestsState.filter(r => r.status === 'Shipped').length,
-    received: allRequestsState.filter(r => r.status === 'Received').length
+    received: allRequestsState.filter(r => r.status === 'Received').length,
+    rejected: allRequestsState.filter(r => r.status === 'Rejected').length
   }), [allRequestsState]);
 
   const categoryStats = useMemo(() => {
@@ -106,31 +83,7 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
     low: allRequestsState.filter(r => r.urgency === 'low' && r.status === 'Pending').length
   }), [allRequestsState]);
 
-  // NEW: Disburse function (Active stock deduction)
-  const handleDisburse = async (shelterId: string, resourceId: string) => {
-    if (!confirm('ยืนยันการตัดสต็อกคลังกลางและจัดส่งไปยังศูนย์ปลายทาง?')) return;
-    
-    setLoadingId(resourceId);
-    try {
-      const res = await axios.post('/api/disbursement', { shelterId, resourceId });
-      if (res.data.success) {
-        setAllRequestsState(prev =>
-          prev.map(r => r._id === resourceId ? { ...r, status: 'Shipped' } : r)
-        );
-        // Refresh hub stock
-        const freshSupplies = await axios.get('/api/supplies');
-        setHubSupplies(freshSupplies.data.data.filter((s: Supply) => !s.shelterId || s.description?.includes('คลังกลาง')));
-        alert('ตัดสต็อกและสถานะเปลี่ยนเป็น "กำลังจัดส่ง" เรียบร้อยแล้ว');
-      }
-    } catch (err: unknown) {
-      const errorMsg = axios.isAxiosError(err) ? err.response?.data?.error : (err as Error).message;
-      alert(`เบิกจ่ายไม่สำเร็จ: ${errorMsg}`);
-    } finally {
-      setLoadingId(null);
-    }
-  };
-
-  // NEW: Receive function (Add to shelter/hub stock)
+  // NEW: Approve function (Admin only)
   const handleReceive = async (targetId: string, resourceId: string, isHub: boolean) => {
     const msg = isHub ? 'ยืนยันการรับของบริจาคเข้าสู่คลังกลาง?' : 'ยืนยันว่าได้รับของชิ้นนี้แล้ว? (ยอดจะไปเพิ่มในสต็อกของศูนย์ปลายทาง)';
     if (!confirm(msg)) return;
@@ -148,6 +101,60 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
     } catch (err: unknown) {
       const errorMsg = axios.isAxiosError(err) ? err.response?.data?.message : (err as Error).message;
       alert(`ยืนยันการรับของไม่สำเร็จ: ${errorMsg}`);
+    } finally {
+      setLoadingId(null);
+    }
+  };
+
+  // NEW: Approve function (Admin only)
+  const handleApprove = async (shelterId: string, resourceId: string, isHub: boolean) => {
+    if (!confirm('ยืนยันการอนุมัติคำร้องขอนี้? ระบบจะตัดสต็อกจากคลังกลางอัตโนมัติ')) return;
+    
+    setLoadingId(resourceId);
+    try {
+      const res = await axios.post('/api/requests/approve', { 
+        shelterId: isHub ? undefined : shelterId,
+        hubId: isHub ? shelterId : undefined,
+        resourceId, 
+        action: 'approve' 
+      });
+      
+      if (res.data.success) {
+        setAllRequestsState(prev =>
+          prev.map(r => r._id === resourceId ? { ...r, status: 'Approved' } : r)
+        );
+        alert(`✅ ${res.data.message}\nตัดสต็อก: ${res.data.stockDeducted} หน่วย`);
+      }
+    } catch (err: unknown) {
+      const errorMsg = axios.isAxiosError(err) ? err.response?.data?.error : (err as Error).message;
+      alert(`❌ อนุมัติไม่สำเร็จ: ${errorMsg}`);
+    } finally {
+      setLoadingId(null);
+    }
+  };
+
+  // NEW: Reject function (Admin only)
+  const handleReject = async (shelterId: string, resourceId: string, isHub: boolean) => {
+    if (!confirm('ยืนยันการปฏิเสธคำร้องขอนี้?')) return;
+    
+    setLoadingId(resourceId);
+    try {
+      const res = await axios.post('/api/requests/approve', { 
+        shelterId: isHub ? undefined : shelterId,
+        hubId: isHub ? shelterId : undefined,
+        resourceId, 
+        action: 'reject' 
+      });
+      
+      if (res.data.success) {
+        setAllRequestsState(prev =>
+          prev.filter(r => r._id !== resourceId) // Remove from list
+        );
+        alert('❌ ปฏิเสธคำร้องขอเรียบร้อย');
+      }
+    } catch (err: unknown) {
+      const errorMsg = axios.isAxiosError(err) ? err.response?.data?.error : (err as Error).message;
+      alert(`ปฏิเสธไม่สำเร็จ: ${errorMsg}`);
     } finally {
       setLoadingId(null);
     }
@@ -177,7 +184,7 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
     <div className="mt-4 pb-5">
       {/* 📊 Summary Cards */}
       <div className="row mb-4 g-3">
-        <div className="col-md-3">
+        <div className="col-md-2">
           <div className="card shadow-sm border-0 h-100 bg-warning bg-opacity-10">
             <div className="card-body">
               <div className="d-flex justify-content-between align-items-center mb-2">
@@ -189,7 +196,19 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
             </div>
           </div>
         </div>
-        <div className="col-md-3">
+        <div className="col-md-2">
+          <div className="card shadow-sm border-0 h-100 bg-success bg-opacity-10">
+            <div className="card-body">
+              <div className="d-flex justify-content-between align-items-center mb-2">
+                <span className="badge bg-success">✅ อนุมัติ</span>
+                <i className="bi bi-check-circle fs-4 text-success"></i>
+              </div>
+              <h2 className="fw-bold mb-0">{statusStats.approved}</h2>
+              <small className="text-secondary">อนุมัติแล้ว</small>
+            </div>
+          </div>
+        </div>
+        <div className="col-md-2">
           <div className="card shadow-sm border-0 h-100 bg-primary bg-opacity-10">
             <div className="card-body">
               <div className="d-flex justify-content-between align-items-center mb-2">
@@ -201,23 +220,35 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
             </div>
           </div>
         </div>
-        <div className="col-md-3">
-          <div className="card shadow-sm border-0 h-100 bg-success bg-opacity-10">
+        <div className="col-md-2">
+          <div className="card shadow-sm border-0 h-100 bg-info bg-opacity-10">
             <div className="card-body">
               <div className="d-flex justify-content-between align-items-center mb-2">
-                <span className="badge bg-success">📥 ได้รับแล้ว</span>
-                <i className="bi bi-check-circle-fill fs-4 text-success"></i>
+                <span className="badge bg-info">📥 ได้รับแล้ว</span>
+                <i className="bi bi-check-circle-fill fs-4 text-info"></i>
               </div>
               <h2 className="fw-bold mb-0">{statusStats.received}</h2>
               <small className="text-secondary">ของถึงที่หมายเรียบร้อย</small>
             </div>
           </div>
         </div>
-        <div className="col-md-3">
-          <div className="card shadow-sm border-2 border-danger h-100">
+        <div className="col-md-2">
+          <div className="card shadow-sm border-0 h-100 bg-danger bg-opacity-10">
+            <div className="card-body">
+              <div className="d-flex justify-content-between align-items-center mb-2">
+                <span className="badge bg-danger">❌ ปฏิเสธ</span>
+                <i className="bi bi-x-circle-fill fs-4 text-danger"></i>
+              </div>
+              <h2 className="fw-bold mb-0">{statusStats.rejected}</h2>
+              <small className="text-secondary">ปฏิเสธแล้ว</small>
+            </div>
+          </div>
+        </div>
+        <div className="col-md-2">
+          <div className="card shadow-sm border-2 border-warning h-100">
             <div className="card-body text-center d-flex flex-column justify-content-center">
-              <h6 className="text-danger fw-bold mb-1">🚨 ของด่วนมาก</h6>
-              <h2 className="text-danger fw-bold mb-0">{urgencyStats.high}</h2>
+              <h6 className="text-warning fw-bold mb-1">🚨 ของด่วนมาก</h6>
+              <h2 className="text-warning fw-bold mb-0">{urgencyStats.high}</h2>
             </div>
           </div>
         </div>
@@ -237,8 +268,10 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
                 >
                   <option value="All">ทุกสถานะ</option>
                   <option value="Pending">⏳ รออนุมัติ</option>
+                  <option value="Approved">✅ อนุมัติแล้ว</option>
                   <option value="Shipped">🚚 กำลังส่ง</option>
                   <option value="Received">📥 ได้รับแล้ว</option>
+                  <option value="Rejected">❌ ปฏิเสธแล้ว</option>
                 </select>
               </div>
             </div>
@@ -266,7 +299,6 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
                 <th className="ps-4">ประเภท / วันที่ขอ</th>
                 <th>ชื่อสิ่งของ</th>
                 <th>จำนวนที่ขอ</th>
-                <th>สต็อกกลางคงเหลือ</th>
                 <th>จากศูนย์</th>
                 <th>ความด่วน</th>
                 <th className="text-end pe-4">การดำเนินการ</th>
@@ -274,9 +306,6 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
             </thead>
             <tbody>
               {filteredRequests.map(req => {
-                const stockAvailable = getHubStock(req.itemName, req.category);
-                const hasEnough = stockAvailable >= req.amount;
-                
                 return (
                   <tr key={req._id} className="border-bottom">
                     <td className="ps-4 py-3">
@@ -297,16 +326,6 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
                       </span>
                     </td>
                     <td>
-                      {req.status === 'Pending' && !req.isHub ? (
-                        <div className={`fw-bold ${hasEnough ? 'text-success' : 'text-danger'}`}>
-                          {stockAvailable} {req.unit} 
-                          {hasEnough ? <i className="bi bi-check-circle ms-1"></i> : <i className="bi bi-x-circle ms-1"></i>}
-                        </div>
-                      ) : (
-                        <span className="text-theme-secondary opacity-50">-</span>
-                      )}
-                    </td>
-                    <td>
                       <div className={`small fw-bold px-2 py-1 rounded d-inline-block ${req.isHub ? 'bg-primary bg-opacity-25 text-primary border border-primary' : 'bg-secondary bg-opacity-25 text-theme-secondary border'}`}>
                         {req.isHub ? '🏗️ ' : '🏠 '}{req.shelterName}
                       </div>
@@ -314,23 +333,28 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
                     <td>{getUrgencyBadge(req.urgency)}</td>
                     <td className="text-end pe-4">
                       {req.status === 'Pending' ? (
-                        req.isHub ? (
+                        <div className="d-flex gap-2 justify-content-end">
                           <button 
                             className="btn btn-sm btn-success px-3 rounded-pill fw-bold"
                             disabled={loadingId === req._id}
-                            onClick={() => handleReceive(req.shelterId!, req._id!, true)}
+                            onClick={() => handleApprove(req.shelterId!, req._id!, req.isHub || false)}
+                            title="อนุมัติและตัดสต็อก"
                           >
-                            {loadingId === req._id ? 'กำลังรับ...' : '📥 รับบริจาค'}
+                            {loadingId === req._id ? '⏳' : '✅ อนุมัติ'}
                           </button>
-                        ) : (
                           <button 
-                            className={`btn btn-sm px-3 rounded-pill fw-bold ${hasEnough ? 'btn-primary' : 'btn-outline-danger'}`}
-                            disabled={loadingId === req._id || !hasEnough}
-                            onClick={() => handleDisburse(req.shelterId!, req._id!)}
+                            className="btn btn-sm btn-outline-danger px-3 rounded-pill fw-bold"
+                            disabled={loadingId === req._id}
+                            onClick={() => handleReject(req.shelterId!, req._id!, req.isHub || false)}
+                            title="ปฏิเสธคำร้องขอ"
                           >
-                            {loadingId === req._id ? 'กำลังส่ง...' : hasEnough ? '🚀 ตัดจ่ายตอนนี้' : '🚩 ของไม่พอ'}
+                            {loadingId === req._id ? '⏳' : '❌ ปฏิเสธ'}
                           </button>
-                        )
+                        </div>
+                      ) : req.status === 'Approved' ? (
+                        <span className="badge rounded-pill px-3 bg-success">
+                          ✅ อนุมัติแล้ว
+                        </span>
                       ) : req.status === 'Shipped' ? (
                         <button 
                           className="btn btn-sm btn-success px-3 rounded-pill fw-bold"
@@ -339,6 +363,10 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
                         >
                           {loadingId === req._id ? 'กำลังบันทึก...' : '📥 ยืนยันรับของ'}
                         </button>
+                      ) : req.status === 'Rejected' ? (
+                        <span className="badge rounded-pill px-3 bg-danger">
+                          ❌ ปฏิเสธแล้ว
+                        </span>
                       ) : (
                         <span className="badge rounded-pill px-3 bg-secondary">
                           📥 ได้รับแล้ว
@@ -350,7 +378,7 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
               })}
               {filteredRequests.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="text-center py-5 text-secondary">
+                  <td colSpan={6} className="text-center py-5 text-secondary">
                     <i className="bi bi-inbox fs-1 d-block mb-2 opacity-50"></i>
                     ไม่มีรายการที่ตรงตามเงื่อนไข
                   </td>
