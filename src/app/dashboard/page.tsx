@@ -5,6 +5,16 @@ import Supply from '@/models/Supply';
 import DashboardDisplay from '@/components/dashboard/DashboardDisplay';
 import { Shelter as ShelterType, DailyLog, ResourceRequest } from '@/types/shelter';
 
+interface DashboardResource extends ResourceRequest {
+  shelterName: string;
+  isHub: boolean;
+}
+
+interface HubData {
+  name: string;
+  resources?: ResourceRequest[];
+}
+
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
@@ -15,35 +25,33 @@ export default async function DashboardPage() {
   const criticalSheltersCount = await Shelter.countDocuments({ capacityStatus: 'ล้นศูนย์' });
   const warningSheltersCount = await Shelter.countDocuments({ capacityStatus: 'ใกล้เต็ม' });
 
-  const [shelterStats, hubStats] = await Promise.all([
-    Shelter.aggregate([
-      {
-        $group: {
-          _id: null,
-          totalCapacity: { $sum: '$capacity' },
-          totalOccupancy: { $sum: '$currentOccupancy' },
-          resources: { $push: '$resources' }
-        }
-      }
-    ]),
-    Hub.aggregate([
-      {
-        $group: {
-          _id: null,
-          resources: { $push: '$resources' }
-        }
-      }
-    ])
+  let totalCapacity = 0;
+  let totalOccupancy = 0;
+  const allResources: DashboardResource[] = [];
+  
+  const [shelterData, hubData] = await Promise.all([
+    Shelter.find({}).select('name resources capacity currentOccupancy').lean() as Promise<ShelterType[]>,
+    Hub.find({}).select('name resources').lean() as Promise<HubData[]>
   ]);
   
-  const sStats = shelterStats[0] || { totalCapacity: 0, totalOccupancy: 0, resources: [] };
-  const hStats = hubStats[0] || { resources: [] };
+  shelterData.forEach(s => {
+    totalCapacity += (s.capacity || 0);
+    totalOccupancy += (s.currentOccupancy || 0);
+    if (s.resources) {
+      s.resources.forEach(r => {
+        allResources.push({ ...r, shelterName: s.name, isHub: false });
+      });
+    }
+  });
 
-  const totalCapacity = sStats.totalCapacity;
-  const totalOccupancy = sStats.totalOccupancy;
+  hubData.forEach(h => {
+    if (h.resources) {
+      h.resources.forEach(r => {
+        allResources.push({ ...r, shelterName: h.name, isHub: true });
+      });
+    }
+  });
 
-  // Flatten all resources
-  const allResources = [...sStats.resources.flat(), ...hStats.resources.flat()] as ResourceRequest[];
   const totalResourceRequests = allResources.length;
 
   // Status counts
@@ -94,6 +102,10 @@ export default async function DashboardPage() {
     currentGlobalOccupancy -= statsForDay.net;
   }
 
+  const recentRequests = allResources
+    .sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime())
+    .slice(0, 5);
+
   const initialData = {
     totalShelters,
     totalCapacity,
@@ -106,6 +118,7 @@ export default async function DashboardPage() {
     outOfStockSupplies,
     criticalList,
     requestStats,
+    recentRequests: JSON.parse(JSON.stringify(recentRequests)),
     trendData: trendData.reverse(),
     movementData: movementData.reverse()
   };

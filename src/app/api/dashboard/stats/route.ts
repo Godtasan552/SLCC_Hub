@@ -3,7 +3,24 @@ import dbConnect from '@/lib/dbConnect';
 import ShelterModel from '@/models/Shelter';
 import HubModel from '@/models/Hub';
 import Supply from '@/models/Supply';
-import { Shelter as ShelterType, DailyLog } from '@/types/shelter';
+import { Shelter as ShelterType, DailyLog, ResourceRequest } from '@/types/shelter';
+
+interface DashboardResource extends ResourceRequest {
+  shelterName: string;
+  isHub: boolean;
+}
+
+interface LeanShelter {
+  name: string;
+  capacity?: number;
+  currentOccupancy?: number;
+  resources?: ResourceRequest[];
+}
+
+interface LeanHub {
+  name: string;
+  resources?: ResourceRequest[];
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -15,35 +32,35 @@ export async function GET() {
     const criticalSheltersCount = await ShelterModel.countDocuments({ capacityStatus: 'ล้นศูนย์' });
     const warningSheltersCount = await ShelterModel.countDocuments({ capacityStatus: 'ใกล้เต็ม' });
 
-    const [shelterStats, hubStats] = await Promise.all([
-      ShelterModel.aggregate([
-        {
-          $group: {
-            _id: null,
-            totalCapacity: { $sum: '$capacity' },
-            totalOccupancy: { $sum: '$currentOccupancy' },
-            resources: { $push: '$resources' }
-          }
-        }
-      ]),
-      HubModel.aggregate([
-        {
-          $group: {
-            _id: null,
-            resources: { $push: '$resources' }
-          }
-        }
-      ])
+    const [shelterData, hubData] = await Promise.all([
+      ShelterModel.find({}).select('name resources capacity currentOccupancy').lean() as Promise<LeanShelter[]>,
+      HubModel.find({}).select('name resources').lean() as Promise<LeanHub[]>
     ]);
     
-    const sStats = shelterStats[0] || { totalCapacity: 0, totalOccupancy: 0, resources: [] };
-    const hStats = hubStats[0] || { resources: [] };
+    let totalCapacity = 0;
+    let totalOccupancy = 0;
+    
+    // Inject names and flatten resources
+    const allResources: DashboardResource[] = [];
+    
+    shelterData.forEach((s: LeanShelter) => {
+      totalCapacity += (s.capacity || 0);
+      totalOccupancy += (s.currentOccupancy || 0);
+      if (s.resources && s.resources.length > 0) {
+        s.resources.forEach((r: ResourceRequest) => {
+           allResources.push({ ...r, shelterName: s.name, isHub: false });
+        });
+      }
+    });
 
-    const totalCapacity = sStats.totalCapacity;
-    const totalOccupancy = sStats.totalOccupancy;
-
-    // Flatten all resources from both collections
-    const allResources = [...sStats.resources.flat(), ...hStats.resources.flat()];
+    hubData.forEach((h: LeanHub) => {
+      if (h.resources && h.resources.length > 0) {
+        h.resources.forEach((r: ResourceRequest) => {
+           allResources.push({ ...r, shelterName: h.name, isHub: true });
+        });
+      }
+    });
+    
     const totalResourceRequests = allResources.length;
 
     // Status counts
@@ -93,6 +110,11 @@ export async function GET() {
       currentGlobalOccupancy -= statsForDay.net;
     }
 
+    // Get 5 most recent requests for activity feed
+    const recentRequests = allResources
+      .sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime())
+      .slice(0, 5);
+
     const stats = {
       totalShelters,
       totalCapacity,
@@ -105,6 +127,7 @@ export async function GET() {
       outOfStockSupplies,
       criticalList,
       requestStats,
+      recentRequests,
       trendData: trendData.reverse(),
       movementData: movementData.reverse()
     };

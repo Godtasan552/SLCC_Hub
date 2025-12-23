@@ -9,6 +9,7 @@ import CriticalShelters from './CriticalShelters';
 import OccupancyTrends from './OccupancyTrends';
 import MovementTrends from './MovementTrends';
 import RequestStatusChart from './RequestStatusChart';
+import RecentRequests from './RecentRequests';
 import { Stats, Shelter as ShelterType } from '@/types/shelter';
 
 const fetcher = (url: string) => axios.get(url).then(res => res.data.data);
@@ -23,6 +24,17 @@ interface DashboardData extends Stats {
     received: number;
     rejected: number;
   };
+  recentRequests: {
+    _id: string;
+    itemName: string;
+    amount: number;
+    unit: string;
+    status: string;
+    urgency: 'low' | 'medium' | 'high';
+    category: string;
+    shelterName: string;
+    requestedAt: string;
+  }[];
 }
 
 interface DashboardDisplayProps {
@@ -88,13 +100,7 @@ export default function DashboardDisplay({ initialData }: DashboardDisplayProps)
               <RequestStatusChart stats={displayData.requestStats} />
             </div>
             <div className="col-12 col-lg-8">
-              <div className="card h-100 shadow-sm border-0 bg-card d-flex align-items-center justify-content-center p-4">
-                 <div className="text-center">
-                    <i className="bi bi-info-circle text-primary h1 mb-3"></i>
-                    <h5 className="fw-bold">ข้อมูลการบริหารจัดการทรัพยากร</h5>
-                    <p className="text-secondary small">ระบบติดตามสถานะคำร้องขอสิ่งของและเสบียงแยกตามสถานะการดำเนินการ (รออนุมัติ, อนุมัติแล้ว, และปฏิเสธ)</p>
-                 </div>
-              </div>
+              <RecentRequests requests={displayData.recentRequests || []} />
             </div>
          </div>
 
