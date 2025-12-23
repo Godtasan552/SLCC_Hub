@@ -95,7 +95,7 @@ export default function CreateRequestClient() {
         category: item.category,
         amount: item.requestQuantity,
         unit: item.unit,
-        urgency: 'ปกติ',
+        urgency: 'low',
         status: 'Pending',
         requestedAt: new Date()
       }));

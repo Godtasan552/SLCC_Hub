@@ -13,35 +13,32 @@ export async function POST(
     const { id } = await params;
     const body = await req.json();
 
-    const {
-      category,
-      itemName,
-      amount,
-      unit,
-      urgency
-    } = body;
+    // Support both single resource and array of resources (for bulk requests)
+    const resourcesToPush = body.resources && Array.isArray(body.resources) 
+      ? body.resources 
+      : [body];
 
-    // Validation ขั้นพื้นฐาน
-    if (!category || !itemName || !amount || !unit || !urgency) {
-      return NextResponse.json(
-        { success: false, error: 'ข้อมูลไม่ครบถ้วน' },
-        { status: 400 }
-      );
+    // Validate each resource
+    for (const res of resourcesToPush) {
+      if (!res.category || !res.itemName || !res.amount || !res.unit) {
+        return NextResponse.json(
+          { success: false, error: 'ข้อมูลไม่ครบถ้วน (category, itemName, amount, unit are required)' },
+          { status: 400 }
+        );
+      }
     }
 
-    const newResource = {
-      category,
-      itemName,
-      amount,
-      unit,
-      urgency,
-      status: 'Pending',      // สำคัญมากสำหรับหน้า summary
+    // Add metadata to each resource
+    const processedResources = resourcesToPush.map((res: { category: string, itemName: string, amount: number, unit: string, urgency?: string, status?: string }) => ({
+      ...res,
+      urgency: res.urgency || 'low',
+      status: res.status || 'Pending',
       requestedAt: new Date()
-    };
+    }));
 
     const shelter = await Shelter.findByIdAndUpdate(
       id,
-      { $push: { resources: newResource } },
+      { $push: { resources: { $each: processedResources } } },
       { new: true }
     );
 
@@ -54,8 +51,8 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      message: 'สร้างคำร้องขอสำเร็จ',
-      data: newResource
+      message: `สร้างคำร้องขอสำเร็จ (${processedResources.length} รายการ)`,
+      data: processedResources
     });
 
   } catch (error) {
