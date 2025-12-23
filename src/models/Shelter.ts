@@ -24,7 +24,8 @@ const DailyOccupancySchema = new Schema({
 });
 
 const ShelterSchema = new Schema({
-  name: { type: String, required: true },
+  name: { type: String, required: true, unique: true }, // ห้ามสร้างชื่อที่ซ้ำกัน
+  type: { type: String, enum: ['Hub', 'Shelter'], default: 'Shelter' }, // แยก "คลังกลาง" กับ "ศูนย์พักพิง"
   district: { type: String, required: true },
   subdistrict: { type: String },
   capacity: { type: Number, default: 0 },

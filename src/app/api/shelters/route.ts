@@ -20,9 +20,12 @@ export async function POST(req: Request) {
     const body = await req.json();
     const shelter = await Shelter.create(body);
     return NextResponse.json({ success: true, data: shelter }, { status: 201 });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Failed to create shelter:', error);
-    return NextResponse.json({ success: false, error: 'Failed to create shelter' }, { status: 400 });
+    if (typeof error === 'object' && error !== null && 'code' in error && (error as { code: number }).code === 11000) {
+      return NextResponse.json({ success: false, error: 'ชื่อศูนย์นี้มีอยู่ในระบบแล้ว กรุณาใช้ชื่ออื่น' }, { status: 400 });
+    }
+    return NextResponse.json({ success: false, error: 'ไม่สามารถสร้างศูนย์ได้' }, { status: 400 });
   }
 }
 

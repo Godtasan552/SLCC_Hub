@@ -13,6 +13,7 @@ export default function Sidebar() {
       icon: 'bi-building',
       items: [
         { name: 'จัดการศูนย์พักพิง', href: '/admin/import', icon: 'bi-list-ul' },
+        { name: 'เพิ่มศูนย์/คลังใหม่', href: '/admin/centers/create', icon: 'bi-plus-circle' },
         { name: 'จัดการคลังสิ่งของ', href: '/admin/supplies', icon: 'bi-box-seam' },
         { name: 'คำร้องขอสิ่งของ', href: '/requests', icon: 'bi-folder2-open' },
       ],
@@ -65,7 +66,7 @@ export default function Sidebar() {
         </div>
 
         <div className="px-3 pb-3">
-          {menuGroups.map((group, groupIndex) => (
+          {menuGroups.map((group) => (
             <div key={group.title} className="mb-3">
               {/* Group Header */}
               <div className="d-flex align-items-center mb-2 px-2" style={{ color: 'var(--text-primary)' }}>

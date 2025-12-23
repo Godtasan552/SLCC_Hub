@@ -30,15 +30,17 @@ export default function CreateRequestClient() {
     fetchShelters();
   }, []);
 
+  // Filter for hubs, but if none found, fallback to all shelters so the user isn't blocked
   const hubShelters = shelters.filter(s => s.name.includes('คลังกลาง'));
+  const displayShelters = hubShelters.length > 0 ? hubShelters : shelters;
   const selectedShelter = shelters.find(s => s._id === selectedShelterId);
 
-  // Auto-select if only one hub exists
+  // Auto-select if only one hub/shelter exists
   useEffect(() => {
-    if (hubShelters.length === 1 && !selectedShelterId) {
-      setSelectedShelterId(hubShelters[0]._id);
+    if (displayShelters.length === 1 && !selectedShelterId) {
+      setSelectedShelterId(displayShelters[0]._id);
     }
-  }, [hubShelters, selectedShelterId]);
+  }, [displayShelters, selectedShelterId]);
 
   if (loading) {
     return (
@@ -57,39 +59,39 @@ export default function CreateRequestClient() {
           <div className="card shadow-sm mb-4 border-0">
             <div className="card-body p-4">
               <div className="d-flex justify-content-between align-items-center mb-3">
-                <h4 className="fw-bold mb-0" style={{ color: 'var(--text-primary)' }}>สร้างรายการขอรับบริจาค (สต็อกกลาง)</h4>
+                <h4 className="fw-bold mb-0" style={{ color: 'var(--text-primary)' }}>สร้างรายการขอรับบริจาค</h4>
                 <Link href="/requests" className="btn btn-sm btn-outline-secondary">
                   <i className="bi bi-arrow-left me-1"></i>กลับหน้ารวม
                 </Link>
               </div>
-              <p className="text-secondary mb-4">ระบบนี้จำกัดให้เฉพาะ **คลังส่วนกลาง** เป็นผู้ส่งคำขอทรัพยากร เพื่อรวบรวมของบริจาคเข้าสู่ระบบ</p>
+              <p className="text-secondary mb-4">โปรดเลือกศูนย์ที่ต้องการเปิดรับบริจาค (แนะนำอย่างยิ่งให้ใช้ศูนย์ที่เป็น **คลังส่วนกลาง**)</p>
               
               <div className="mb-4">
-                <label className="form-label fw-bold">เลือกศูนย์คลังกลางที่ต้องการส่งคำขอ</label>
+                <label className="form-label fw-bold">เลือกศูนย์ที่ต้องการส่งคำขอ</label>
                 <select 
                   className="form-select form-select-lg border-primary"
                   value={selectedShelterId}
                   onChange={(e) => setSelectedShelterId(e.target.value)}
                 >
-                  {hubShelters.length === 0 ? (
-                    <option value="">-- ไม่พบข้อมูลคลังกลาง (โปรดสร้างในระบบจัดการ) --</option>
-                  ) : hubShelters.length > 1 ? (
-                    <>
-                      <option value="">-- โปรดเลือกคลังกลาง --</option>
-                      {hubShelters.map(s => (
-                        <option key={s._id} value={s._id}>{s.name}</option>
-                      ))}
-                    </>
-                  ) : (
-                    hubShelters.map(s => (
-                      <option key={s._id} value={s._id}>{s.name}</option>
-                    ))
-                  )}
+                  <option value="">-- โปรดเลือกศูนย์ --</option>
+                  {displayShelters.map(s => (
+                    <option key={s._id} value={s._id}>
+                      {s.name} {s.district ? `(${s.district})` : ''}
+                    </option>
+                  ))}
                 </select>
-                {hubShelters.length === 0 && (
-                  <div className="alert alert-warning mt-2 small py-2">
+                
+                {hubShelters.length === 0 && shelters.length > 0 && (
+                  <div className="alert alert-info mt-2 small py-2">
+                    <i className="bi bi-info-circle-fill me-2"></i>
+                    ยังไม่มีศูนย์ที่ชื่อระบุว่า &quot;คลังกลาง&quot; ระบบจึงแสดงศูนย์ทั้งหมดเพื่อให้คุณใช้งานได้ครับ
+                  </div>
+                )}
+                
+                {shelters.length === 0 && (
+                  <div className="alert alert-danger mt-2 small py-2">
                     <i className="bi bi-exclamation-triangle-fill me-2"></i>
-                    ไม่พบศูนย์ที่ชื่อ &quot;คลังกลาง&quot; ในระบบ โปรดเพิ่มศูนย์ชื่อนี้ในเมนูนำเข้าข้อมููลก่อน
+                    ไม่พบข้อมูลศูนย์ใดๆ ในระบบ โปรดไปที่หน้าจัดการศูนย์เพื่อเพิ่มข้อมูลก่อน
                   </div>
                 )}
               </div>
