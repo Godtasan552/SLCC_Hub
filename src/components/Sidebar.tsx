@@ -33,8 +33,8 @@ export default function Sidebar() {
       title: 'ศูนย์พักพิง',
       icon: 'bi-hospital',
       items: [
-        { name: 'รายชื่อศูนย์', href: '/', icon: 'bi-list-task', roles: ['admin', 'staff', 'user'] },
-        { name: 'รายการสิ่งของ', href: '/supplies', icon: 'bi-box', roles: ['admin', 'staff', 'user'] },
+        { name: 'รายชื่อศูนย์', href: '/', icon: 'bi-list-task' },
+        { name: 'รายการสิ่งของ', href: '/supplies', icon: 'bi-box' },
         { name: 'สร้างคำร้องขอ', href: '/requests/create', icon: 'bi-plus-square', roles: ['admin', 'staff'] },
         { name: 'รายการเบิกจ่าย', href: '/requests/summary', icon: 'bi-hexagon', roles: ['admin', 'staff'] },
       ],
