@@ -229,11 +229,13 @@ export default function SuppliesPage() {
   const categories = ['ทั้งหมด', ...Object.values(SupplyCategory).filter(c => c !== SupplyCategory.ALL)];
 
   return (
-    <div className="container-fluid px-4 py-4" style={{ maxWidth: '1600px', minHeight: '100vh', backgroundColor: 'var(--bg-body)' }}>
+    <div className="container-fluid px-4 py-4" style={{ maxWidth: '1600px', minHeight: '100vh', backgroundColor: 'var(--bg-primary)' }}>
       <div className="d-flex flex-column flex-md-row justify-content-between align-items-end mb-4 gap-3">
         <div>
            <div className="d-flex align-items-center mb-2">
-                <span className="badge bg-primary rounded-circle p-2 me-2"><i className="bi bi-box-seam-fill fs-5 text-white"></i></span>
+                <span className="badge bg-primary rounded-circle p-2 me-2" style={{ display: 'inline-flex', width: '40px', height: '40px', alignItems: 'center', justifyContent: 'center' }}>
+                    <i className="bi bi-box-seam-fill fs-5 text-white"></i>
+                </span>
                 <h4 className="fw-bold mb-0" style={{ color: 'var(--text-primary)' }}>ระบบจัดการคลังสินค้า</h4>
            </div>
            <p className="text-secondary small mb-0 ps-1">ระบบบริหารจัดการทรัพยากร สิ่งของบริจาค และเวชภัณฑ์</p>

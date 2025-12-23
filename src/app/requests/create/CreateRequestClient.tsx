@@ -127,15 +127,15 @@ export default function CreateRequestClient() {
           <div className="d-flex justify-content-between position-relative">
             {[1, 2, 3, 4].map((s) => (
               <div key={s} className="d-flex flex-column align-items-center" style={{ zIndex: 2 }}>
-                <div className={`rounded-circle d-flex align-items-center justify-content-center border-3 ${step >= s ? 'bg-primary text-white border-primary' : 'bg-white text-muted border-light'}`} style={{ width: '40px', height: '40px', fontWeight: 'bold' }}>
+                <div className={`rounded-circle d-flex align-items-center justify-content-center border-3 ${step >= s ? 'bg-primary text-white border-primary' : 'border-theme'}`} style={{ width: '40px', height: '40px', fontWeight: 'bold', backgroundColor: step >= s ? '' : 'var(--bg-secondary)', color: step >= s ? '' : 'var(--text-secondary)' }}>
                   {s}
                 </div>
-                <span className={`small mt-2 fw-bold ${step >= s ? 'text-primary' : 'text-muted'}`}>
+                <span className={`small mt-2 fw-bold ${step >= s ? 'text-primary' : 'text-theme-secondary'}`}>
                   {s === 1 ? 'เลือกคลังต้นทาง' : s === 2 ? 'เลือกสิ่งของ' : s === 3 ? 'เลือกศูนย์ปลายทาง' : 'ยืนยัน'}
                 </span>
               </div>
             ))}
-            <div className="position-absolute top-50 start-0 translate-middle-y w-100 bg-light" style={{ height: '4px', zIndex: 1 }}>
+            <div className="position-absolute top-50 start-0 translate-middle-y w-100" style={{ height: '4px', zIndex: 1, backgroundColor: 'var(--border-color)' }}>
               <div className="bg-primary h-100 transition-all" style={{ width: `${((step - 1) / 3) * 100}%` }}></div>
             </div>
           </div>

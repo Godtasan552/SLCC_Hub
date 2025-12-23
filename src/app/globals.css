@@ -1,36 +1,42 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap');
+
 /* Theme Variables */
 :root[data-theme="dark"] {
-  --bg-primary: #212529;
-  --bg-secondary: #16191c;
-  --bg-card: #2d3238;
-  --text-primary: #f8f9fa;
-  --text-secondary: #adb5bd;
-  --border-color: #495057;
-  --table-hover: #343a40;
+  --bg-primary: #121416;         /* Slightly darker for better background separation */
+  --bg-secondary: #1a1d21;
+  --bg-card: #22262b;
+  --text-primary: #ffffff;       /* Pure white for maximum contrast */
+  --text-secondary: #ced4da;     /* Lighter grey for better readability */
+  --border-color: #3d4349;
+  --table-hover: #2c3036;
 }
 
 :root[data-theme="light"] {
   --bg-primary: #f8f9fa;
-  --bg-secondary: #e9ecef;
+  --bg-secondary: #f1f3f5;
   --bg-card: #ffffff;
-  --text-primary: #212529;
-  --text-secondary: #6c757d;
+  --text-primary: #1a1d21;       /* Darker than before for crispness */
+  --text-secondary: #495057;     /* Darker grey for better readability */
   --border-color: #dee2e6;
-  --table-hover: #e9ecef;
+  --table-hover: #f1f3f5;
 }
 
 html,
 body {
   max-width: 100vw;
   overflow-x: hidden;
+  height: 100%;
 }
 
 body {
   color: var(--text-primary);
   background: var(--bg-primary);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Inter', 'Noto Sans Thai', Arial, sans-serif;
+  line-height: 1.6;               /* Better spacing between lines */
+  letter-spacing: -0.01em;       /* Modern spacing for Inter */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
@@ -45,6 +51,12 @@ a {
   text-decoration: none;
 }
 
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
 /* Theme-aware table styles */
 .table {
   --bs-table-bg: var(--bg-card);
@@ -53,9 +65,14 @@ a {
   --bs-table-hover-bg: var(--table-hover);
 }
 
-.table thead {
-  background-color: var(--bg-secondary);
-  color: var(--text-secondary);
+.table thead th {
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-secondary) !important;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  border-bottom: 2px solid var(--border-color) !important;
 }
 
 .table tbody {
@@ -155,17 +172,51 @@ input:-webkit-autofill:active {
   box-shadow: inset 0 0 20px 20px var(--bg-card) !important;
 }
 
-/* Badge theme support */
-.badge {
-  --bs-badge-color: var(--text-primary);
+/* Bootstrap Utility Overrides for Readability */
+.text-muted {
+  color: var(--text-secondary) !important;
 }
 
-/* Button theme support */
-.btn-outline-light {
-  --bs-btn-color: var(--text-primary);
-  --bs-btn-border-color: var(--border-color);
-  --bs-btn-hover-bg: var(--table-hover);
-  --bs-btn-hover-border-color: var(--border-color);
+.small, small {
+  font-size: 0.825rem;
+  font-weight: 500;
+}
+
+.bg-light {
+  background-color: var(--bg-secondary) !important;
+}
+
+.bg-white {
+  background-color: var(--bg-card) !important;
+}
+
+.border {
+  border-color: var(--border-color) !important;
+}
+
+/* Badge readable improvements */
+.badge {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.4em 0.8em;
+}
+
+.badge.bg-light {
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+/* Ensure sticky headers are readable */
+.sticky-top {
+  z-index: 1020;
+  background-color: var(--bg-primary);
+}
+
+.table.sticky-top thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 /* Sidebar Responsive Styles */
@@ -173,6 +224,7 @@ input:-webkit-autofill:active {
   width: 280px;
   height: 100%;
   transition: transform 0.3s ease-in-out;
+  background-color: var(--bg-secondary);
 }
 
 @media (max-width: 991.98px) {
@@ -185,4 +237,29 @@ input:-webkit-autofill:active {
   .sidebar-container.show {
     transform: translateX(0);
   }
+}
+
+/* Accessibility & Smoothing */
+::selection {
+  background-color: rgba(13, 110, 253, 0.25);
+  color: var(--text-primary);
+}
+
+/* Scrollbar improvement for dark mode */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
 }

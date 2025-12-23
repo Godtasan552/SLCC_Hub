@@ -292,7 +292,7 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
                     </td>
                     <td className="fw-bold fs-6">{req.itemName}</td>
                     <td>
-                      <span className="badge bg-light text-dark border px-3 py-2">
+                      <span className="badge bg-light text-theme border px-3 py-2">
                         {req.amount} {req.unit}
                       </span>
                     </td>
@@ -303,11 +303,11 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
                           {hasEnough ? <i className="bi bi-check-circle ms-1"></i> : <i className="bi bi-x-circle ms-1"></i>}
                         </div>
                       ) : (
-                        <span className="text-muted">-</span>
+                        <span className="text-theme-secondary opacity-50">-</span>
                       )}
                     </td>
                     <td>
-                      <div className={`small fw-bold px-2 py-1 rounded d-inline-block ${req.isHub ? 'bg-primary bg-opacity-10 text-primary border border-primary' : 'bg-light text-secondary'}`}>
+                      <div className={`small fw-bold px-2 py-1 rounded d-inline-block ${req.isHub ? 'bg-primary bg-opacity-25 text-primary border border-primary' : 'bg-secondary bg-opacity-25 text-theme-secondary border'}`}>
                         {req.isHub ? '🏗️ ' : '🏠 '}{req.shelterName}
                       </div>
                     </td>
