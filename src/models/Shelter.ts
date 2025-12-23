@@ -3,8 +3,8 @@ import { Schema, model, models } from 'mongoose';
 // โครงสร้างการขอทรัพยากร
 const ResourceRequestSchema = new Schema({
   category: { 
-    type: String, 
-    enum: ['Medical', 'Food', 'Supplies', 'Others'], // ยา, อาหาร, ของใช้, อื่นๆ
+    type: String,
+    // Support both Thai and English categories
     required: true 
   },
   itemName: { type: String, required: true }, // เช่น "ยาแก้ปวด"
@@ -12,7 +12,7 @@ const ResourceRequestSchema = new Schema({
   amount: { type: Number, default: 0 },
   unit: { type: String }, // แผง, กล่อง, กิโลกรัม
   urgency: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
-  status: { type: String, enum: ['Pending', 'Approved', 'Shipped', 'Received'], default: 'Pending' },
+  status: { type: String, enum: ['Pending', 'Approved', 'Shipped', 'Received', 'Rejected'], default: 'Pending' },
   requestedAt: { type: Date, default: Date.now }
 });
 

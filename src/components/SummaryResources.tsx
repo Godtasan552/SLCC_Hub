@@ -148,7 +148,7 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
       
       if (res.data.success) {
         setAllRequestsState(prev =>
-          prev.filter(r => r._id !== resourceId) // Remove from list
+          prev.map(r => r._id === resourceId ? { ...r, status: 'Rejected' } : r)
         );
         alert('❌ ปฏิเสธคำร้องขอเรียบร้อย');
       }

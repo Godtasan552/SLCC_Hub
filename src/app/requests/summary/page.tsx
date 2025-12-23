@@ -12,7 +12,7 @@ interface Resource {
   amount: number;
   unit: string;
   urgency: 'low' | 'medium' | 'high';
-  status: 'Pending' | 'Approved' | 'Shipped' | 'Received';
+  status: string;
   requestedAt: Date | string;
 }
 
@@ -26,32 +26,15 @@ interface ShelterSummary {
 export default async function RequestsSummaryPage() {
   await dbConnect();
 
+  // Fetch ALL resources from shelters and hubs to allow various filtering in SummaryResources component
   const [sheltersRaw, hubsRaw] = await Promise.all([
     Shelter.find(
-      { 'resources.status': 'Pending' },
-      {
-        name: 1,
-        resources: {
-          $filter: {
-            input: '$resources',
-            as: 'res',
-            cond: { $eq: ['$$res.status', 'Pending'] }
-          }
-        }
-      }
+      { 'resources.0': { $exists: true } },
+      { name: 1, resources: 1 }
     ).lean(),
     Hub.find(
-      { 'resources.status': 'Pending' },
-      {
-        name: 1,
-        resources: {
-          $filter: {
-            input: '$resources',
-            as: 'res',
-            cond: { $eq: ['$$res.status', 'Pending'] }
-          }
-        }
-      }
+      { 'resources.0': { $exists: true } },
+      { name: 1, resources: 1 }
     ).lean()
   ]);
 
@@ -70,4 +53,3 @@ export default async function RequestsSummaryPage() {
     </div>
   );
 }
-

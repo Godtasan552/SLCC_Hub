@@ -13,21 +13,22 @@ export async function POST(req: Request) {
     const { shelterId, resourceId, action, hubId } = body;
     // action: 'approve' or 'reject'
 
-    if (!shelterId || !resourceId || !action) {
+    // Check if we have either shelterId or hubId (identifying where the request came from)
+    if ((!shelterId && !hubId) || !resourceId || !action) {
       return NextResponse.json(
         { success: false, error: 'Missing required fields' },
         { status: 400 }
       );
     }
 
-    // Find the shelter/hub and the specific resource
-    const isHub = !!hubId;
-    const Model = isHub ? Hub : Shelter;
+    // Find the entity (Shelter or Hub) that made the request
+    const isHubRequest = !!hubId;
+    const Model = isHubRequest ? Hub : Shelter;
     const entity = await Model.findById(shelterId || hubId);
 
     if (!entity) {
       return NextResponse.json(
-        { success: false, error: 'Shelter/Hub not found' },
+        { success: false, error: 'Requesting entity (Shelter/Hub) not found' },
         { status: 404 }
       );
     }
@@ -41,7 +42,6 @@ export async function POST(req: Request) {
     }
 
     if (action === 'reject') {
-      // Simply update status to Rejected
       resource.status = 'Rejected';
       await entity.save();
 
@@ -53,20 +53,30 @@ export async function POST(req: Request) {
     }
 
     if (action === 'approve') {
-      // Check if there's enough stock in hub supplies (supplies without shelterId are hub supplies)
+      // 🎯 ดึงเฉพาะคันที่สร้างขึ้นเอง (Hubs)
+      const allHubs = await Hub.find({}).select('_id');
+      const hubIds = allHubs.map(h => h._id);
+
+      console.log('🏗️ ระบบกำลังค้นหาสต็อกเฉพาะในคลังที่สร้างเอง (Hubs)...');
+      console.log('📍 Hub IDs ทั้งหมด:', hubIds.length, 'แห่ง');
+
+      // คันหา Supply เฉพาะที่ผูกกับ Hub IDs เหล่านี้เท่านั้น
       const hubSupplies = await Supply.find({
         name: { $regex: new RegExp(`^${resource.itemName}$`, 'i') },
         category: resource.category,
-        $or: [
-          { shelterId: { $exists: false } },
-          { shelterId: null }
-        ],
-        quantity: { $gt: 0 } // Only get supplies with quantity > 0
+        quantity: { $gt: 0 },
+        shelterId: { $in: hubIds } // ✅ เอาเฉพาะคลังที่สร้างเอง
       }).sort({ createdAt: 1 }); // FIFO
 
       console.log('🔍 Searching for:', resource.itemName, 'Category:', resource.category);
-      console.log('📦 Found supplies:', hubSupplies.length, 'items');
-      console.log('📊 Total available:', hubSupplies.reduce((sum, s) => sum + s.quantity, 0));
+      console.log('📦 Found supplies in your created hubs:', hubSupplies.length, 'items');
+      
+      hubSupplies.forEach(s => {
+        console.log(`   - ${s.name}: ${s.quantity} ${s.unit} (In Hub: ${s.shelterName || s.shelterId})`);
+      });
+      
+      const totalAvailable = hubSupplies.reduce((sum, s) => sum + s.quantity, 0);
+      console.log('📊 Total available in your hubs:', totalAvailable);
 
       let remainingAmount = resource.amount;
       const updatedSupplies = [];
@@ -75,13 +85,11 @@ export async function POST(req: Request) {
         if (remainingAmount <= 0) break;
 
         if (supply.quantity >= remainingAmount) {
-          // This supply has enough
           supply.quantity -= remainingAmount;
           remainingAmount = 0;
           await supply.save();
           updatedSupplies.push(supply);
         } else {
-          // Take all from this supply and continue
           remainingAmount -= supply.quantity;
           supply.quantity = 0;
           await supply.save();
@@ -93,7 +101,7 @@ export async function POST(req: Request) {
         return NextResponse.json(
           { 
             success: false, 
-            error: `สต็อกไม่เพียงพอ ขาดอีก ${remainingAmount} ${resource.unit}` 
+            error: `สต็อกในคลัง(Hub)ไม่เพียงพอ ขาดอีก ${remainingAmount} ${resource.unit}` 
           },
           { status: 400 }
         );
@@ -105,7 +113,7 @@ export async function POST(req: Request) {
 
       return NextResponse.json({
         success: true,
-        message: 'อนุมัติคำร้องขอและตัดสต็อกเรียบร้อย',
+        message: 'อนุมัติคำร้องขอและตัดสต็อกจากคลัง(Hub)เรียบร้อย',
         data: resource,
         stockDeducted: resource.amount
       });

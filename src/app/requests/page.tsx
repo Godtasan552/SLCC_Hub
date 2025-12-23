@@ -50,9 +50,10 @@ export default async function RequestsPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'Pending': return <span className="badge rounded-pill border border-warning text-warning">รอดำเนินการ</span>;
-      case 'Approved': return <span className="badge rounded-pill bg-primary">อนุมัติแล้ว</span>;
-      case 'Shipped': return <span className="badge rounded-pill bg-info">กำลังขนส่ง</span>;
-      case 'Received': return <span className="badge rounded-pill bg-success">ได้รับแล้ว</span>;
+      case 'Approved': return <span className="badge rounded-pill bg-success text-white">อนุมัติแล้ว</span>;
+      case 'Shipped': return <span className="badge rounded-pill bg-info text-white">กำลังขนส่ง</span>;
+      case 'Received': return <span className="badge rounded-pill bg-success text-white">ได้รับแล้ว</span>;
+      case 'Rejected': return <span className="badge rounded-pill bg-danger text-white">ปฏิเสธแล้ว</span>;
       default: return <span className="badge rounded-pill bg-secondary">{status}</span>;
     }
   };
