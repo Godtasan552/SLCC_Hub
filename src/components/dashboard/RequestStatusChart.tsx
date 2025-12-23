@@ -7,7 +7,6 @@ interface RequestStatusChartProps {
   stats: {
     pending: number;
     approved: number;
-    shipped: number;
     received: number;
     rejected: number;
   };
@@ -16,7 +15,6 @@ interface RequestStatusChartProps {
 const COLORS = {
   pending: '#ffc107',  // Waiting - Warning Yellow
   approved: '#198754', // Approved - Success Green
-  shipped: '#0d6efd',  // Shipped - Primary Blue
   received: '#6f42c1', // Received - Purple
   rejected: '#dc3545', // Rejected - Danger Red
 };
@@ -26,7 +24,6 @@ export default function RequestStatusChart({ stats }: RequestStatusChartProps) {
   const data = [
     { name: 'รออนุมัติ', value: stats.pending, color: COLORS.pending },
     { name: 'อนุมัติแล้ว', value: stats.approved, color: COLORS.approved },
-    { name: 'กำลังส่ง', value: stats.shipped, color: COLORS.shipped },
     { name: 'ได้รับแล้ว', value: stats.received, color: COLORS.received },
     { name: 'ปฏิเสธ', value: stats.rejected, color: COLORS.rejected },
   ];
@@ -35,7 +32,7 @@ export default function RequestStatusChart({ stats }: RequestStatusChartProps) {
   // but the legend will show everything if handled differently.
   // Actually, to match "all statuses", let's keep even small ones but only render labels for non-zero.
   const chartData = data.filter(item => item.value > 0);
-  const total = stats.pending + stats.approved + stats.shipped + stats.received + stats.rejected;
+  const total = stats.pending + stats.approved + stats.received + stats.rejected;
 
   interface PieLabelProps {
     cx?: number;

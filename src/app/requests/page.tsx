@@ -1,5 +1,10 @@
 import dbConnect from '@/lib/dbConnect';
 import Shelter from '@/models/Shelter';
+import Hub from '@/models/Hub';
+import RequestListClient from '@/components/requests/RequestListClient';
+import Link from 'next/link';
+
+export const dynamic = 'force-dynamic';
 
 interface Resource {
   _id: string;
@@ -16,47 +21,29 @@ interface ShelterWithResources {
   _id: string;
   name: string;
   resources: Resource[];
+  isHub?: boolean;
 }
-
-export const dynamic = 'force-dynamic';
-
-import Link from 'next/link';
 
 export default async function RequestsPage() {
   await dbConnect();
 
-  const sheltersWithRequests = await Shelter.find({
-    'resources.0': { $exists: true }
-  }).select('name resources').lean() as unknown as ShelterWithResources[];
+  const [sheltersRaw, hubsRaw] = await Promise.all([
+    Shelter.find({ 'resources.0': { $exists: true } }).select('name resources').lean(),
+    Hub.find({ 'resources.0': { $exists: true } }).select('name resources').lean()
+  ]);
 
-  // Flatten all resources with their shelter name
-  const allRequests = sheltersWithRequests.flatMap(shelter => 
-    shelter.resources.map(res => ({
-      ...res,
-      shelterName: shelter.name,
-      shelterId: shelter._id
-    }))
-  ).sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime());
+  // Combine and sort
+  const allRequests = [
+    ...(sheltersRaw as unknown as ShelterWithResources[]).flatMap(s => 
+      s.resources.map(r => ({ ...r, shelterName: s.name, shelterId: s._id, isHub: false }))
+    ),
+    ...(hubsRaw as unknown as ShelterWithResources[]).flatMap(h => 
+      h.resources.map(r => ({ ...r, shelterName: h.name, shelterId: h._id, isHub: true }))
+    )
+  ].sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime());
 
-  const getUrgencyBadge = (urgency: string) => {
-    switch (urgency) {
-      case 'high': return <span className="badge bg-danger">ด่วนมาก</span>;
-      case 'medium': return <span className="badge bg-warning text-dark">ด่วน</span>;
-      case 'low': return <span className="badge bg-info text-dark">ปกติ</span>;
-      default: return <span className="badge bg-secondary">ทั่วไป</span>;
-    }
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'Pending': return <span className="badge rounded-pill border border-warning text-warning">รอดำเนินการ</span>;
-      case 'Approved': return <span className="badge rounded-pill bg-success text-white">อนุมัติแล้ว</span>;
-      case 'Shipped': return <span className="badge rounded-pill bg-info text-white">กำลังขนส่ง</span>;
-      case 'Received': return <span className="badge rounded-pill bg-success text-white">ได้รับแล้ว</span>;
-      case 'Rejected': return <span className="badge rounded-pill bg-danger text-white">ปฏิเสธแล้ว</span>;
-      default: return <span className="badge rounded-pill bg-secondary">{status}</span>;
-    }
-  };
+  // Serialize for client component
+  const serializedRequests = JSON.parse(JSON.stringify(allRequests));
 
   return (
     <div className="container py-4">
@@ -67,49 +54,7 @@ export default async function RequestsPage() {
         </Link>
       </div>
       
-      <div className="table-responsive rounded border" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}>
-        <table className="table table-hover align-middle mb-0">
-          <thead style={{ backgroundColor: 'var(--bg-secondary)' }}>
-            <tr style={{ color: 'var(--text-secondary)' }}>
-              <th>ศูนย์พักพิง</th>
-              <th>รายการ</th>
-              <th>จำนวน</th>
-              <th>ความด่วน</th>
-              <th>สถานะ</th>
-              <th>วันที่ขอ</th>
-            </tr>
-          </thead>
-          <tbody>
-            {allRequests.length > 0 ? (
-              allRequests.map((req) => (
-                <tr key={String(req._id)} style={{ color: 'var(--text-primary)' }}>
-                  <td className="fw-bold">{req.shelterName}</td>
-                  <td>
-                    <div className="fw-bold">{req.itemName}</div>
-                    <small className="text-secondary">{req.category}</small>
-                  </td>
-                  <td>{req.amount} {req.unit}</td>
-                  <td>{getUrgencyBadge(req.urgency)}</td>
-                  <td>{getStatusBadge(req.status)}</td>
-                  <td>
-                    {new Intl.DateTimeFormat('th-TH', {
-                      day: '2-digit',
-                      month: 'short',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    }).format(new Date(req.requestedAt))}
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={6} className="text-center py-5 text-secondary">ไม่พบรายการร้องขอในขณะนี้</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <RequestListClient initialRequests={serializedRequests} />
     </div>
   );
 }

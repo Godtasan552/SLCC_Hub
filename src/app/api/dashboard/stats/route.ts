@@ -50,7 +50,6 @@ export async function GET() {
     const requestStats = {
       pending: allResources.filter(r => r.status === 'Pending').length,
       approved: allResources.filter(r => r.status === 'Approved').length,
-      shipped: allResources.filter(r => r.status === 'Shipped').length,
       received: allResources.filter(r => r.status === 'Received').length,
       rejected: allResources.filter(r => r.status === 'Rejected').length
     };

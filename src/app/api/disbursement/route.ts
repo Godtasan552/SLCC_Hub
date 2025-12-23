@@ -66,13 +66,13 @@ export async function POST(req: Request) {
       await supply.save();
     }
 
-    // 4. Update Resource Request status to Shipped
-    resourceRequest.status = 'Shipped';
+    // 4. Update Resource Request status to Approved
+    resourceRequest.status = 'Approved';
     await shelter.save();
 
     return NextResponse.json({
       success: true,
-      message: 'ตัดสต็อกคลังกลางและเปลี่ยนสถานะเป็น "กำลังจัดส่ง" เรียบร้อยแล้ว',
+      message: 'ตัดสต็อกคลังกลางและเปลี่ยนสถานะเป็น "อนุมัติแล้ว" เรียบร้อยแล้ว',
       remainingStock: totalAvailable - resourceRequest.amount
     });
 

@@ -20,7 +20,6 @@ interface DashboardData extends Stats {
   requestStats: {
     pending: number;
     approved: number;
-    shipped: number;
     received: number;
     rejected: number;
   };

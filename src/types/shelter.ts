@@ -12,7 +12,7 @@ export interface ResourceRequest {
   amount: number;
   unit?: string;
   urgency: 'low' | 'medium' | 'high';
-  status: 'Pending' | 'Approved' | 'Shipped' | 'Received' | 'Rejected';
+  status: 'Pending' | 'Approved' | 'Received' | 'Rejected';
   requestedAt: string;
 }
 

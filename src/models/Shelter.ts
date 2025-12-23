@@ -12,7 +12,7 @@ const ResourceRequestSchema = new Schema({
   amount: { type: Number, default: 0 },
   unit: { type: String }, // แผง, กล่อง, กิโลกรัม
   urgency: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
-  status: { type: String, enum: ['Pending', 'Approved', 'Shipped', 'Received', 'Rejected'], default: 'Pending' },
+  status: { type: String, enum: ['Pending', 'Approved', 'Received', 'Rejected'], default: 'Pending' },
   requestedAt: { type: Date, default: Date.now }
 });
 

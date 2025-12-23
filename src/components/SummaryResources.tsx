@@ -73,7 +73,6 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
   const statusStats = useMemo(() => ({
     pending: allRequestsState.filter((r: Resource) => r.status === 'Pending').length,
     approved: allRequestsState.filter((r: Resource) => r.status === 'Approved').length,
-    shipped: allRequestsState.filter((r: Resource) => r.status === 'Shipped').length,
     received: allRequestsState.filter((r: Resource) => r.status === 'Received').length,
     rejected: allRequestsState.filter((r: Resource) => r.status === 'Rejected').length
   }), [allRequestsState]);
@@ -210,18 +209,7 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
             </div>
           </div>
         </div>
-        <div className="col-md-2">
-          <div className="card shadow-sm border-0 h-100 bg-primary bg-opacity-10">
-            <div className="card-body">
-              <div className="d-flex justify-content-between align-items-center mb-2">
-                <span className="badge bg-primary">🚚 กำลังส่ง</span>
-                <i className="bi bi-truck fs-4 text-primary"></i>
-              </div>
-              <h2 className="fw-bold mb-0">{statusStats.shipped}</h2>
-              <small className="text-secondary">อยู่ระหว่างการนำส่ง</small>
-            </div>
-          </div>
-        </div>
+
         <div className="col-md-2">
           <div className="card shadow-sm border-0 h-100 bg-info bg-opacity-10">
             <div className="card-body">
@@ -257,34 +245,50 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
       </div>
 
       {/* 🔍 Filters */}
-      <div className="card shadow-sm border-0 mb-4 bg-light">
+      <div className="card shadow-sm mb-4" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
         <div className="card-body">
           <div className="row g-3 align-items-center">
             <div className="col-md-4">
               <div className="input-group input-group-sm">
-                <span className="input-group-text bg-white border-0"><i className="bi bi-funnel"></i></span>
+                <span className="input-group-text" style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)' }}>
+                  <i className="bi bi-funnel"></i>
+                </span>
                 <select 
-                  className="form-select border-0 shadow-none" 
+                  className="form-select shadow-none" 
+                  style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderLeft: 'none' }}
                   value={filterStatus} 
                   onChange={e => setFilterStatus(e.target.value as typeof filterStatus)}
                 >
                   <option value="All">ทุกสถานะ</option>
                   <option value="Pending">⏳ รออนุมัติ</option>
                   <option value="Approved">✅ อนุมัติแล้ว</option>
-                  <option value="Shipped">🚚 กำลังส่ง</option>
                   <option value="Received">📥 ได้รับแล้ว</option>
                   <option value="Rejected">❌ ปฏิเสธแล้ว</option>
                 </select>
               </div>
             </div>
             <div className="col-md-4">
-              <select className="form-select form-select-sm border-0 shadow-none" value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
+              <select 
+                className="form-select form-select-sm shadow-none" 
+                style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
+                value={filterCategory} 
+                onChange={e => setFilterCategory(e.target.value)}
+              >
                 <option value="All">ทุกหมวดหมู่</option>
                 {Object.keys(categoryStats).map(cat => <option key={cat} value={cat}>{cat}</option>)}
               </select>
             </div>
             <div className="col-md-4 text-end">
-              <button className="btn btn-sm btn-white text-danger border-0" onClick={() => {setFilterStatus('All'); setFilterCategory('All'); setFilterUrgency('All');}}>
+              <button 
+                className="btn btn-sm" 
+                style={{ 
+                  backgroundColor: 'var(--bg-card)', 
+                  color: 'var(--text-secondary)',
+                  border: '1px solid var(--border-color)',
+                  padding: '4px 12px'
+                }}
+                onClick={() => {setFilterStatus('All'); setFilterCategory('All'); setFilterUrgency('All');}}
+              >
                 ล้างตัวกรอง
               </button>
             </div>
@@ -293,42 +297,42 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
       </div>
 
       {/* 📋 Table */}
-      <div className="card shadow-sm border-0 overflow-hidden">
+      <div className="card shadow-sm border-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-card)' }}>
         <div className="table-responsive">
-          <table className="table table-hover align-middle mb-0">
-            <thead className="table-light">
-              <tr className="small text-secondary">
-                <th className="ps-4">ประเภท / วันที่ขอ</th>
-                <th>ชื่อสิ่งของ</th>
-                <th>จำนวนที่ขอ</th>
-                <th>จากศูนย์</th>
-                <th>ความด่วน</th>
-                <th className="text-end pe-4">การดำเนินการ</th>
+          <table className="table align-middle mb-0">
+            <thead>
+              <tr className="small" style={{ color: 'var(--text-secondary)', backgroundColor: 'var(--bg-secondary)' }}>
+                <th className="ps-4 border-0">ประเภท / วันที่ขอ</th>
+                <th className="border-0">ชื่อสิ่งของ</th>
+                <th className="border-0">จำนวนที่ขอ</th>
+                <th className="border-0">จากศูนย์</th>
+                <th className="border-0">ความด่วน</th>
+                <th className="border-0 text-end pe-4">การดำเนินการ</th>
               </tr>
             </thead>
             <tbody>
               {filteredRequests.map((req: Resource) => {
                 return (
-                  <tr key={req._id}>
+                  <tr key={req._id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                     <td className="ps-4">
                       <div className="d-flex align-items-center">
                         <span className="fs-4 me-3">{getCategoryIcon(req.category)}</span>
                         <div>
-                          <div className="small fw-bold text-dark">{req.category}</div>
-                          <div className="text-secondary" style={{ fontSize: '0.75rem' }}>
+                          <div className="small fw-bold" style={{ color: 'var(--text-primary)' }}>{req.category}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                             {new Date(req.requestedAt).toLocaleDateString('th-TH')}
                           </div>
                         </div>
                       </div>
                     </td>
                     <td>
-                      <div className="fw-bold text-dark">{req.itemName}</div>
+                      <div className="fw-bold" style={{ color: 'var(--text-primary)' }}>{req.itemName}</div>
                     </td>
                     <td>
-                      <span className="fw-bold text-primary">{req.amount}</span> {req.unit}
+                      <span className="fw-bold text-primary">{req.amount}</span> <span style={{ color: 'var(--text-secondary)' }}>{req.unit}</span>
                     </td>
                     <td>
-                      <span className="badge bg-light text-dark fw-normal border shadow-sm">
+                      <span className="badge fw-normal border shadow-sm" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)', borderColor: 'var(--border-color) !important' }}>
                         {req.isHub ? '📦' : '🏠'} {req.shelterName}
                       </span>
                     </td>
@@ -352,10 +356,6 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
                           </button>
                         </div>
                       ) : req.status === 'Approved' ? (
-                        <span className="badge rounded-pill px-3 bg-success">
-                          ✅ อนุมัติแล้ว
-                        </span>
-                      ) : req.status === 'Shipped' ? (
                         <button 
                           className="btn btn-sm btn-success px-3 rounded-pill fw-bold"
                           disabled={loadingId === req._id}
@@ -378,7 +378,7 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
               })}
               {filteredRequests.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="text-center py-5 text-secondary">
+                  <td colSpan={6} className="text-center py-5" style={{ color: 'var(--text-secondary)' }}>
                     <i className="bi bi-inbox fs-1 d-block mb-2 opacity-50"></i>
                     ไม่มีรายการที่ตรงตามเงื่อนไข
                   </td>
@@ -388,23 +388,6 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
           </table>
         </div>
       </div>
-
-      <style jsx>{`
-        .table-hover tbody tr:hover {
-          background-color: rgba(0,0,0,0.02);
-        }
-        .btn-white {
-          background: white;
-          border: 1px solid #eee;
-        }
-        .animate-fade-in {
-          animation: fadeIn 0.4s ease-out;
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
     </div>
   );
 }
