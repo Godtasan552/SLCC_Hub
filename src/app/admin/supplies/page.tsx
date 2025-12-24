@@ -19,6 +19,7 @@ export default function SuppliesPage() {
   const hubFilter = searchParams.get('hub');
   
   const [activeTab, setActiveTab] = useState<'inventory' | 'management'>('inventory');
+  const [activeImportSchema, setActiveImportSchema] = useState<'excel' | 'json'>('excel');
   const [viewMode, setViewMode] = useState<'hubs' | 'shelters' | 'all'>('hubs');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -238,16 +239,17 @@ export default function SuppliesPage() {
       const matchesUrlHub = hubFilter ? s.shelterId === hubFilter : true;
       
       // 3. View Mode filter (The fix for disbursed items confusion)
-      let matchesViewMode = true;
+      const matchesViewMode = !s.description?.includes('Disbursement') && !s.description?.includes('เบิกจ่าย');
       const isActuallyHub = !s.shelterId || hubIds.has(s.shelterId) || !!(s.shelterName && /คลังกลาง|Hub/i.test(s.shelterName));
       
+      let viewMatches = true;
       if (viewMode === 'hubs') {
-        matchesViewMode = isActuallyHub;
+        viewMatches = isActuallyHub;
       } else if (viewMode === 'shelters') {
-        matchesViewMode = !isActuallyHub;
+        viewMatches = !isActuallyHub;
       }
       
-      return matchesSearch && matchesUrlHub && matchesViewMode;
+      return matchesSearch && matchesUrlHub && matchesViewMode && viewMatches;
     });
   }, [supplies, searchTerm, hubFilter, viewMode, hubIds]);
 
@@ -304,7 +306,6 @@ export default function SuppliesPage() {
                             {/* View Mode Toggle */}
                             <div className="btn-group btn-group-sm p-1 bg-light rounded-pill border">
                                 <button className={`btn btn-sm rounded-pill px-3 ${viewMode === 'hubs' ? 'btn-primary shadow-sm' : 'text-secondary'}`} onClick={() => setViewMode('hubs')}>🏢 คลังกลาง</button>
-                                <button className={`btn btn-sm rounded-pill px-3 ${viewMode === 'shelters' ? 'btn-primary shadow-sm' : 'text-secondary'}`} onClick={() => setViewMode('shelters')}>📍 ศูนย์พักพิง</button>
                                 <button className={`btn btn-sm rounded-pill px-3 ${viewMode === 'all' ? 'btn-primary shadow-sm' : 'text-secondary'}`} onClick={() => setViewMode('all')}>ทั้งหมด</button>
                             </div>
                             
@@ -381,22 +382,16 @@ export default function SuppliesPage() {
                                     <div className="col-12">
                                         <div className="p-3 rounded-3 bg-primary bg-opacity-10 border border-primary border-opacity-25 mb-2">
                                             <label className="form-label small fw-bold text-primary"><i className="bi bi-geo-alt-fill me-1"></i>ขั้นตอนที่ 1: เลือกสถานที่รับ/เก็บสินค้า</label>
-                                            <select 
+                                             <select 
                                                 className="form-select border-primary border-opacity-50 fw-bold text-primary" 
                                                 value={manualForm.shelterId} 
                                                 onChange={(e) => handleShelterChange(e.target.value)}
                                                 required
                                             >
-                                                <optgroup label="🏢 คลังกลาง (Central Hubs)">
-                                                  {hubs.map((h) => (
-                                                      <option key={h._id} value={h._id}>📦 {h.name}</option>
-                                                  ))}
-                                                </optgroup>
-                                                <optgroup label="📍 ศูนย์พักพิง (Shelters)">
-                                                  {allLocations.filter(loc => !loc.isHub).map((s) => (
-                                                      <option key={s._id} value={s._id}>🏠 {s.name}</option>
-                                                  ))}
-                                                </optgroup>
+                                                <option value="" disabled>เลือกคลังกลาง...</option>
+                                                {hubs.map((h) => (
+                                                    <option key={h._id} value={h._id}>📦 {h.name}</option>
+                                                ))}
                                             </select>
                                         </div>
                                     </div>
@@ -469,6 +464,80 @@ export default function SuppliesPage() {
                                 <p className="text-secondary small">รองรับไฟล์มาตรฐาน .xlsx และ .json</p>
                                 <button className="btn btn-outline-success btn-sm rounded-pill px-4 mt-2">Browse Files</button>
                                 <input type="file" id="fileIn" className="d-none" accept=".json,.xlsx" onChange={handleFileUpload} />
+                            </div>
+
+                            <div className="mb-3 text-start mt-2">
+                                <div className="d-flex justify-content-between align-items-center mb-2">
+                                    <label className="small fw-bold text-secondary mb-0">โครงสร้างไฟล์นำเข้า:</label>
+                                    <div className="btn-group btn-group-sm rounded-pill border" style={{ fontSize: '0.65rem' }}>
+                                        <button type="button" className={`btn btn-xs py-0 px-2 ${activeImportSchema === 'excel' ? 'btn-primary' : 'btn-light'}`} onClick={() => setActiveImportSchema('excel')}>Excel</button>
+                                        <button type="button" className={`btn btn-xs py-0 px-2 ${activeImportSchema === 'json' ? 'btn-primary' : 'btn-light'}`} onClick={() => setActiveImportSchema('json')}>JSON</button>
+                                    </div>
+                                </div>
+
+                                {activeImportSchema === 'excel' ? (
+                                    <div className="table-responsive rounded-3 border animate-fade-in">
+                                        <table className="table table-sm table-bordered mb-0" style={{ fontSize: '0.7rem' }}>
+                                            <thead className="table-light">
+                                                <tr>
+                                                    <th className="py-1 px-1 text-center bg-light" style={{ width: '45px' }}>#</th>
+                                                    <th className="py-1 px-1 text-center bg-light">A(1)</th>
+                                                    <th className="py-1 px-1 text-center bg-light">B(2)</th>
+                                                    <th className="py-1 px-1 text-center bg-light">C(3)</th>
+                                                    <th className="py-1 px-1 text-center bg-light">D(4)</th>
+                                                    <th className="py-1 px-1 text-center bg-light">E(5)</th>
+                                                    <th className="py-1 px-1 text-center bg-light">F(6)</th>
+                                                    <th className="py-1 px-1 text-center bg-light">G(7)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <td className="py-1 px-1 fw-bold bg-light">ข้อมูล</td>
+                                                    <td className="py-1 px-1">ชื่อสิ่งของ</td>
+                                                    <td className="py-1 px-1">หมวดหมู่</td>
+                                                    <td className="py-1 px-1">จำนวน</td>
+                                                    <td className="py-1 px-1">หน่วย</td>
+                                                    <td className="py-1 px-1">รายละเอียด</td>
+                                                    <td className="py-1 px-1">ชื่อคลัง</td>
+                                                    <td className="py-1 px-1">ผู้บริจาค</td>
+                                                </tr>
+                                                <tr>
+                                                    <td className="py-1 px-1 fw-bold bg-light">ชนิด</td>
+                                                    <td className="py-1 px-1 text-primary">อักษร</td>
+                                                    <td className="py-1 px-1 text-primary">อักษร</td>
+                                                    <td className="py-1 px-1 text-success">ตัวเลข</td>
+                                                    <td className="py-1 px-1 text-primary">อักษร</td>
+                                                    <td className="py-1 px-1 text-primary">อักษร</td>
+                                                    <td className="py-1 px-1 text-primary">อักษร</td>
+                                                    <td className="py-1 px-1 text-primary">อักษร</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <div className="bg-light p-2 rounded-3 border animate-fade-in">
+                                        <pre className="mb-0 text-secondary" style={{ fontSize: '0.65rem', whiteSpace: 'pre-wrap' }}>
+{`[
+  {
+    "name": "ชื่อสิ่งของ",
+    "category": "อาหารและน้ำดื่ม",
+    "quantity": 100,
+    "unit": "ถุง",
+    "description": "รายละเอียด",
+    "shelterName": "ชื่อคลัง/ศูนย์",
+    "supplier": "ผู้บริจาค"
+  }
+]`}
+                                        </pre>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="alert alert-light border small text-start d-flex gap-2">
+                                <i className="bi bi-info-circle text-primary mt-1"></i>
+                                <span className="text-secondary" style={{ fontSize: '0.75rem' }}>
+                                    การนำเข้าไฟล์จะอัปเดตข้อมูลที่มีอยู่แล้ว และระบุ &quot;สถานที่เก็บ&quot; เพื่อแยกสต็อกตามศูนย์ต่างๆ
+                                </span>
                             </div>
                         </div>
                     </div>

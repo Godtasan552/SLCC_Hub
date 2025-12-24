@@ -26,6 +26,7 @@ export default function AdminPage() {
 
   // --- States ---
   const [activeTab, setActiveTab] = useState<'daily' | 'management'>('daily');
+  const [activeImportSchema, setActiveImportSchema] = useState<'excel' | 'json'>('excel');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [shelters, setShelters] = useState<Shelter[]>([]);
@@ -53,7 +54,8 @@ export default function AdminPage() {
     district: '',
     subdistrict: '',
     capacity: 0,
-    currentOccupancy: 0
+    currentOccupancy: 0,
+    phoneNumbers: ''
   });
 
   // --- Fetch Data ---
@@ -156,9 +158,13 @@ export default function AdminPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      await axios.post('/api/shelters', manualForm);
+      const dataToSend = {
+        ...manualForm,
+        phoneNumbers: manualForm.phoneNumbers ? [manualForm.phoneNumbers] : []
+      };
+      await axios.post('/api/shelters', dataToSend);
       showToast(`เพิ่มศูนย์ "${manualForm.name}" เรียบร้อย`);
-      setManualForm({ name: '', district: '', subdistrict: '', capacity: 0, currentOccupancy: 0 });
+      setManualForm({ name: '', district: '', subdistrict: '', capacity: 0, currentOccupancy: 0, phoneNumbers: '' });
       fetchShelters();
     } catch (err: unknown) {
       const error = err as { response?: { data?: { error?: string } }; message: string };
@@ -296,8 +302,16 @@ export default function AdminPage() {
                                         <input type="text" className="form-control border" value={manualForm.district} onChange={(e) => setManualForm({...manualForm, district: e.target.value})} required placeholder="เช่น เมือง..." />
                                     </div>
                                     <div className="col-md-6">
+                                        <label className="form-label small fw-bold text-secondary">ตำบล</label>
+                                        <input type="text" className="form-control border" value={manualForm.subdistrict} onChange={(e) => setManualForm({...manualForm, subdistrict: e.target.value})} placeholder="เช่น ในเมือง..." />
+                                    </div>
+                                    <div className="col-md-6">
                                         <label className="form-label small fw-bold text-secondary">ความจุ (คน)</label>
                                         <input type="number" className="form-control border" value={manualForm.capacity} onChange={(e) => setManualForm({...manualForm, capacity: Number(e.target.value)})} />
+                                    </div>
+                                    <div className="col-12">
+                                        <label className="form-label small fw-bold text-secondary">เบอร์โทรศัพท์ติดต่อ</label>
+                                        <input type="text" className="form-control border" value={manualForm.phoneNumbers} onChange={(e) => setManualForm({...manualForm, phoneNumbers: e.target.value})} placeholder="เช่น 081-234-5678" />
                                     </div>
                                     <div className="col-12 mt-4">
                                         <button type="submit" className="btn btn-primary w-100 py-2 rounded-3 fw-bold shadow-sm" disabled={loading}>
@@ -326,6 +340,65 @@ export default function AdminPage() {
                                 </button>
                                 <input type="file" id="fileIn" className="d-none" accept=".json,.xlsx" onChange={handleFileUpload} />
                             </div>
+                            <div className="mb-3 text-start">
+                                <div className="d-flex justify-content-between align-items-center mb-2">
+                                    <label className="small fw-bold text-secondary mb-0">โครงสร้างไฟล์นำเข้า:</label>
+                                    <div className="btn-group btn-group-sm rounded-pill border" style={{ fontSize: '0.65rem' }}>
+                                        <button type="button" className={`btn btn-xs py-0 px-2 ${activeImportSchema === 'excel' ? 'btn-primary' : 'btn-light'}`} onClick={() => setActiveImportSchema('excel')}>Excel</button>
+                                        <button type="button" className={`btn btn-xs py-0 px-2 ${activeImportSchema === 'json' ? 'btn-primary' : 'btn-light'}`} onClick={() => setActiveImportSchema('json')}>JSON</button>
+                                    </div>
+                                </div>
+                                
+                                {activeImportSchema === 'excel' ? (
+                                    <div className="table-responsive rounded-3 border animate-fade-in">
+                                        <table className="table table-sm table-bordered mb-0 x-small-text text-nowrap">
+                                            <thead className="table-light">
+                                                <tr>
+                                                    <th className="py-1 px-2 text-center bg-light" style={{ width: '60px' }}>#</th>
+                                                    <th className="py-1 px-2 text-center bg-light">A (1)</th>
+                                                    <th className="py-1 px-2 text-center bg-light">B (2)</th>
+                                                    <th className="py-1 px-2 text-center bg-light">C (3)</th>
+                                                    <th className="py-1 px-2 text-center bg-light">D (4)</th>
+                                                    <th className="py-1 px-2 text-center bg-light">E (5)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <td className="py-1 px-2 fw-bold bg-light">ข้อมูล</td>
+                                                    <td className="py-1 px-2">ชื่อศูนย์</td>
+                                                    <td className="py-1 px-2">อำเภอ</td>
+                                                    <td className="py-1 px-2">ตำบล</td>
+                                                    <td className="py-1 px-2">ความจุ</td>
+                                                    <td className="py-1 px-2">เบอร์โทร</td>
+                                                </tr>
+                                                <tr>
+                                                    <td className="py-1 px-2 fw-bold bg-light">ชนิด</td>
+                                                    <td className="py-1 px-2 text-primary">อักษร</td>
+                                                    <td className="py-1 px-2 text-primary">อักษร</td>
+                                                    <td className="py-1 px-2 text-primary">อักษร</td>
+                                                    <td className="py-1 px-2 text-success">ตัวเลข</td>
+                                                    <td className="py-1 px-2 text-primary">อักษร</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <div className="bg-light p-2 rounded-3 border animate-fade-in">
+                                        <pre className="mb-0 x-small-text text-secondary" style={{ whiteSpace: 'pre-wrap' }}>
+{`[
+  {
+    "name": "ชื่อศูนย์พักพิง",
+    "district": "อำเภอ",
+    "subdistrict": "ตำบล",
+    "capacity": 200,
+    "phoneNumbers": ["081-xxx-xxxx"]
+  }
+]`}
+                                        </pre>
+                                    </div>
+                                )}
+                            </div>
+
                             <div className="alert alert-light border small text-start d-flex gap-2">
                                 <i className="bi bi-info-circle text-primary mt-1"></i>
                                 <span className="text-secondary">การนำเข้าไฟล์จะอัปเดตข้อมูลที่มีอยู่แล้วหากชื่อตรงกัน และสร้างใหม่หากยังไม่มี</span>
@@ -394,9 +467,9 @@ export default function AdminPage() {
                        </div>
                    </div>
                    <div className="mb-4">
-                        <label className="form-label small fw-bold text-secondary">ความจุ (คน)</label>
-                        <input type="number" className="form-control" value={editingShelter?.capacity || 0} 
-                            onChange={(e) => setEditingShelter(prev => prev ? {...prev, capacity: Number(e.target.value)} : null)} />
+                        <label className="form-label small fw-bold text-secondary">เบอร์โทรศัพท์ติดต่อ</label>
+                        <input type="text" className="form-control" value={editingShelter?.phoneNumbers?.[0] || ''} 
+                            onChange={(e) => setEditingShelter(prev => prev ? {...prev, phoneNumbers: [e.target.value]} : null)} placeholder="เช่น 081-234-5678" />
                    </div>
                    <button onClick={saveEdit} className="btn btn-primary w-100 py-2 fw-bold rounded-3" disabled={loading}>
                        {loading ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}
@@ -420,6 +493,7 @@ export default function AdminPage() {
              background-color: var(--bg-card) !important;
         }
         .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
+        .x-small-text { font-size: 0.72rem; }
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(5px); }
             to { opacity: 1; transform: translateY(0); }

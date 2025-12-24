@@ -26,6 +26,7 @@ export default function Sidebar() {
         { name: 'เพิ่มศูนย์/คลังใหม่', href: '/admin/centers/create', icon: 'bi-plus-circle', roles: ['admin'] },
         { name: 'ศูนย์บริหารจัดการคลัง', href: '/admin/hubs', icon: 'bi-building-gear', roles: ['admin'] },
         { name: 'จัดการคลังสิ่งของ', href: '/admin/supplies', icon: 'bi-box-seam', roles: ['admin'] },
+        { name: 'ส่งออกข้อมูล', href: '/admin/export', icon: 'bi-cloud-download', roles: ['admin'] },
         { name: 'รายการอนุมัติคำขอ', href: '/requests/summary', icon: 'bi-hexagon', roles: ['admin'] },
       ],
     },
