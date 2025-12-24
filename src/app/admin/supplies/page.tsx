@@ -13,8 +13,9 @@ interface Shelter {
 }
 
 import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 
-export default function SuppliesPage() {
+function SuppliesPageContent() {
   const searchParams = useSearchParams();
   const hubFilter = searchParams.get('hub');
   
@@ -559,4 +560,21 @@ export default function SuppliesPage() {
       `}</style>
     </div>
   );
+}
+
+export default function SuppliesPage() {
+    return (
+        <Suspense fallback={
+            <div className="container-fluid px-4 py-4 d-flex justify-content-center align-items-center" style={{ minHeight: '100vh', backgroundColor: 'var(--bg-primary)' }}>
+                <div className="text-center">
+                    <div className="spinner-border text-primary mb-3" role="status">
+                        <span className="visually-hidden">Loading...</span>
+                    </div>
+                    <p className="text-secondary fw-bold">กำลังโหลดข้อมูลคลังสินค้า...</p>
+                </div>
+            </div>
+        }>
+            <SuppliesPageContent />
+        </Suspense>
+    );
 }

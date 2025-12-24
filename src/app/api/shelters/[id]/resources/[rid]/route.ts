@@ -5,7 +5,7 @@ import Supply from '@/models/Supply';
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { id: string; rid: string } }
+  { params }: { params: Promise<{ id: string; rid: string }> }
 ) {
   try {
     await dbConnect();

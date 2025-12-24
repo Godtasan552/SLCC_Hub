@@ -5,12 +5,12 @@ import Supply from '@/models/Supply';
 // GET - ดึงข้อมูลสิ่งของรายการเดียว
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
-    
-    const supply = await Supply.findById(params.id);
+    const { id } = await params;
+    const supply = await Supply.findById(id);
     
     if (!supply) {
       return NextResponse.json(
@@ -35,15 +35,16 @@ export async function GET(
 // PUT - อัพเดทข้อมูลสิ่งของ
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     await dbConnect();
     
     const body = await req.json();
     
     const supply = await Supply.findByIdAndUpdate(
-      params.id,
+      id,
       { ...body, updatedAt: new Date() },
       { new: true, runValidators: true }
     );
@@ -71,12 +72,13 @@ export async function PUT(
 // DELETE - ลบสิ่งของ
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     await dbConnect();
     
-    const supply = await Supply.findByIdAndDelete(params.id);
+    const supply = await Supply.findByIdAndDelete(id);
     
     if (!supply) {
       return NextResponse.json(
