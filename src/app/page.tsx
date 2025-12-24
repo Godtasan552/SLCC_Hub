@@ -81,11 +81,9 @@ export default async function HomePage(props: Props) {
   };
 
   const formatPhoneNumber = (phone: string) => {
-    if (!phone) return '-';
-    // แยกเบอร์ออกจากชื่อ (ถ้ามี / คั่น)
+    if (!phone) return null;
     const phonePart = phone.split('/')[0].trim();
-    // ถ้าอยากแสดงชื่อด้วยก็ return phone ไปเลย แต่ถ้าเอาแค่เบอร์ก็ phonePart
-    // ในที่นี้ user บอกว่า "เบอร์ มีตัวหนังสือติดมาด้วย" แปลว่าอยากเอาออก
+    if (/^0+$/.test(phonePart.replace(/[- ]/g, ''))) return null;
     return phonePart;
   };
 
@@ -129,9 +127,16 @@ export default async function HomePage(props: Props) {
                       {shelter.district} {shelter.subdistrict ? `(${shelter.subdistrict})` : ''}
                     </div>
                     <div className="d-sm-none small mt-1">
-                      {shelter.phoneNumbers && shelter.phoneNumbers[0] && !/^0+$/.test(shelter.phoneNumbers[0]) && (
-                        <span className="text-primary"><i className="bi bi-telephone-fill me-1"></i>{formatPhoneNumber(shelter.phoneNumbers[0])}</span>
-                      )}
+                      {shelter.phoneNumbers?.map((phone, idx, arr) => {
+                        const formatted = formatPhoneNumber(phone);
+                        if (!formatted) return null;
+                        const isLast = idx === arr.length - 1;
+                        return (
+                          <div key={idx} className={`text-primary ${!isLast ? 'border-bottom border-secondary border-opacity-10 pb-1 mb-1' : ''}`}>
+                            <i className="bi bi-telephone-fill me-1"></i>{formatted}
+                          </div>
+                        );
+                      })}
                     </div>
                   </td>
                   <td className="d-none d-md-table-cell">
@@ -139,9 +144,20 @@ export default async function HomePage(props: Props) {
                     <div className="small text-secondary">{shelter.district}</div>
                   </td>
                   <td className="d-none d-sm-table-cell" style={{ color: 'var(--text-primary)' }}>
-                    {shelter.phoneNumbers && shelter.phoneNumbers.length > 0 && !/^0+$/.test(shelter.phoneNumbers[0])
-                      ? <span className="text-nowrap">{formatPhoneNumber(shelter.phoneNumbers[0])}</span> 
-                      : '-'}
+                    {shelter.phoneNumbers && shelter.phoneNumbers.length > 0 ? (
+                      <div className="d-flex flex-column">
+                        {shelter.phoneNumbers.map((phone, idx, arr) => {
+                          const formatted = formatPhoneNumber(phone);
+                          if (!formatted) return null;
+                          const isLast = idx === arr.length - 1;
+                          return (
+                            <div key={idx} className={`text-nowrap small py-1 ${!isLast ? 'border-bottom border-secondary border-opacity-10' : ''}`}>
+                              {formatted}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : '-'}
                   </td>
                   <td className="fw-bold" style={{ color: 'var(--text-primary)', opacity: 0.85 }}>
                     {shelter.currentOccupancy || 0} / {shelter.capacity}
