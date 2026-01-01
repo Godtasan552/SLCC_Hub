@@ -29,6 +29,7 @@ function SuppliesPageContent() {
   const [selectedCategory, setSelectedCategory] = useState('ทั้งหมด');
   const [hubs, setHubs] = useState<Shelter[]>([]);
   const [allLocations, setAllLocations] = useState<Shelter[]>([]);
+  const [uploadProgress, setUploadProgress] = useState(0);
   
   const [manualForm, setManualForm] = useState({
     name: '',
@@ -155,6 +156,7 @@ function SuppliesPageContent() {
     if (!file) return;
 
     setLoading(true);
+    setUploadProgress(0);
     setMessage('กำลังประมวลผลไฟล์...');
 
     try {
@@ -185,7 +187,16 @@ function SuppliesPageContent() {
           });
         }
       }
-      await axios.patch('/api/supplies', { data: dataToImport });
+      
+      await axios.patch('/api/supplies', { data: dataToImport }, {
+        onUploadProgress: (progressEvent) => {
+            if (progressEvent.total) {
+                const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                setUploadProgress(percent);
+            }
+        }
+      });
+      
       showToast('นำเข้าและอัปเดตข้อมูลไฟล์สำเร็จ');
       fetchSupplies();
     } catch (err) {
@@ -193,6 +204,7 @@ function SuppliesPageContent() {
       console.error(err);
     } finally {
       setLoading(false);
+      setUploadProgress(0);
       e.target.value = '';
     }
   };
@@ -459,12 +471,31 @@ function SuppliesPageContent() {
                             <h6 className="mb-0 fw-bold text-success"><i className="bi bi-file-earmark-excel me-2"></i>นำเข้า Excel / JSON</h6>
                         </div>
                         <div className="card-body p-4 d-flex flex-column justify-content-center text-center">
-                            <div className="upload-box p-5 rounded-4 border-2 border-dashed mb-3 cursor-pointer transition-all" onClick={() => document.getElementById('fileIn')?.click()}>
-                                <i className="bi bi-cloud-arrow-up-fill text-success" style={{ fontSize: '3rem', opacity: 0.8 }}></i>
-                                <h5 className="mt-3 fw-bold" style={{ color: 'var(--text-primary)' }}>ลากไฟล์มาวาง หรือ คลิกเพื่อเลือกไฟล์</h5>
-                                <p className="text-secondary small">รองรับไฟล์มาตรฐาน .xlsx และ .json</p>
-                                <button className="btn btn-outline-success btn-sm rounded-pill px-4 mt-2">Browse Files</button>
-                                <input type="file" id="fileIn" className="d-none" accept=".json,.xlsx" onChange={handleFileUpload} />
+                            <div className="upload-box p-5 rounded-4 border-2 border-dashed mb-3 cursor-pointer transition-all" onClick={() => !loading && document.getElementById('fileIn')?.click()}>
+                                {loading && uploadProgress > 0 ? (
+                                    <div className="animate-fade-in py-3">
+                                        <h5 className="mb-3 text-success fw-bold">🚀 กำลังอัปโหลดข้อมูล... {uploadProgress}%</h5>
+                                        <div className="progress rounded-pill shadow-sm" style={{ height: '20px', width: '80%', margin: '0 auto' }}>
+                                            <div 
+                                                className="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                                                role="progressbar" 
+                                                style={{ width: `${uploadProgress}%`, transition: 'width 0.3s ease-in-out' }} 
+                                                aria-valuenow={uploadProgress} 
+                                                aria-valuemin={0} 
+                                                aria-valuemax={100}
+                                            >
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <i className="bi bi-cloud-arrow-up-fill text-success" style={{ fontSize: '3rem', opacity: 0.8 }}></i>
+                                        <h5 className="mt-3 fw-bold" style={{ color: 'var(--text-primary)' }}>ลากไฟล์มาวาง หรือ คลิกเพื่อเลือกไฟล์</h5>
+                                        <p className="text-secondary small">รองรับไฟล์มาตรฐาน .xlsx และ .json</p>
+                                        <button className="btn btn-outline-success btn-sm rounded-pill px-4 mt-2" disabled={loading}>Browse Files</button>
+                                    </>
+                                )}
+                                <input type="file" id="fileIn" className="d-none" accept=".json,.xlsx" onChange={handleFileUpload} disabled={loading} />
                             </div>
 
                             <div className="mb-3 text-start mt-2">
