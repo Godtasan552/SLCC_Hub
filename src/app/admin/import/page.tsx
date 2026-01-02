@@ -183,27 +183,24 @@ export default function AdminPage() {
     if (!file) return;
 
     setLoading(true);
-    setUploadProgress(0);
-    setMessage('กำลังประมวลผลไฟล์...');
+    setUploadProgress(1); // เริ่มต้นที่ 1% เพื่อแสดง UI ทันที
+    setMessage('กำลังอ่านไฟล์...');
 
     try {
       let dataToImport: ShelterData[] = [];
       
-      // Simulate progress during file reading
-      setUploadProgress(10);
-      
       if (file.name.endsWith('.json')) {
         const text = await file.text();
-        setUploadProgress(30);
+        setUploadProgress(20);
         const json = JSON.parse(text);
         dataToImport = json.data || json;
-        setUploadProgress(50);
+        setUploadProgress(40);
       } else if (file.name.endsWith('.xlsx')) {
         const arrayBuffer = await file.arrayBuffer();
-        setUploadProgress(20);
+        setUploadProgress(15);
         const workbook = new ExcelJS.Workbook();
         await workbook.xlsx.load(arrayBuffer);
-        setUploadProgress(40);
+        setUploadProgress(30);
         const worksheet = workbook.getWorksheet(1);
         if (worksheet) {
           const totalRows = worksheet.rowCount;
@@ -220,36 +217,50 @@ export default function AdminPage() {
               });
             }
             processedRows++;
-            // Update progress during parsing (40% to 60%)
-            const parseProgress = 40 + Math.round((processedRows / totalRows) * 20);
+            // Update progress during parsing (30% to 40%)
+            const parseProgress = 30 + Math.round((processedRows / totalRows) * 10);
             setUploadProgress(parseProgress);
           });
         }
       }
       
-      setUploadProgress(65);
+      setUploadProgress(40);
       setMessage(`กำลังอัปโหลด ${dataToImport.length} รายการ...`);
       
       await axios.patch('/api/shelters', { data: dataToImport }, {
         onUploadProgress: (progressEvent) => {
             if (progressEvent.total) {
-                // Map upload progress from 65% to 100%
+                // Map upload progress from 40% to 90%
                 const uploadPercent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-                const totalProgress = 65 + Math.round(uploadPercent * 0.35);
+                const totalProgress = 40 + Math.round(uploadPercent * 0.5);
                 setUploadProgress(totalProgress);
+                
+                if (uploadPercent === 100) {
+                  setMessage('กำลังประมวลผลบนเซิร์ฟเวอร์...');
+                }
             }
         }
       });
       
       setUploadProgress(100);
+      setMessage('นำเข้าไฟล์สำเร็จ!');
       showToast('นำเข้าไฟล์สำเร็จ');
       fetchShelters();
+
+      // หน่วงเวลา 2 วินาทีก่อนปิด Progress bar
+      setTimeout(() => {
+        setLoading(false);
+        setUploadProgress(0);
+        setMessage('');
+        if (e.target) e.target.value = '';
+      }, 2000);
+
     } catch (err) {
       showToast('ไฟล์ไม่ถูกต้อง หรือเกิดข้อผิดพลาด');
       console.error(err);
-    } finally {
       setLoading(false);
       setUploadProgress(0);
+      setMessage('');
       e.target.value = '';
     }
   };
@@ -369,7 +380,7 @@ export default function AdminPage() {
                             <div className="upload-box p-5 rounded-4 border-2 border-dashed mb-3 cursor-pointer transition-all" onClick={() => !loading && document.getElementById('fileIn')?.click()}>
                                 {loading && uploadProgress > 0 ? (
                                     <div className="animate-fade-in py-3">
-                                        <h5 className="mb-3 text-success fw-bold">🚀 กำลังอัปโหลดข้อมูล... {uploadProgress}%</h5>
+                                        <h5 className="mb-3 text-success fw-bold">🚀 {message || 'กำลังดำเนินการ...'} {uploadProgress}%</h5>
                                         <div className="progress rounded-pill shadow-sm" style={{ height: '20px', width: '80%', margin: '0 auto' }}>
                                             <div 
                                                 className="progress-bar progress-bar-striped progress-bar-animated bg-success" 

@@ -5,7 +5,8 @@ import Hub from '@/models/Hub';
 import Supply from '@/models/Supply';
 import DashboardDisplay from '@/components/dashboard/DashboardDisplay';
 import { Shelter as ShelterType, ResourceRequest } from '@/types/shelter';
-import { calculateCurrentOccupancy } from '@/utils/shelter-utils';
+import { getCapacityStatus } from '@/utils/shelter-utils';
+import { calculateCurrentOccupancy } from '@/utils/shelter-server-utils';
 
 interface DashboardResource extends ResourceRequest {
   shelterName: string;
@@ -38,14 +39,14 @@ export default async function DashboardPage() {
       totalOccupancy += currentOccupancy;
       totalCapacity += shelter.capacity || 0;
       
-      const ratio = (currentOccupancy / (shelter.capacity || 1)) * 100;
-      if (ratio >= 100) criticalSheltersCount++;
-      else if (ratio >= 80) warningSheltersCount++;
+      const status = getCapacityStatus(currentOccupancy, shelter.capacity || 0);
+      if (status.text === 'ล้นศูนย์') criticalSheltersCount++;
+      else if (status.text === 'ใกล้เต็ม') warningSheltersCount++;
       
       return {
         ...shelter,
         currentOccupancy,
-        capacityStatus: ratio >= 100 ? 'ล้นศูนย์' : ratio >= 80 ? 'ใกล้เต็ม' : 'รองรับได้'
+        capacityStatus: status.text
       };
     })
   );

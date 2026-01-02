@@ -5,7 +5,8 @@ import ShelterLog from '@/models/ShelterLog';
 import HubModel from '@/models/Hub';
 import Supply from '@/models/Supply';
 import { ResourceRequest } from '@/types/shelter';
-import { calculateCurrentOccupancy } from '@/utils/shelter-utils';
+import { getCapacityStatus } from '@/utils/shelter-utils';
+import { calculateCurrentOccupancy } from '@/utils/shelter-server-utils';
 
 interface DashboardResource extends ResourceRequest {
   shelterName: string;
@@ -39,23 +40,23 @@ export async function GET() {
     let criticalSheltersCount = 0;
     let warningSheltersCount = 0;
     
-    const sheltersWithOccupancy = await Promise.all(
-      allShelters.map(async (shelter) => {
-        const currentOccupancy = await calculateCurrentOccupancy(shelter._id);
-        totalOccupancy += currentOccupancy;
-        totalCapacity += shelter.capacity || 0;
-        
-        const ratio = (currentOccupancy / (shelter.capacity || 1)) * 100;
-        if (ratio >= 100) criticalSheltersCount++;
-        else if (ratio >= 80) warningSheltersCount++;
-        
-        return {
-          ...shelter,
-          currentOccupancy,
-          capacityStatus: ratio >= 100 ? 'ล้นศูนย์' : ratio >= 80 ? 'ใกล้เต็ม' : 'รองรับได้'
-        };
-      })
-    );
+      const sheltersWithOccupancy = await Promise.all(
+        allShelters.map(async (shelter) => {
+          const currentOccupancy = await calculateCurrentOccupancy(shelter._id);
+          totalOccupancy += currentOccupancy;
+          totalCapacity += shelter.capacity || 0;
+          
+          const status = getCapacityStatus(currentOccupancy, shelter.capacity || 0);
+          if (status.text === 'ล้นศูนย์') criticalSheltersCount++;
+          else if (status.text === 'ใกล้เต็ม') warningSheltersCount++;
+          
+          return {
+            ...shelter,
+            currentOccupancy,
+            capacityStatus: status.text
+          };
+        })
+      );
 
     const [hubData] = await Promise.all([
       HubModel.find({}).select('name resources').lean() as Promise<LeanHub[]>
