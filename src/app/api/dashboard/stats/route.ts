@@ -34,7 +34,7 @@ export async function GET() {
     const totalShelters = await ShelterModel.countDocuments({});
 
     // ✅ คำนวณ currentOccupancy และ capacityStatus จาก ShelterLog
-    const allShelters = await ShelterModel.find({}).lean() as LeanShelter[];
+    const allShelters = await ShelterModel.find({}).select('-dailyLogs').lean() as LeanShelter[];
     let totalCapacity = 0;
     let totalOccupancy = 0;
     let criticalSheltersCount = 0;

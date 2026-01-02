@@ -27,7 +27,7 @@ export default async function DashboardPage() {
   const totalShelters = await Shelter.countDocuments({});
   
   // ✅ คำนวณ currentOccupancy และ capacityStatus จาก ShelterLog
-  const allShelters = await Shelter.find({}).lean();
+  const allShelters = await Shelter.find({}).select('-dailyLogs').lean();
   let totalCapacity = 0;
   let totalOccupancy = 0;
   let criticalSheltersCount = 0;
@@ -132,7 +132,7 @@ export default async function DashboardPage() {
     .sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime())
     .slice(0, 5);
 
-  const initialData = {
+  const initialData = JSON.parse(JSON.stringify({
     totalShelters,
     totalCapacity,
     totalOccupancy,
@@ -144,10 +144,10 @@ export default async function DashboardPage() {
     outOfStockSupplies,
     criticalList,
     requestStats,
-    recentRequests: JSON.parse(JSON.stringify(recentRequests)),
+    recentRequests,
     trendData: trendData.reverse(),
     movementData: movementData.reverse()
-  };
+  }));
 
   return (
     <div className="container-fluid min-vh-100 py-4" style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}>

@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import Shelter from '../models/Shelter';
+import Hub from '../models/Hub';
 import dotenv from 'dotenv';
 import path from 'path';
 
@@ -62,8 +63,38 @@ const cleanDatabase = async () => {
       }
     }
 
-    console.log('--- Cleanup Complete ---');
-    console.log(`Updated ${modifiedCount} documents.`);
+    console.log(`Updated ${modifiedCount} shelters.`);
+
+    // --- Clean Hubs ---
+    const hubs = await Hub.find({ 
+      phoneNumbers: { $exists: true, $not: { $size: 0 } } 
+    });
+
+    console.log(`\nFound ${hubs.length} hubs with phone numbers.`);
+    let hubModifiedCount = 0;
+
+    for (const hub of hubs) {
+      let isChanged = false;
+      const newPhones: string[] = [];
+
+      for (const phone of hub.phoneNumbers) {
+        const clean = sanitizePhone(phone);
+        if (clean) {
+          if (clean !== phone) isChanged = true;
+          newPhones.push(clean);
+        } else {
+          isChanged = true;
+        }
+      }
+
+      if (isChanged) {
+        await Hub.updateOne({ _id: hub._id }, { $set: { phoneNumbers: newPhones } });
+        hubModifiedCount++;
+      }
+    }
+
+    console.log(`Updated ${hubModifiedCount} hubs.`);
+    console.log('\n--- Cleanup Complete ---');
 
     await mongoose.disconnect();
     console.log('Disconnected from MongoDB');
