@@ -6,7 +6,7 @@ import Supply from '@/models/Supply';
 import DashboardDisplay from '@/components/dashboard/DashboardDisplay';
 import { Shelter as ShelterType, ResourceRequest } from '@/types/shelter';
 import { getCapacityStatus } from '@/utils/shelter-utils';
-import { calculateCurrentOccupancy } from '@/utils/shelter-server-utils';
+import { calculateCurrentOccupancy, getAllShelterOccupancy, getAllShelterMovements } from '@/utils/shelter-server-utils';
 
 interface DashboardResource extends ResourceRequest {
   shelterName: string;
@@ -33,23 +33,24 @@ export default async function DashboardPage() {
   let criticalSheltersCount = 0;
   let warningSheltersCount = 0;
   
-  const sheltersWithOccupancy = await Promise.all(
-    allShelters.map(async (shelter) => {
-      const currentOccupancy = await calculateCurrentOccupancy(shelter._id);
-      totalOccupancy += currentOccupancy;
-      totalCapacity += shelter.capacity || 0;
-      
-      const status = getCapacityStatus(currentOccupancy, shelter.capacity || 0);
-      if (status.text === 'ล้นศูนย์') criticalSheltersCount++;
-      else if (status.text === 'ใกล้เต็ม') warningSheltersCount++;
-      
-      return {
-        ...shelter,
-        currentOccupancy,
-        capacityStatus: status.text
-      };
-    })
-  );
+  // ✅ Optimization: ดึง occupancy ทั้งหมดในครั้งเดียว
+  const occupancyMap = await getAllShelterOccupancy();
+  
+  const sheltersWithOccupancy = allShelters.map((shelter) => {
+    const currentOccupancy = occupancyMap[shelter._id.toString()] || 0;
+    totalOccupancy += currentOccupancy;
+    totalCapacity += shelter.capacity || 0;
+    
+    const status = getCapacityStatus(currentOccupancy, shelter.capacity || 0);
+    if (status.text === 'ล้นศูนย์') criticalSheltersCount++;
+    else if (status.text === 'ใกล้เต็ม') warningSheltersCount++;
+    
+    return {
+      ...shelter,
+      currentOccupancy,
+      capacityStatus: status.text
+    };
+  });
 
   const allResources: DashboardResource[] = [];
   

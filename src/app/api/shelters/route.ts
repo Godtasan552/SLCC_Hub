@@ -3,8 +3,7 @@ import dbConnect from '@/lib/dbConnect';
 import Shelter from '@/models/Shelter';
 import { Shelter as IShelter } from '@/types/shelter';
 import { getCapacityStatus } from '@/utils/shelter-utils';
-import { calculateCurrentOccupancy } from '@/utils/shelter-server-utils';
-import { getAggregatedMovement } from '@/utils/shelter-server-utils';
+import { calculateCurrentOccupancy, getAllShelterOccupancy, getAllShelterMovements } from '@/utils/shelter-server-utils';
 
 export async function GET(req: Request) {
   await dbConnect();
@@ -14,23 +13,24 @@ export async function GET(req: Request) {
     
     const shelters = await Shelter.find({}).sort({ updatedAt: -1 });
     
-    // คำนวณ currentOccupancy, capacityStatus และ recentMovement สำหรับแต่ละศูนย์
-    const sheltersWithData = await Promise.all(
-      shelters.map(async (shelter) => {
-        const currentOccupancy = await calculateCurrentOccupancy(shelter._id);
-        const status = getCapacityStatus(currentOccupancy, shelter.capacity);
-        
-        // ✅ คำนวณ movement ตามจำนวนวันที่กำหนด (default 7)
-        const recentMovement = await getAggregatedMovement(shelter._id, days);
-        
-        return {
-          ...shelter.toObject(),
-          currentOccupancy,
-          capacityStatus: status.text,
-          recentMovement
-        };
-      })
-    );
+    // ✅ Optimization: ดึง occupancy และ movement ทั้งหมดในครั้งเดียว
+    const [occupancyMap, movementMap] = await Promise.all([
+      getAllShelterOccupancy(),
+      getAllShelterMovements(days)
+    ]);
+    
+    const sheltersWithData = shelters.map((shelter) => {
+      const currentOccupancy = occupancyMap[shelter._id.toString()] || 0;
+      const status = getCapacityStatus(currentOccupancy, shelter.capacity);
+      const recentMovement = movementMap[shelter._id.toString()] || { in: 0, out: 0 };
+      
+      return {
+        ...shelter.toObject(),
+        currentOccupancy,
+        capacityStatus: status.text,
+        recentMovement
+      };
+    });
     
     return NextResponse.json({ success: true, data: sheltersWithData });
   } catch (error) {
@@ -65,73 +65,48 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ success: false, error: 'Data must be an array' }, { status: 400 });
     }
 
+    const bulkOps = [];
     const results = [];
+
     for (const item of data) {
-      try {
-        // ลบ fields ที่ไม่ควรอัปเดตผ่าน import
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { _id, currentOccupancy, capacityStatus, dailyLogs, ...updateData } = item;
-        
-        // Data Sanitization FIRST (before lookup)
-        const sanitizedName = (item.name || '').trim();
-        if (typeof updateData.name === 'string') updateData.name = updateData.name.trim();
-        if (typeof updateData.district === 'string') updateData.district = updateData.district.trim();
-        if (typeof updateData.subdistrict === 'string') updateData.subdistrict = updateData.subdistrict.trim();
-        
-        // Default required fields if missing to prevent validation errors
-        if (!updateData.district) updateData.district = 'ไม่ระบุ';
-        
-        // Ensure numeric fields are numbers, defaulting to 0 if null/invalid
-        if (updateData.capacity === null || updateData.capacity === undefined || isNaN(Number(updateData.capacity))) {
-            updateData.capacity = 0;
-        }
-
-        // Use sanitized name for lookup
-        const existing = await Shelter.findOne({ name: sanitizedName });
-
-        if (existing) {
-          // Update existing - EXCLUDE name field to prevent unique constraint violation
-          // และ EXCLUDE currentOccupancy, capacityStatus, dailyLogs
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          const { name, ...fieldsToUpdate } = updateData;
-          Object.assign(existing, fieldsToUpdate);
-          
-          try {
-            await existing.save();
-            results.push({ action: 'updated', name: sanitizedName });
-          } catch (saveErr) {
-            console.error(`Save error for ${sanitizedName}:`, saveErr);
-            results.push({ action: 'error', name: sanitizedName, error: `Update failed: ${String(saveErr)}` });
-          }
-        } else {
-            // Create new
-            try {
-                const newShelter = await Shelter.create(updateData) as unknown as IShelter;
-                results.push({ action: 'created', name: newShelter.name });
-            } catch (createErr) {
-                 // Double-check race condition
-                 if (typeof createErr === 'object' && createErr !== null && 'code' in createErr && (createErr as { code: number }).code === 11000) {
-                     const retryExisting = await Shelter.findOne({ name: sanitizedName });
-                     if (retryExisting) {
-                         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                         const { name, ...fieldsToUpdate } = updateData;
-                         Object.assign(retryExisting, fieldsToUpdate);
-                         await retryExisting.save();
-                         results.push({ action: 'updated (retry)', name: sanitizedName });
-                     } else {
-                         throw createErr;
-                     }
-                 } else {
-                     throw createErr;
-                 }
-            }
-        }
-      } catch (err) {
-        console.error(`Error processing shelter ${item.name}:`, err);
-        results.push({ action: 'error', name: item.name, error: String(err) });
-        // Continue processing other items
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { _id, currentOccupancy, capacityStatus, dailyLogs, ...updateData } = item;
+      
+      const sanitizedName = (item.name || '').trim();
+      if (typeof updateData.name === 'string') updateData.name = updateData.name.trim();
+      if (typeof updateData.district === 'string') updateData.district = updateData.district.trim();
+      if (typeof updateData.subdistrict === 'string') updateData.subdistrict = updateData.subdistrict.trim();
+      
+      if (!updateData.district) updateData.district = 'ไม่ระบุ';
+      if (updateData.capacity === null || updateData.capacity === undefined || isNaN(Number(updateData.capacity))) {
+          updateData.capacity = 0;
       }
+
+      // Preparation for bulkWrite
+      bulkOps.push({
+        updateOne: {
+          filter: { name: sanitizedName },
+          update: { $set: updateData },
+          upsert: true
+        }
+      });
+      results.push({ name: sanitizedName });
     }
+
+    if (bulkOps.length > 0) {
+      const bulkResult = await Shelter.bulkWrite(bulkOps);
+      return NextResponse.json({ 
+        success: true, 
+        summary: {
+          matched: bulkResult.matchedCount,
+          modified: bulkResult.modifiedCount,
+          upserted: bulkResult.upsertedCount
+        },
+        results 
+      });
+    }
+
+    return NextResponse.json({ success: true, results: [] });
 
     return NextResponse.json({ success: true, results });
   } catch (error) {

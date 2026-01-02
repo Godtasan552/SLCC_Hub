@@ -31,6 +31,36 @@ export const calculateCurrentOccupancy = async (shelterId: string | mongoose.Typ
 };
 
 /**
+ * [Server-side Only] คำนวณ currentOccupancy สำหรับทุกศูนย์พักพิงพร้อมกัน (Aggregation Batch)
+ */
+export const getAllShelterOccupancy = async (): Promise<Record<string, number>> => {
+  try {
+    const results = await ShelterLog.aggregate([
+      {
+        $group: {
+          _id: "$shelterId",
+          totalIn: {
+            $sum: { $cond: [{ $eq: ["$action", "in"] }, "$amount", 0] }
+          },
+          totalOut: {
+            $sum: { $cond: [{ $eq: ["$action", "out"] }, "$amount", 0] }
+          }
+        }
+      }
+    ]);
+
+    const occupancyMap: Record<string, number> = {};
+    results.forEach(res => {
+      occupancyMap[res._id.toString()] = Math.max(0, res.totalIn - res.totalOut);
+    });
+    return occupancyMap;
+  } catch (error) {
+    console.error('Error calculating all occupancies:', error);
+    return {};
+  }
+};
+
+/**
  * [Server-side Only] คำนวณยอดสะสมการเข้า-ออกตามช่วงเวลา
  */
 export const getAggregatedMovement = async (
@@ -55,6 +85,37 @@ export const getAggregatedMovement = async (
   } catch (error) {
     console.error('Error getting aggregated movement:', error);
     return { in: 0, out: 0 };
+  }
+};
+
+/**
+ * [Server-side Only] คำนวณความเคลื่อนไหวสำหรับทุกศูนย์พักพิงพร้อมกัน (Aggregation Batch)
+ */
+export const getAllShelterMovements = async (timeRangeDays: number): Promise<Record<string, { in: number, out: number }>> => {
+  try {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - timeRangeDays);
+    startDate.setHours(0, 0, 0, 0);
+
+    const results = await ShelterLog.aggregate([
+      { $match: { date: { $gte: startDate } } },
+      {
+        $group: {
+          _id: "$shelterId",
+          in: { $sum: { $cond: [{ $eq: ["$action", "in"] }, "$amount", 0] } },
+          out: { $sum: { $cond: [{ $eq: ["$action", "out"] }, "$amount", 0] } }
+        }
+      }
+    ]);
+
+    const movementMap: Record<string, { in: number, out: number }> = {};
+    results.forEach(res => {
+      movementMap[res._id.toString()] = { in: res.in, out: res.out };
+    });
+    return movementMap;
+  } catch (error) {
+    console.error('Error getting all shelter movements:', error);
+    return {};
   }
 };
 
