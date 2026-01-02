@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import axios from 'axios';
 import { SupplyCategory } from '@/types/supply';
 import { getItemsByCategory } from '@/constants/standardItems';
+import { showAlert } from '@/utils/swal-utils';
 
 interface ResourceRequestProps {
   shelterId: string;
@@ -43,17 +44,17 @@ export default function ResourceRequest({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.itemName) {
-      alert('โปรดเลือกชื่อสิ่งของ');
+      showAlert.error('ข้อมูลไม่ครบ', 'โปรดเลือกชื่อสิ่งของ');
       return;
     }
     try {
       const url = apiUrl || `/api/shelters/${shelterId}/resources`;
       await axios.post(url, formData);
-      alert('ส่งคำขอสำเร็จ');
+      showAlert.success('สำเร็จ', 'ส่งคำขอสำเร็จ');
       if (onSuccess) onSuccess();
     } catch (err) {
       console.error('Error sending resource request:', err);
-      alert('เกิดข้อผิดพลาดในการส่งคำขอ');
+      showAlert.error('ผิดพลาด', 'เกิดข้อผิดพลาดในการส่งคำขอ');
     }
   };
 

@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { Supply } from '@/types/supply';
+import { showAlert } from '@/utils/swal-utils';
 
 interface Location {
   _id: string;
@@ -107,11 +108,11 @@ export default function CreateRequestClient() {
       }));
 
       await axios.post(`/api/shelters/${selectedShelterId}/resources`, { resources: requests });
-      alert('สร้างคำร้องขอเรียบร้อยแล้ว');
+      showAlert.success('สำเร็จ', 'สร้างคำร้องขอเรียบร้อยแล้ว');
       window.location.href = '/requests';
     } catch (err) {
       console.error(err);
-      alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+      showAlert.error('ผิดพลาด', 'เกิดข้อผิดพลาดในการบันทึกข้อมูล');
     } finally {
       setLoading(false);
     }

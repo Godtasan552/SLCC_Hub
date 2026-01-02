@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
+import { showAlert } from '@/utils/swal-utils';
 
 interface Resource {
   _id: string;
@@ -48,7 +49,11 @@ export default function RequestListClient({ initialRequests }: RequestListClient
   }, [initialRequests]);
 
   const handleReceive = async (shelterId: string, resourceId: string) => {
-    if (!confirm('ยืนยันว่าได้รับทรัพยากรชิ้นนี้แล้ว?')) return;
+    const isConfirmed = await showAlert.confirmDelete(
+      'ยืนยันการรับของ?',
+      'คุณได้รับทรัพยากรชิ้นนี้เรียบร้อยแล้วใช่หรือไม่?'
+    );
+    if (!isConfirmed) return;
     
     setLoadingId(resourceId);
     try {
@@ -57,12 +62,12 @@ export default function RequestListClient({ initialRequests }: RequestListClient
       });
       
       if (res.data.success) {
-        alert('ยืนยันการรับของเรียบร้อย');
+        showAlert.success('เรียบร้อย', 'ยืนยันการรับของเรียบร้อย');
         router.refresh(); 
       }
     } catch (err) {
       console.error('Confirm receipt failed:', err);
-      alert('เกิดข้อผิดพลาดในการยืนยันรายการ');
+      showAlert.error('เกิดข้อผิดพลาด', 'ไม่สามารถยืนยันรายการได้');
     } finally {
       setLoadingId(null);
     }

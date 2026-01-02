@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import axios from 'axios';
 import useSWR from 'swr';
+import { showAlert } from '@/utils/swal-utils';
 
 interface Resource {
   _id?: string;
@@ -94,7 +95,8 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
   // NEW: Receive function
   const handleReceive = async (targetId: string, resourceId: string, isHub: boolean) => {
     const msg = isHub ? 'ยืนยันการรับของบริจาคเข้าสู่คลังกลาง?' : 'ยืนยันว่าได้รับของชิ้นนี้แล้ว? (ยอดจะไปเพิ่มในสต็อกของศูนย์ปลายทาง)';
-    if (!confirm(msg)) return;
+    const isConfirmed = await showAlert.confirmDelete('ยืนยัน?', msg);
+    if (!isConfirmed) return;
     
     setLoadingId(resourceId);
     try {
@@ -103,11 +105,11 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
       if (res.data.success) {
         // อัปเดตข้อมูลผ่าน SWR Mutate
         mutate();
-        alert('ยืนยันการรับของเรียบร้อย ยอดคงเหลือถูกเพิ่มเข้าสู่ระบบแล้ว');
+        showAlert.success('เรียบร้อย', 'ยืนยันการรับของเรียบร้อย ยอดคงเหลือถูกเพิ่มเข้าสู่ระบบแล้ว');
       }
     } catch (err: unknown) {
       const errorMsg = axios.isAxiosError(err) ? err.response?.data?.message : (err as Error).message;
-      alert(`ยืนยันการรับของไม่สำเร็จ: ${errorMsg}`);
+      showAlert.error('ผิดพลาด', `ยืนยันการรับของไม่สำเร็จ: ${errorMsg}`);
     } finally {
       setLoadingId(null);
     }
@@ -115,7 +117,8 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
 
   // NEW: Approve function (Admin only)
   const handleApprove = async (shelterId: string, resourceId: string, isHub: boolean) => {
-    if (!confirm('ยืนยันการอนุมัติคำร้องขอนี้? ระบบจะตัดสต็อกจากคลังกลางอัตโนมัติ')) return;
+    const isConfirmed = await showAlert.confirmDelete('ยืนยันการอนุมัติ?', 'ระบบจะตัดสต็อกจากคลังกลางอัตโนมัติ');
+    if (!isConfirmed) return;
     
     setLoadingId(resourceId);
     try {
@@ -128,11 +131,11 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
       
       if (res.data.success) {
         mutate();
-        alert(`✅ ${res.data.message}\nตัดสต็อก: ${res.data.stockDeducted} หน่วย`);
+        showAlert.success('อนุมัติสำเร็จ', `ตัดสต็อก: ${res.data.stockDeducted} หน่วย`);
       }
     } catch (err: unknown) {
       const errorMsg = axios.isAxiosError(err) ? err.response?.data?.error : (err as Error).message;
-      alert(`❌ อนุมัติไม่สำเร็จ: ${errorMsg}`);
+      showAlert.error('อนุมัติไม่สำเร็จ', errorMsg);
     } finally {
       setLoadingId(null);
     }
@@ -140,7 +143,8 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
 
   // NEW: Reject function (Admin only)
   const handleReject = async (shelterId: string, resourceId: string, isHub: boolean) => {
-    if (!confirm('ยืนยันการปฏิเสธคำร้องขอนี้?')) return;
+    const isConfirmed = await showAlert.confirmDelete('ยืนยัน?', 'ยืนยันการปฏิเสธคำร้องขอนี้?');
+    if (!isConfirmed) return;
     
     setLoadingId(resourceId);
     try {
@@ -153,11 +157,11 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
       
       if (res.data.success) {
         mutate();
-        alert('❌ ปฏิเสธคำร้องขอเรียบร้อย');
+        showAlert.success('เรียบร้อย', 'ปฏิเสธคำร้องขอเรียบร้อย');
       }
     } catch (err: unknown) {
       const errorMsg = axios.isAxiosError(err) ? err.response?.data?.error : (err as Error).message;
-      alert(`ปฏิเสธไม่สำเร็จ: ${errorMsg}`);
+      showAlert.error('ปฏิเสธไม่สำเร็จ', errorMsg);
     } finally {
       setLoadingId(null);
     }

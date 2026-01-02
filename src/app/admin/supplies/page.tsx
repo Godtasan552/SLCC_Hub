@@ -5,6 +5,7 @@ import ExcelJS from 'exceljs';
 import Link from 'next/link';
 import { SupplyCategory, Supply, SupplyData } from '@/types/supply';
 import { getItemsByCategory } from '@/constants/standardItems';
+import { showAlert } from '@/utils/swal-utils';
 
 interface Shelter {
   _id: string;
@@ -116,10 +117,7 @@ function SuppliesPageContent() {
     }
   };
 
-  const showToast = (msg: string) => {
-    setMessage(msg);
-    setTimeout(() => setMessage(''), 3000);
-  };
+
 
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,7 +128,7 @@ function SuppliesPageContent() {
         shelterId: manualForm.shelterId || null
       };
       await axios.post('/api/supplies', payload);
-      showToast(`บันทึกข้อมูล "${manualForm.name}" เรียบร้อยแล้ว`);
+      showAlert.success('บันทึกสำเร็จ', `บันทึกข้อมูล "${manualForm.name}" เรียบร้อยแล้ว`);
       setManualForm({ 
         name: '', 
         category: SupplyCategory.FOOD_AND_WATER, 
@@ -145,7 +143,7 @@ function SuppliesPageContent() {
     } catch (err) {
        // @ts-expect-error: Error response type
       const errorMessage = err.response?.data?.error || err.message;
-      showToast(`เกิดข้อผิดพลาด: ${errorMessage}`);
+      showAlert.error('ผิดพลาด', `เกิดข้อผิดพลาด: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -197,10 +195,10 @@ function SuppliesPageContent() {
         }
       });
       
-      showToast('นำเข้าและอัปเดตข้อมูลไฟล์สำเร็จ');
+      showAlert.success('สำเร็จ', 'นำเข้าและอัปเดตข้อมูลไฟล์สำเร็จ');
       fetchSupplies();
     } catch (err) {
-      showToast('เกิดข้อผิดพลาดในการประมวลผลไฟล์');
+      showAlert.error('ผิดพลาด', 'เกิดข้อผิดพลาดในการประมวลผลไฟล์');
       console.error(err);
     } finally {
       setLoading(false);
@@ -210,31 +208,32 @@ function SuppliesPageContent() {
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`ต้องการลบ "${name}" หรือไม่?`)) return;
+    const isConfirmed = await showAlert.confirmDelete('ยืนยันการลบ?', `ต้องการลบ "${name}" หรือไม่?`);
+    if (!isConfirmed) return;
     try {
       setLoading(true);
       await axios.delete(`/api/supplies/${id}`);
-      showToast(`ลบ "${name}" สำเร็จ`);
+      showAlert.success('สำเร็จ', `ลบ "${name}" สำเร็จ`);
       fetchSupplies();
     } catch (err) {
       console.error('Delete failed:', err);
-      showToast('ไม่สามารถลบข้อมูลได้');
+      showAlert.error('ผิดพลาด', 'ไม่สามารถลบข้อมูลได้');
     } finally {
       setLoading(false);
     }
   };
 
   const handleUpdateQuantity = async (id: string, currentQty: number, name: string) => {
-    const val = prompt(`ระบุจำนวนใหม่สำหรับ "${name}":`, String(currentQty));
+    const val = await showAlert.prompt(`แก้ไขจำนวน: ${name}`, 'ระบุจำนวนใหม่ที่ต้องการ:', String(currentQty));
     if (!val || isNaN(parseInt(val))) return;
     try {
       setLoading(true);
       await axios.put(`/api/supplies/${id}`, { quantity: parseInt(val) });
       fetchSupplies();
-      showToast(`อัพเดทจำนวน "${name}" สำเร็จ`);
+      showAlert.success('อัพเดทสำเร็จ', `อัพเดทจำนวน "${name}" สำเร็จ`);
     } catch (err) {
       console.error('Update failed:', err);
-      showToast('ไม่สามารถอัปเดตข้อมูลได้');
+      showAlert.error('ผิดพลาด', 'ไม่สามารถอัปเดตข้อมูลได้');
     } finally {
       setLoading(false);
     }
@@ -290,14 +289,7 @@ function SuppliesPageContent() {
         </div>
       </div>
 
-       {message && (
-         <div className="position-fixed top-0 start-50 translate-middle-x mt-4" style={{ zIndex: 1050 }}>
-            <div className={`alert ${message.includes('ผิดพลาด') ? 'alert-danger' : 'alert-success'} shadow-lg d-flex align-items-center py-2 px-4 rounded-pill border-0`}>
-             <i className={`bi ${message.includes('ผิดพลาด') ? 'bi-x-circle-fill' : 'bi-check-circle-fill'} me-2 fs-5`}></i>
-             <span className="fw-bold">{message}</span>
-           </div>
-         </div>
-      )}
+
 
       <div className="animate-fade-in">
         {activeTab === 'inventory' && (

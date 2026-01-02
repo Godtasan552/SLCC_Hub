@@ -4,6 +4,7 @@ import { useState } from 'react';
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { showAlert } from '@/utils/swal-utils';
 
 export default function CreateCenterPage() {
   const router = useRouter();
@@ -31,12 +32,12 @@ export default function CreateCenterPage() {
       const res = await axios.post(endpoint, cleanedData);
       
       if (res.data.success) {
-        alert(`สร้าง${formData.type === 'Hub' ? 'คลังกลาง' : 'ศูนย์พักพิง'}เรียบร้อยแล้ว`);
+        showAlert.success('สร้างสำเร็จ', `สร้าง${formData.type === 'Hub' ? 'คลังกลาง' : 'ศูนย์พักพิง'}เรียบร้อยแล้ว`);
         router.push(formData.type === 'Hub' ? '/admin/hubs' : '/admin/import');
       }
     } catch (error: unknown) {
       const message = axios.isAxiosError(error) ? error.response?.data?.error : (error as Error).message;
-      alert(message || 'เกิดข้อผิดพลาดในการสร้างศูนย์');
+      showAlert.error('เกิดข้อผิดพลาด', message || 'เกิดข้อผิดพลาดในการสร้างศูนย์');
     } finally {
       setLoading(false);
     }

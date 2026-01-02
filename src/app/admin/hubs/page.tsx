@@ -5,6 +5,7 @@ import axios from 'axios';
 import Link from 'next/link';
 import { Modal } from 'bootstrap';
 import { useSession } from 'next-auth/react';
+import { showAlert } from '@/utils/swal-utils';
 
 interface Resource {
   _id: string;
@@ -88,10 +89,7 @@ export default function HubsManagementPage() {
     fetchData();
   }, [fetchData]);
 
-  const showToast = (msg: string) => {
-    setMessage(msg);
-    setTimeout(() => setMessage(''), 3000);
-  };
+
 
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,12 +99,12 @@ export default function HubsManagementPage() {
         phoneNumbers: manualForm.phoneNumbers.filter(p => p.trim() !== '')
       };
       await axios.post('/api/hubs', payload);
-      showToast(`สร้างคลังสินค้า "${manualForm.name}" เรียบร้อย`);
+      showAlert.success('สร้างสำเร็จ', `สร้างคลังสินค้า "${manualForm.name}" เรียบร้อย`);
       setManualForm({ name: '', district: '', subdistrict: '', phoneNumbers: [''] });
       fetchData();
     } catch (err: unknown) {
       const error = err as { response?: { data?: { error?: string } }; message: string };
-      showToast('Error: ' + (error.response?.data?.error || error.message));
+      showAlert.error('ผิดพลาด', error.response?.data?.error || error.message);
     }
   };
 
@@ -129,24 +127,25 @@ export default function HubsManagementPage() {
         phoneNumbers: editForm.phoneNumbers.filter(p => p.trim() !== '')
       };
       await axios.put(`/api/hubs/${editingHub._id}`, payload);
-      showToast(`อัปเดตข้อมูล "${editForm.name}" เรียบร้อย`);
+      showAlert.success('อัปเดตสำเร็จ', `อัปเดตข้อมูล "${editForm.name}" เรียบร้อย`);
       bsEditModalRef.current?.hide();
       fetchData();
     } catch (err: unknown) {
         const error = err as { response?: { data?: { error?: string } }; message: string };
-        showToast('Error: ' + (error.response?.data?.error || error.message));
+        showAlert.error('ผิดพลาด', error.response?.data?.error || error.message);
     }
   };
 
   const handleDeleteHub = async (id: string, name: string) => {
-    if (!confirm(`คุณต้องการลบ Hub "${name}" ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้`)) return;
+    const isConfirmed = await showAlert.confirmDelete('ยืนยันการลบ?', `คุณต้องการลบ Hub "${name}" ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้`);
+    if (!isConfirmed) return;
     try {
       await axios.delete(`/api/hubs/${id}`);
-      showToast(`ลบ Hub "${name}" เรียบร้อย`);
+      showAlert.success('ลบสำเร็จ', `ลบ Hub "${name}" เรียบร้อย`);
       fetchData();
     } catch (err: unknown) {
         const error = err as { response?: { data?: { error?: string } }; message: string };
-        showToast('Error: ' + (error.response?.data?.error || error.message));
+        showAlert.error('ผิดพลาด', error.response?.data?.error || error.message);
     }
   };
 
@@ -193,15 +192,6 @@ export default function HubsManagementPage() {
         </div>
       </div>
 
-      {/* Toast */}
-      {message && (
-         <div className="position-fixed top-0 start-50 translate-middle-x mt-4 z-index-toast" style={{ zIndex: 1050 }}>
-            <div className={`alert ${message.includes('Error') ? 'alert-danger' : 'alert-success'} shadow-lg d-flex align-items-center py-2 px-4 rounded-pill border-0`}>
-             <i className={`bi ${message.includes('Error') ? 'bi-x-circle-fill' : 'bi-check-circle-fill'} me-2 fs-5`}></i>
-             <span className="fw-bold">{message}</span>
-           </div>
-         </div>
-      )}
 
       {/* Content */}
       <div className="animate-fade-in">

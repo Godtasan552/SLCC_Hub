@@ -15,7 +15,7 @@ export const showAlert = {
       timer: 2000,
       showConfirmButton: false,
       toast: true,
-      position: 'top-end',
+      position: 'top',
       timerProgressBar: true,
     });
   },
@@ -27,6 +27,7 @@ export const showAlert = {
       title,
       text: text || 'เกิดข้อผิดพลาดบางอย่าง กรุณาลองใหม่อีกครั้ง',
       confirmButtonColor: '#3085d6',
+      position: 'top',
     });
   },
 
@@ -41,7 +42,8 @@ export const showAlert = {
       cancelButtonColor: '#3085d6',
       confirmButtonText: 'ใช่, ลบเลย!',
       cancelButtonText: 'ยกเลิก',
-      reverseButtons: true
+      reverseButtons: true,
+      position: 'top',
     });
     return result.isConfirmed;
   },
@@ -53,6 +55,29 @@ export const showAlert = {
       title,
       text,
       confirmButtonColor: '#3085d6',
+      position: 'top',
     });
+  },
+
+  // ⌨️ รับค่าจากผู้ใช้ (Prompt)
+  prompt: async (title: string, inputLabel: string, defaultValue: string = '') => {
+    const { value } = await Swal.fire({
+      title,
+      input: 'text',
+      inputLabel,
+      inputValue: defaultValue,
+      showCancelButton: true,
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#6e7881',
+      confirmButtonText: 'ตกลง',
+      cancelButtonText: 'ยกเลิก',
+      position: 'top',
+      inputValidator: (value) => {
+        if (!value) {
+          return 'กรุณาระบุข้อมูล!';
+        }
+      }
+    });
+    return value;
   }
 };

@@ -2,6 +2,7 @@
 import { signIn } from 'next-auth/react';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { showAlert } from '@/utils/swal-utils';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -19,7 +20,7 @@ export default function LoginPage() {
     if (res?.ok) {
       router.push('/admin/import'); // Login สำเร็จไปหน้าจัดการข้อมูล
     } else {
-      alert('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+      showAlert.error('เข้าสู่ระบบไม่สำเร็จ', 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
     }
   };
 
