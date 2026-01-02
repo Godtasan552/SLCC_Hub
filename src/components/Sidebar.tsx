@@ -91,7 +91,7 @@ export default function Sidebar() {
                 </div>
 
                 {/* Group Items with Left Border Line */}
-                <div className="d-flex flex-column" style={{ marginLeft: '11px', borderLeft: '2px solid rgba(128, 128, 128, 0.3)', paddingLeft: '15px' }}>
+                <div className="d-flex flex-column" style={{ marginLeft: '11px', borderLeft: '2px solid var(--border-color)', paddingLeft: '15px' }}>
                   {visibleItems.map((item) => {
                     const isActive = pathname === item.href;
                     return (
@@ -113,7 +113,7 @@ export default function Sidebar() {
           })}
         </div>
 
-        <div className="mt-auto border-top border-secondary pt-3 pb-3 px-3 mx-2">
+        <div className="mt-auto border-top border-theme pt-3 pb-3 px-3 mx-2">
           <div className="text-theme-secondary small text-center">
             &copy; 2025 SLCC Hub
           </div>

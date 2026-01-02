@@ -26,31 +26,33 @@ export default function LoginPage() {
 
   return (
     <div className="container d-flex justify-content-center align-items-center" style={{ minHeight: '80vh' }}>
-      <div className="card shadow-lg" style={{ width: '400px' }}>
+      <div className="card shadow-sm" style={{ width: '400px', backgroundColor: 'var(--bg-card)' }}>
         <div className="card-body p-5 text-center">
-          <h3 className="mb-4">เจ้าหน้าที่เข้าสู่ระบบ</h3>
+          <h3 className="mb-4" style={{ color: 'var(--text-primary)' }}>เจ้าหน้าที่เข้าสู่ระบบ</h3>
           <form onSubmit={handleSubmit}>
             <div className="form-floating mb-3">
               <input 
                 type="text" 
                 className="form-control" 
+                id="userInput"
                 placeholder="Username"
                 onChange={(e) => setUsername(e.target.value)}
               />
-              <label>Username</label>
+              <label htmlFor="userInput">Username</label>
             </div>
             <div className="form-floating mb-4">
               <input 
                 type="password" 
                 className="form-control" 
+                id="passInput"
                 placeholder="Password"
                 onChange={(e) => setPassword(e.target.value)}
               />
-              <label>Password</label>
+              <label htmlFor="passInput">Password</label>
             </div>
-            <button className="btn btn-primary w-100 btn-lg" type="submit">Login</button>
+            <button className="btn btn-primary w-100 btn-lg shadow-sm" type="submit">Login</button>
           </form>
-          <p className="mt-3 text-muted small">เฉพาะเจ้าหน้าที่ศูนย์พักพิงเท่านั้น</p>
+          <p className="mt-3 text-secondary small">เฉพาะเจ้าหน้าที่ศูนย์พักพิงเท่านั้น</p>
         </div>
       </div>
     </div>

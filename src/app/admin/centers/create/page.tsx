@@ -72,22 +72,22 @@ export default function CreateCenterPage() {
                     <label className="form-label fw-bold">ประเภทศูนย์</label>
                     <div className="d-flex gap-3">
                       <div 
-                        className={`flex-grow-1 p-3 border rounded cursor-pointer text-center ${formData.type === 'Hub' ? 'border-primary bg-primary bg-opacity-10 text-primary' : ''}`}
+                        className={`flex-grow-1 p-3 border rounded cursor-pointer text-center ${formData.type === 'Hub' ? 'border-primary bg-primary-subtle text-primary' : ''}`}
                         onClick={() => setFormData({ ...formData, type: 'Hub' })}
                         style={{ cursor: 'pointer' }}
                       >
                         <i className="bi bi-box-seam fs-3 d-block mb-1"></i>
                         <strong>คลังกลาง (Hub)</strong>
-                        <small className="d-block text-muted">สำหรับเก็บและกระจายของ</small>
+                        <small className="d-block text-secondary">สำหรับเก็บและกระจายของ</small>
                       </div>
                       <div 
-                        className={`flex-grow-1 p-3 border rounded cursor-pointer text-center ${formData.type === 'Shelter' ? 'border-success bg-success bg-opacity-10 text-success' : ''}`}
+                        className={`flex-grow-1 p-3 border rounded cursor-pointer text-center ${formData.type === 'Shelter' ? 'border-success bg-success-subtle text-success' : ''}`}
                         onClick={() => setFormData({ ...formData, type: 'Shelter' })}
                         style={{ cursor: 'pointer' }}
                       >
                         <i className="bi bi-house-door fs-3 d-block mb-1"></i>
                         <strong>ศูนย์พักพิง (Shelter)</strong>
-                        <small className="d-block text-muted">สำหรับรองรับผู้ประสบภัย</small>
+                        <small className="d-block text-secondary">สำหรับรองรับผู้ประสบภัย</small>
                       </div>
                     </div>
                   </div>

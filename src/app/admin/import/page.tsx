@@ -286,7 +286,7 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="container-fluid px-4 py-4" style={{ maxWidth: '1600px', minHeight: '100vh', backgroundColor: 'var(--bg-body)' }}>
+    <div className="container-fluid px-4 py-4" style={{ maxWidth: '1600px', minHeight: '100vh', backgroundColor: 'var(--bg-primary)' }}>
       
       {/* 1. Header & Tabs */}
       <div className="d-flex flex-column flex-md-row justify-content-between align-items-end mb-4 gap-3">
@@ -299,7 +299,7 @@ export default function AdminPage() {
         </div>
         
         {/* Tab Navigation */}
-        <div className="bg-white dark-mode-bg rounded-pill p-1 shadow-sm d-flex" style={{ border: '1px solid var(--border-color)' }}>
+        <div className="bg-secondary rounded-pill p-1 shadow-sm d-flex" style={{ border: '1px solid var(--border-color)' }}>
             <button 
                 className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'daily' ? 'btn-primary shadow-sm' : 'text-secondary hover-bg-light'}`}
                 onClick={() => setActiveTab('daily')}
@@ -307,7 +307,7 @@ export default function AdminPage() {
                 <i className="bi bi-list-check me-2"></i>อัปเดตรายวัน
             </button>
             <button 
-                className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'management' ? 'btn-primary shadow-sm' : 'text-secondary hover-bg-light'}`}
+                className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'management' ? 'btn-primary shadow-sm text-white' : 'text-secondary'}`}
                 onClick={() => setActiveTab('management')}
             >
                 <i className="bi bi-database-gear me-2"></i>จัดการฐานข้อมูล
@@ -401,7 +401,7 @@ export default function AdminPage() {
                                 {loading && uploadProgress > 0 ? (
                                     <div className="animate-fade-in py-3">
                                         <h5 className="mb-3 text-success fw-bold">🚀 {message || 'กำลังดำเนินการ...'} {uploadProgress}%</h5>
-                                        <div className="progress rounded-pill shadow-sm" style={{ height: '20px', width: '80%', margin: '0 auto' }}>
+                                        <div className="progress rounded-pill shadow-sm" style={{ height: '20px', width: '80%', margin: '0 auto', backgroundColor: 'var(--bg-secondary)' }}>
                                             <div 
                                                 className="progress-bar progress-bar-striped progress-bar-animated bg-success" 
                                                 role="progressbar" 
@@ -429,27 +429,27 @@ export default function AdminPage() {
                                 <div className="d-flex justify-content-between align-items-center mb-2">
                                     <label className="small fw-bold text-secondary mb-0">โครงสร้างไฟล์นำเข้า:</label>
                                     <div className="btn-group btn-group-sm rounded-pill border" style={{ fontSize: '0.65rem' }}>
-                                        <button type="button" className={`btn btn-xs py-0 px-2 ${activeImportSchema === 'excel' ? 'btn-primary' : 'btn-light'}`} onClick={() => setActiveImportSchema('excel')}>Excel</button>
-                                        <button type="button" className={`btn btn-xs py-0 px-2 ${activeImportSchema === 'json' ? 'btn-primary' : 'btn-light'}`} onClick={() => setActiveImportSchema('json')}>JSON</button>
+                                        <button type="button" className={`btn btn-xs py-0 px-2 ${activeImportSchema === 'excel' ? 'btn-primary text-white' : 'text-secondary'}`} onClick={() => setActiveImportSchema('excel')}>Excel</button>
+                                        <button type="button" className={`btn btn-xs py-0 px-2 ${activeImportSchema === 'json' ? 'btn-primary text-white' : 'text-secondary'}`} onClick={() => setActiveImportSchema('json')}>JSON</button>
                                     </div>
                                 </div>
                                 
                                 {activeImportSchema === 'excel' ? (
                                     <div className="table-responsive rounded-3 border animate-fade-in">
                                         <table className="table table-sm table-bordered mb-0 x-small-text text-nowrap">
-                                            <thead className="table-light">
+                                            <thead>
                                                 <tr>
-                                                    <th className="py-1 px-2 text-center bg-light" style={{ width: '60px' }}>#</th>
-                                                    <th className="py-1 px-2 text-center bg-light">A (1)</th>
-                                                    <th className="py-1 px-2 text-center bg-light">B (2)</th>
-                                                    <th className="py-1 px-2 text-center bg-light">C (3)</th>
-                                                    <th className="py-1 px-2 text-center bg-light">D (4)</th>
-                                                    <th className="py-1 px-2 text-center bg-light">E (5)</th>
+                                                    <th className="py-1 px-2 text-center bg-secondary" style={{ width: '60px' }}>#</th>
+                                                    <th className="py-1 px-2 text-center bg-secondary">A (1)</th>
+                                                    <th className="py-1 px-2 text-center bg-secondary">B (2)</th>
+                                                    <th className="py-1 px-2 text-center bg-secondary">C (3)</th>
+                                                    <th className="py-1 px-2 text-center bg-secondary">D (4)</th>
+                                                    <th className="py-1 px-2 text-center bg-secondary">E (5)</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 <tr>
-                                                    <td className="py-1 px-2 fw-bold bg-light">ข้อมูล</td>
+                                                    <td className="py-1 px-2 fw-bold bg-secondary">ข้อมูล</td>
                                                     <td className="py-1 px-2">ชื่อศูนย์</td>
                                                     <td className="py-1 px-2">อำเภอ</td>
                                                     <td className="py-1 px-2">ตำบล</td>
@@ -457,7 +457,7 @@ export default function AdminPage() {
                                                     <td className="py-1 px-2">เบอร์โทร</td>
                                                 </tr>
                                                 <tr>
-                                                    <td className="py-1 px-2 fw-bold bg-light">ชนิด</td>
+                                                    <td className="py-1 px-2 fw-bold bg-secondary">ชนิด</td>
                                                     <td className="py-1 px-2 text-primary">อักษร</td>
                                                     <td className="py-1 px-2 text-primary">อักษร</td>
                                                     <td className="py-1 px-2 text-primary">อักษร</td>
@@ -468,7 +468,7 @@ export default function AdminPage() {
                                         </table>
                                     </div>
                                 ) : (
-                                    <div className="bg-light p-2 rounded-3 border animate-fade-in">
+                                    <div className="bg-secondary p-2 rounded-3 border animate-fade-in">
                                         <pre className="mb-0 x-small-text text-secondary" style={{ whiteSpace: 'pre-wrap' }}>
 {`[
   {
@@ -484,7 +484,7 @@ export default function AdminPage() {
                                 )}
                             </div>
 
-                            <div className="alert alert-light border small text-start d-flex gap-2">
+                            <div className="alert alert-secondary border small text-start d-flex gap-2">
                                 <i className="bi bi-info-circle text-primary mt-1"></i>
                                 <span className="text-secondary">การนำเข้าไฟล์จะอัปเดตข้อมูลที่มีอยู่แล้วหากชื่อตรงกัน และสร้างใหม่หากยังไม่มี</span>
                             </div>
@@ -588,7 +588,7 @@ export default function AdminPage() {
         }
         .upload-box:hover {
             border-color: #198754;
-            background-color: rgba(25, 135, 84, 0.05);
+            background-color: var(--bg-opacity-success);
         }
         .dark-mode-bg {
              background-color: var(--bg-card) !important;

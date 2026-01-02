@@ -279,11 +279,11 @@ function SuppliesPageContent() {
            </div>
            <p className="text-secondary small mb-0 ps-1">ระบบบริหารจัดการทรัพยากร สิ่งของบริจาค และเวชภัณฑ์</p>
         </div>
-        <div className="bg-white dark-mode-bg rounded-pill p-1 shadow-sm d-flex" style={{ border: '1px solid var(--border-color)' }}>
-            <button className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'inventory' ? 'btn-primary shadow-sm' : 'text-secondary hover-bg-light'}`} onClick={() => setActiveTab('inventory')}>
+        <div className="bg-white rounded-pill p-1 shadow-sm d-flex" style={{ border: '1px solid var(--border-color)' }}>
+            <button className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'inventory' ? 'btn-primary shadow-sm text-white' : 'text-secondary hover-bg-light'}`} onClick={() => setActiveTab('inventory')}>
                 <i className="bi bi-list-ul me-2"></i>รายการสินค้า
             </button>
-            <button className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'management' ? 'btn-primary shadow-sm' : 'text-secondary hover-bg-light'}`} onClick={() => setActiveTab('management')}>
+            <button className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'management' ? 'btn-primary shadow-sm text-white' : 'text-secondary hover-bg-light'}`} onClick={() => setActiveTab('management')}>
                 <i className="bi bi-database-gear me-2"></i>จัดการสต็อก
             </button>
         </div>
@@ -309,9 +309,9 @@ function SuppliesPageContent() {
                         </div>
                         <div className="col-12 col-md-5 d-flex gap-2">
                             {/* View Mode Toggle */}
-                            <div className="btn-group btn-group-sm p-1 bg-light rounded-pill border">
-                                <button className={`btn btn-sm rounded-pill px-3 ${viewMode === 'hubs' ? 'btn-primary shadow-sm' : 'text-secondary'}`} onClick={() => setViewMode('hubs')}>🏢 คลังกลาง</button>
-                                <button className={`btn btn-sm rounded-pill px-3 ${viewMode === 'all' ? 'btn-primary shadow-sm' : 'text-secondary'}`} onClick={() => setViewMode('all')}>ทั้งหมด</button>
+                            <div className="btn-group btn-group-sm p-1 bg-secondary rounded-pill border">
+                                <button className={`btn btn-sm rounded-pill px-3 ${viewMode === 'hubs' ? 'btn-primary shadow-sm text-white' : 'text-secondary'}`} onClick={() => setViewMode('hubs')}>🏢 คลังกลาง</button>
+                                <button className={`btn btn-sm rounded-pill px-3 ${viewMode === 'all' ? 'btn-primary shadow-sm text-white' : 'text-secondary'}`} onClick={() => setViewMode('all')}>ทั้งหมด</button>
                             </div>
                             
                             <select className="form-select form-select-sm border-theme shadow-sm fw-bold w-auto rounded-pill" value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
@@ -328,7 +328,7 @@ function SuppliesPageContent() {
                 </div>
                 <div className="table-responsive">
                     <table className="table table-hover align-middle mb-0 text-theme">
-                        <thead className="table-light sticky-top">
+                        <thead className="sticky-top">
                             <tr className="small text-secondary">
                                 <th className="ps-4">ชื่อสิ่งของ</th>
                                 <th>หมวดหมู่</th>
@@ -385,7 +385,7 @@ function SuppliesPageContent() {
                             <form onSubmit={handleManualSubmit}>
                                 <div className="row g-3">
                                     <div className="col-12">
-                                        <div className="p-3 rounded-3 bg-primary bg-opacity-10 border border-primary border-opacity-25 mb-2">
+                                        <div className="p-3 rounded-3 bg-primary-subtle border border-primary border-opacity-25 mb-2">
                                             <label className="form-label small fw-bold text-primary"><i className="bi bi-geo-alt-fill me-1"></i>ขั้นตอนที่ 1: เลือกสถานที่รับ/เก็บสินค้า</label>
                                              <select 
                                                 className="form-select border-primary border-opacity-50 fw-bold text-primary" 
@@ -397,7 +397,7 @@ function SuppliesPageContent() {
                                                 {hubs.map((h) => (
                                                     <option key={h._id} value={h._id}>📦 {h.name}</option>
                                                 ))}
-                                            </select>
+                                             </select>
                                         </div>
                                     </div>
                                     <div className="col-12 mt-2">
@@ -467,7 +467,7 @@ function SuppliesPageContent() {
                                 {loading && uploadProgress > 0 ? (
                                     <div className="animate-fade-in py-3">
                                         <h5 className="mb-3 text-success fw-bold">🚀 กำลังอัปโหลดข้อมูล... {uploadProgress}%</h5>
-                                        <div className="progress rounded-pill shadow-sm" style={{ height: '20px', width: '80%', margin: '0 auto' }}>
+                                        <div className="progress rounded-pill shadow-sm" style={{ height: '20px', width: '80%', margin: '0 auto', backgroundColor: 'var(--bg-secondary)' }}>
                                             <div 
                                                 className="progress-bar progress-bar-striped progress-bar-animated bg-success" 
                                                 role="progressbar" 
@@ -493,30 +493,30 @@ function SuppliesPageContent() {
                             <div className="mb-3 text-start mt-2">
                                 <div className="d-flex justify-content-between align-items-center mb-2">
                                     <label className="small fw-bold text-secondary mb-0">โครงสร้างไฟล์นำเข้า:</label>
-                                    <div className="btn-group btn-group-sm rounded-pill border" style={{ fontSize: '0.65rem' }}>
-                                        <button type="button" className={`btn btn-xs py-0 px-2 ${activeImportSchema === 'excel' ? 'btn-primary' : 'btn-light'}`} onClick={() => setActiveImportSchema('excel')}>Excel</button>
-                                        <button type="button" className={`btn btn-xs py-0 px-2 ${activeImportSchema === 'json' ? 'btn-primary' : 'btn-light'}`} onClick={() => setActiveImportSchema('json')}>JSON</button>
+                                    <div className="btn-group btn-group-sm rounded-pill border" style={{ fontSize: '0.65rem', backgroundColor: 'var(--bg-secondary)' }}>
+                                        <button type="button" className={`btn btn-xs py-0 px-2 ${activeImportSchema === 'excel' ? 'btn-primary text-white' : 'text-secondary'}`} onClick={() => setActiveImportSchema('excel')}>Excel</button>
+                                        <button type="button" className={`btn btn-xs py-0 px-2 ${activeImportSchema === 'json' ? 'btn-primary text-white' : 'text-secondary'}`} onClick={() => setActiveImportSchema('json')}>JSON</button>
                                     </div>
                                 </div>
 
                                 {activeImportSchema === 'excel' ? (
                                     <div className="table-responsive rounded-3 border animate-fade-in">
                                         <table className="table table-sm table-bordered mb-0" style={{ fontSize: '0.7rem' }}>
-                                            <thead className="table-light">
+                                            <thead>
                                                 <tr>
-                                                    <th className="py-1 px-1 text-center bg-light" style={{ width: '45px' }}>#</th>
-                                                    <th className="py-1 px-1 text-center bg-light">A(1)</th>
-                                                    <th className="py-1 px-1 text-center bg-light">B(2)</th>
-                                                    <th className="py-1 px-1 text-center bg-light">C(3)</th>
-                                                    <th className="py-1 px-1 text-center bg-light">D(4)</th>
-                                                    <th className="py-1 px-1 text-center bg-light">E(5)</th>
-                                                    <th className="py-1 px-1 text-center bg-light">F(6)</th>
-                                                    <th className="py-1 px-1 text-center bg-light">G(7)</th>
+                                                    <th className="py-1 px-1 text-center bg-secondary" style={{ width: '45px' }}>#</th>
+                                                    <th className="py-1 px-1 text-center bg-secondary">A(1)</th>
+                                                    <th className="py-1 px-1 text-center bg-secondary">B(2)</th>
+                                                    <th className="py-1 px-1 text-center bg-secondary">C(3)</th>
+                                                    <th className="py-1 px-1 text-center bg-secondary">D(4)</th>
+                                                    <th className="py-1 px-1 text-center bg-secondary">E(5)</th>
+                                                    <th className="py-1 px-1 text-center bg-secondary">F(6)</th>
+                                                    <th className="py-1 px-1 text-center bg-secondary">G(7)</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 <tr>
-                                                    <td className="py-1 px-1 fw-bold bg-light">ข้อมูล</td>
+                                                    <td className="py-1 px-1 fw-bold bg-secondary">ข้อมูล</td>
                                                     <td className="py-1 px-1">ชื่อสิ่งของ</td>
                                                     <td className="py-1 px-1">หมวดหมู่</td>
                                                     <td className="py-1 px-1">จำนวน</td>
@@ -526,7 +526,7 @@ function SuppliesPageContent() {
                                                     <td className="py-1 px-1">ผู้บริจาค</td>
                                                 </tr>
                                                 <tr>
-                                                    <td className="py-1 px-1 fw-bold bg-light">ชนิด</td>
+                                                    <td className="py-1 px-1 fw-bold bg-secondary">ชนิด</td>
                                                     <td className="py-1 px-1 text-primary">อักษร</td>
                                                     <td className="py-1 px-1 text-primary">อักษร</td>
                                                     <td className="py-1 px-1 text-success">ตัวเลข</td>
@@ -539,7 +539,7 @@ function SuppliesPageContent() {
                                         </table>
                                     </div>
                                 ) : (
-                                    <div className="bg-light p-2 rounded-3 border animate-fade-in">
+                                    <div className="bg-secondary p-2 rounded-3 border animate-fade-in">
                                         <pre className="mb-0 text-secondary" style={{ fontSize: '0.65rem', whiteSpace: 'pre-wrap' }}>
 {`[
   {
@@ -557,7 +557,7 @@ function SuppliesPageContent() {
                                 )}
                             </div>
 
-                            <div className="alert alert-light border small text-start d-flex gap-2">
+                            <div className="alert alert-secondary border small text-start d-flex gap-2">
                                 <i className="bi bi-info-circle text-primary mt-1"></i>
                                 <span className="text-secondary" style={{ fontSize: '0.75rem' }}>
                                     การนำเข้าไฟล์จะอัปเดตข้อมูลที่มีอยู่แล้ว และระบุ &quot;สถานที่เก็บ&quot; เพื่อแยกสต็อกตามศูนย์ต่างๆ
@@ -573,8 +573,7 @@ function SuppliesPageContent() {
       <style jsx>{`
         .cursor-pointer { cursor: pointer; }
         .upload-box { border: 2px dashed var(--border-color); background-color: var(--bg-secondary); }
-        .upload-box:hover { border-color: #198754; background-color: rgba(25, 135, 84, 0.05); transform: translateY(-2px); }
-        .dark-mode-bg { background-color: var(--bg-card) !important; }
+        .upload-box:hover { border-color: #198754; background-color: var(--bg-opacity-success); transform: translateY(-2px); }
         .border-theme { border: 1px solid var(--border-color); }
         .border-bottom-theme { border-bottom: 1px solid var(--border-color); }
         .text-primary-theme { color: var(--text-primary); }

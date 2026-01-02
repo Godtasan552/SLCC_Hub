@@ -176,7 +176,7 @@ export default function HubsManagementPage() {
            <p className="text-secondary small mb-0 ps-1">ระบบจัดการคลังสต็อกสินค้าหลักและการกระจายทรัพยากรส่วนกลาง</p>
         </div>
         
-        <div className="bg-white dark-mode-bg rounded-pill p-1 shadow-sm d-flex" style={{ border: '1px solid var(--border-color)' }}>
+        <div className="bg-white rounded-pill p-1 shadow-sm d-flex" style={{ border: '1px solid var(--border-color)' }}>
             <button 
                 className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'overview' ? 'btn-primary shadow-sm' : 'text-secondary hover-bg-light'}`}
                 onClick={() => setActiveTab('overview')}
@@ -401,7 +401,6 @@ export default function HubsManagementPage() {
           transform: translateY(-5px);
           box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
         }
-        .dark-mode-bg { background-color: var(--bg-card) !important; }
         .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(5px); }

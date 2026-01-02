@@ -159,11 +159,11 @@ export default function ShelterList({
               </h6>
             </div>
             <div className="col-12 col-md-12 col-xl-8 d-flex justify-content-center justify-content-xl-end">
-              <div className="btn-group btn-group-sm p-1 rounded-pill overflow-auto" style={{ backgroundColor: 'rgba(0,0,0,0.05)', whiteSpace: 'nowrap' }}>
+              <div className="btn-group btn-group-sm p-1 rounded-pill overflow-auto" style={{ backgroundColor: 'var(--bg-secondary)', whiteSpace: 'nowrap' }}>
                 {[1, 3, 7, 14, 30].map((range) => (
                   <button 
                     key={range}
-                    className={`btn px-3 rounded-pill border-0 ${timeRange === range ? 'btn-primary shadow-sm' : 'text-secondary'}`}
+                    className={`btn px-3 rounded-pill border-0 ${timeRange === range ? 'btn-primary shadow-sm text-white' : 'text-secondary'}`}
                     onClick={() => setTimeRange(range)}
                   >
                     {range === 1 ? 'วันนี้' : `${range} วัน`}
