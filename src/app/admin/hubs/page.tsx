@@ -176,15 +176,15 @@ export default function HubsManagementPage() {
            <p className="text-secondary small mb-0 ps-1">ระบบจัดการคลังสต็อกสินค้าหลักและการกระจายทรัพยากรส่วนกลาง</p>
         </div>
         
-        <div className="bg-white rounded-pill p-1 shadow-sm d-flex" style={{ border: '1px solid var(--border-color)' }}>
+        <div className="bg-secondary rounded-pill p-1 shadow-sm d-flex" style={{ border: '1px solid var(--border-color)' }}>
             <button 
-                className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'overview' ? 'btn-primary shadow-sm' : 'text-secondary hover-bg-light'}`}
+                className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'overview' ? 'btn-primary shadow-sm text-white' : 'text-theme-secondary'}`}
                 onClick={() => setActiveTab('overview')}
             >
                 <i className="bi bi-grid-fill me-2"></i>คลังทั้งหมด
             </button>
             <button 
-                className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'management' ? 'btn-primary shadow-sm' : 'text-secondary hover-bg-light'}`}
+                className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'management' ? 'btn-primary shadow-sm text-white' : 'text-theme-secondary'}`}
                 onClick={() => setActiveTab('management')}
             >
                 <i className="bi bi-gear-fill me-2"></i>จัดการคลัง
@@ -205,7 +205,7 @@ export default function HubsManagementPage() {
                     <div className="d-flex justify-content-between align-items-start">
                       <div>
                         <h5 className="fw-bold mb-1" style={{ color: 'var(--text-primary)' }}>{hub.name}</h5>
-                        <span className="badge bg-light text-primary border border-primary px-3 rounded-pill">
+                        <span className="badge bg-secondary text-primary border border-primary px-3 rounded-pill">
                           📍 อ.{hub.district || 'ไม่ระบุ'}
                         </span>
                         {(hub.phoneNumbers || []).length > 0 && (
@@ -241,7 +241,7 @@ export default function HubsManagementPage() {
                       {hub.resources?.filter(r => r.status === 'Pending').slice(0, 2).map((r, idx) => (
                         <div key={idx} className="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded" style={{ backgroundColor: 'var(--bg-secondary) !important' }}>
                           <span className="small fw-bold text-theme-primary">{r.itemName}</span>
-                          <span className="badge bg-white text-dark border small">{r.amount} {r.unit}</span>
+                          <span className="badge bg-secondary text-theme border small">{r.amount} {r.unit}</span>
                         </div>
                       ))}
                       {(!hub.resources || hub.resources.filter(r => r.status === 'Pending').length === 0) && (

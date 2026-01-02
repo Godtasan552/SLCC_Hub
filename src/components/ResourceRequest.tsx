@@ -72,7 +72,7 @@ export default function ResourceRequest({
   };
 
   return (
-    <div className="card shadow-sm border-0 bg-white">
+    <div className="card shadow-sm border-0 bg-card">
       <div className="card-body p-0">
         <div className="alert alert-info py-2 small mb-3">
           <i className="bi bi-info-circle me-2"></i>สร้างคำขอสำหรับ: <strong>{shelterName}</strong>

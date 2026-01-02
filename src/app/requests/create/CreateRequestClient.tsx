@@ -170,7 +170,7 @@ export default function CreateRequestClient() {
             <div className="card-body p-0">
               <div className="row g-0">
                 {/* Main Content Pane */}
-                <div className="col-lg-8 p-4 bg-white">
+                <div className="col-lg-8 p-4 bg-card">
                   
                   {/* STEP 1: SELECT HUB */}
                   {step === 1 && (
@@ -182,7 +182,7 @@ export default function CreateRequestClient() {
                         {hubs.map(hub => (
                           <div key={hub._id} className="col-md-6">
                             <div 
-                              className={`card h-100 cursor-pointer border-2 transition-all hover-shadow ${selectedHubId === hub._id ? 'border-primary bg-primary bg-opacity-10' : 'border-light'}`}
+                              className={`card h-100 cursor-pointer border-2 transition-all hover-shadow ${selectedHubId === hub._id ? 'border-primary bg-primary bg-opacity-10' : 'border-theme'}`}
                               onClick={() => { setSelectedHubId(hub._id); setStep(2); }}
                             >
                               <div className="card-body p-4 text-center">
@@ -214,7 +214,7 @@ export default function CreateRequestClient() {
                       <div className="row g-2 mb-4">
                         <div className="col-md-5">
                           <div className="input-group">
-                            <span className="input-group-text bg-white border-theme"><i className="bi bi-search"></i></span>
+                            <span className="input-group-text bg-card border-theme"><i className="bi bi-search"></i></span>
                             <input 
                               type="text" 
                               className="form-control border-theme shadow-none" 
@@ -229,7 +229,7 @@ export default function CreateRequestClient() {
                               {categories.map(cat => (
                                 <button 
                                   key={cat} 
-                                  className={`btn btn-sm rounded-pill whitespace-nowrap px-3 ${activeCategory === cat ? 'btn-primary' : 'btn-light'}`}
+                                  className={`btn btn-sm rounded-pill whitespace-nowrap px-3 ${activeCategory === cat ? 'btn-primary text-white' : 'btn-secondary text-theme-secondary'}`}
                                   onClick={() => setActiveCategory(cat)}
                                 >
                                   {cat}
@@ -246,7 +246,7 @@ export default function CreateRequestClient() {
                           return (
                             <div key={supply._id} className="col-md-4">
                               <div 
-                                className={`card h-100 cursor-pointer border-2 transition-all p-3 text-center position-relative ${isSelected ? 'border-primary shadow-sm bg-primary bg-opacity-10' : 'border-light bg-light bg-opacity-50'}`}
+                                className={`card h-100 cursor-pointer border-2 transition-all p-3 text-center position-relative ${isSelected ? 'border-primary shadow-sm bg-primary bg-opacity-10' : 'border-theme bg-secondary bg-opacity-50'}`}
                                 onClick={() => toggleCartItem(supply)}
                               >
                                 {isSelected && <div className="position-absolute top-0 end-0 p-2"><i className="bi bi-check-circle-fill text-primary fs-5"></i></div>}
@@ -290,10 +290,10 @@ export default function CreateRequestClient() {
                          {shelters.map(shelter => (
                            <div key={shelter._id} className="col-md-6">
                               <div 
-                                className={`card h-100 cursor-pointer border-2 transition-all p-3 d-flex flex-row align-items-center ${selectedShelterId === shelter._id ? 'border-success bg-success bg-opacity-10 shadow-sm' : 'border-light'}`}
+                                className={`card h-100 cursor-pointer border-2 transition-all p-3 d-flex flex-row align-items-center ${selectedShelterId === shelter._id ? 'border-success bg-success bg-opacity-10 shadow-sm' : 'border-theme'}`}
                                 onClick={() => setSelectedShelterId(shelter._id)}
                               >
-                                 <div className={`p-2 rounded-circle me-3 ${selectedShelterId === shelter._id ? 'bg-success text-white' : 'bg-light text-secondary'}`}>
+                                 <div className={`p-2 rounded-circle me-3 ${selectedShelterId === shelter._id ? 'bg-success text-white' : 'bg-secondary text-secondary'}`}>
                                     <i className="bi bi-house-fill fs-4"></i>
                                  </div>
                                  <div className="flex-grow-1">
@@ -326,7 +326,7 @@ export default function CreateRequestClient() {
                             <p className="text-secondary">สรุปรายการเบิกจ่ายทรัพยากรฉุกเฉิน</p>
                         </div>
 
-                        <div className="card border-0 bg-light p-4 rounded-4 mb-4">
+                        <div className="card border-0 bg-secondary p-4 rounded-4 mb-4">
                             <div className="row text-center">
                                 <div className="col-5">
                                     <div className="small text-muted">หุบต้นทาง</div>
@@ -344,7 +344,7 @@ export default function CreateRequestClient() {
 
                         <div className="table-responsive mb-5">
                             <table className="table table-sm align-middle">
-                                <thead className="table-light">
+                                <thead className="bg-secondary">
                                     <tr>
                                         <th className="ps-3 py-2">รายการ</th>
                                         <th className="text-center">จำนวนที่ขอ</th>

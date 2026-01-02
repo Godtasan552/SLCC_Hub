@@ -40,9 +40,9 @@ export default function CriticalShelters({ shelters }: CriticalSheltersProps) {
             ) : (
                 <div className="d-flex flex-column gap-3">
                     {criticalList.map((s) => {
-                        const occupancyRate = (s.currentOccupancy / (s.capacity || 1)) * 100;
+                        const occupancyRate = ((s.currentOccupancy ?? 0) / (s.capacity || 1)) * 100;
                         return (
-                            <div key={s._id} className="p-3 border rounded-3 bg-body-tertiary position-relative overflow-hidden" 
+                            <div key={s._id} className="p-3 border rounded-3 bg-secondary position-relative overflow-hidden" 
                                  style={{ borderLeft: '4px solid #dc3545 !important' }}>
                                 <div className="d-flex justify-content-between align-items-start mb-2">
                                     <div>

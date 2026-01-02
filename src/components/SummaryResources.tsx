@@ -170,8 +170,8 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
   const getUrgencyBadge = (urgency: string) => {
     switch (urgency) {
       case 'high': return <span className="badge bg-danger">ด่วนมาก</span>;
-      case 'medium': return <span className="badge bg-warning text-dark">ด่วน</span>;
-      case 'low': return <span className="badge bg-info text-dark">ปกติ</span>;
+      case 'medium': return <span className="badge bg-warning text-white">ด่วน</span>;
+      case 'low': return <span className="badge bg-info text-white">ปกติ</span>;
       default: return <span className="badge bg-secondary">{urgency}</span>;
     }
   };
