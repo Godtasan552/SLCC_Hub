@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
+import useSWR, { mutate } from 'swr';
 import ExcelJS from 'exceljs';
 import ShelterList from '@/components/dashboard/ShelterList';
 import { Shelter } from "@/types/shelter";
@@ -30,10 +31,28 @@ export default function AdminPage() {
   const [activeImportSchema, setActiveImportSchema] = useState<'excel' | 'json'>('excel');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [shelters, setShelters] = useState<Shelter[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [timeRange, setTimeRange] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [filterCapacity, setFilterCapacity] = useState('All');
+  const [filterDistrict, setFilterDistrict] = useState('All');
   const [uploadProgress, setUploadProgress] = useState(0);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterCapacity, filterDistrict, timeRange]);
+
+  // --- SWR Data Fetching ---
+  const fetcher = (url: string) => axios.get(url).then(res => res.data);
+  const sheltersUrl = `/api/shelters?days=${timeRange}&page=${currentPage}&limit=30&searchTerm=${searchTerm}&district=${filterDistrict}&status=${filterCapacity}`;
+  const { data: swrData, error: swrError, isLoading: swrLoading } = useSWR(sheltersUrl, fetcher, {
+    revalidateOnFocus: false,
+    keepPreviousData: true
+  });
+
+  const shelters = swrData?.data || [];
+  const pagination = swrData?.pagination || { total: 0, page: 1, limit: 30, totalPages: 1 };
   
   // Action Modal State (In/Out)
   const [modalState, setModalState] = useState<{ isOpen: boolean, shelter: Shelter | null, action: 'in' | 'out', amount: number | string }>({
@@ -59,19 +78,10 @@ export default function AdminPage() {
     phoneNumbers: ''
   });
 
-  // --- Fetch Data ---
-  const fetchShelters = useCallback(async () => {
-    try {
-      const res = await axios.get(`/api/shelters?days=${timeRange}`);
-      setShelters(res.data.data);
-    } catch (err) {
-      console.error('Fetch shelters failed:', err);
-    }
-  }, [timeRange]);
-
-  useEffect(() => {
-    fetchShelters();
-  }, [fetchShelters]);
+  // No longer need manual fetchShelters with useEffect as SWR handles it
+  const refreshData = () => {
+    mutate(sheltersUrl);
+  };
 
   // --- Bootstrap Modals ---
   useEffect(() => {
@@ -86,7 +96,7 @@ export default function AdminPage() {
 
   // --- Actions ---
   const openActionModal = (id: string, action: 'in' | 'out') => {
-    const targetShelter = shelters.find(s => s._id === id);
+    const targetShelter = shelters.find((s: Shelter) => s._id === id);
     if (!targetShelter) return;
     setModalState({ isOpen: true, shelter: targetShelter, action, amount: '' });
     bsModalRef.current?.show();
@@ -112,6 +122,7 @@ export default function AdminPage() {
       });
       setLoading(false);
       showAlert.success('บันทึกข้อมูลเรียบร้อย', `${modalState.action === 'in' ? 'รับเข้า' : 'ส่งออก'} ${amountNum} คน`);
+      refreshData();
     } catch (err) {
       console.error(err);
       showAlert.error('เกิดข้อผิดพลาด', 'ไม่สามารถบันทึกข้อมูลได้');
@@ -133,7 +144,7 @@ export default function AdminPage() {
     try {
         await axios.put(`/api/shelters/${editingShelter._id}`, editingShelter);
         showAlert.success('แก้ไขสำเร็จ', `แก้ไขข้อมูล "${editingShelter.name}" เรียบร้อย`);
-        fetchShelters();
+        refreshData();
     } catch (err) {
         console.error(err);
         showAlert.error('แก้ไขล้มเหลว', 'ไม่สามารถบันทึกข้อมูลที่แก้ไขได้');
@@ -154,9 +165,7 @@ export default function AdminPage() {
     try {
         await axios.delete(`/api/shelters/${id}`);
         showAlert.success('ลบเรียบร้อย');
-        // Optimistic update
-        setShelters(prev => prev.filter(s => s._id !== id));
-        fetchShelters();
+        refreshData();
     } catch (err) {
         console.error(err);
         showAlert.error('ลบล้มเหลว', 'เกิดข้อผิดพลาดในการลบข้อมูล');
@@ -178,7 +187,7 @@ export default function AdminPage() {
       await axios.post('/api/shelters', dataToSend);
       showAlert.success('เพิ่มสำเร็จ', `เพิ่มศูนย์ "${manualForm.name}" เรียบร้อยแล้ว`);
       setManualForm({ name: '', district: '', subdistrict: '', capacity: 0, phoneNumbers: '' });
-      fetchShelters();
+      refreshData();
     } catch (err: unknown) {
       const error = err as { response?: { data?: { error?: string } }; message: string };
       const errorMessage = error.response?.data?.error || error.message;
@@ -256,7 +265,7 @@ export default function AdminPage() {
       setUploadProgress(100);
       setMessage('นำเข้าไฟล์สำเร็จ!');
       showAlert.success('สำเร็จ', 'นำเข้าข้อมูลไฟล์เรียบร้อยแล้ว');
-      fetchShelters();
+      refreshData();
 
       // หน่วงเวลา 2 วินาทีก่อนปิด Progress bar
       setTimeout(() => {
@@ -322,6 +331,14 @@ export default function AdminPage() {
                         setTimeRange={setTimeRange}
                         searchTerm={searchTerm}
                         setSearchTerm={setSearchTerm}
+                        currentPage={currentPage}
+                        setCurrentPage={setCurrentPage}
+                        filterCapacity={filterCapacity}
+                        setFilterCapacity={setFilterCapacity}
+                        filterDistrict={filterDistrict}
+                        setFilterDistrict={setFilterDistrict}
+                        pagination={pagination}
+                        isLoading={swrLoading}
                         onAction={openActionModal}
                         onEdit={isAdmin ? handleEdit : undefined}
                         onDelete={isAdmin ? handleDelete : undefined}

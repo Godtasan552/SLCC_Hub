@@ -9,12 +9,23 @@ interface ShelterListProps {
   setTimeRange: (range: number) => void;
   searchTerm: string;
   setSearchTerm: (term: string) => void;
+  currentPage: number;
+  setCurrentPage: (page: number) => void;
+  filterCapacity: string;
+  setFilterCapacity: (status: string) => void;
+  filterDistrict: string;
+  setFilterDistrict: (district: string) => void;
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+  isLoading?: boolean;
   onAction?: (id: string, action: 'in' | 'out') => void;
   onEdit?: (shelter: Shelter) => void;
   onDelete?: (id: string) => void;
 }
-
-const ITEMS_PER_PAGE = 30;
 
 export default function ShelterList({ 
   shelters, 
@@ -22,41 +33,26 @@ export default function ShelterList({
   setTimeRange, 
   searchTerm, 
   setSearchTerm,
+  currentPage,
+  setCurrentPage,
+  filterCapacity,
+  setFilterCapacity,
+  filterDistrict,
+  setFilterDistrict,
+  pagination,
+  isLoading,
   onAction,
   onEdit,
   onDelete
 }: ShelterListProps) {
-  const [currentPage, setCurrentPage] = useState(1);
-  const [filterCapacity, setFilterCapacity] = useState('All');
-  const [filterDistrict, setFilterDistrict] = useState('All');
-
   const districts = useMemo(() => {
-    return ['All', ...new Set(shelters.map(s => s.district).filter(Boolean))];
-  }, [shelters]);
+    // Note: In a fully server-side system, this should ideally come from an API metadata
+    // But for now we can still extract from what's currently loaded or fixed list
+    return ['All', 'เมือง', 'วารินชำราบ', 'เดชอุดม', 'ตระการพืชผล', 'พิบูลมังสาหาร', 'เขมราฐ']; 
+  }, []);
 
-  const filteredShelters = useMemo(() => {
-    return shelters.filter(s => {
-      const matchSearch = (s.name?.toLowerCase().includes(searchTerm.toLowerCase())) || 
-                          (s.district?.toLowerCase().includes(searchTerm.toLowerCase()));
-      
-      const status = getCapacityStatus(s.currentOccupancy ?? 0, s.capacity);
-      const matchCapacity = filterCapacity === 'All' || status.text === filterCapacity;
-      
-      const matchDistrict = filterDistrict === 'All' || s.district === filterDistrict;
-      
-      return matchSearch && matchCapacity && matchDistrict;
-    });
-  }, [shelters, searchTerm, filterCapacity, filterDistrict]);
-
-  const totalPages = Math.ceil(filteredShelters.length / ITEMS_PER_PAGE);
-  const paginatedShelters = filteredShelters.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, filterCapacity, filterDistrict]);
+  const totalPages = pagination.totalPages;
+  const paginatedShelters = shelters; // Data is already paginated from API
 
   const hasActions = onAction || onEdit || onDelete;
 
@@ -146,10 +142,10 @@ export default function ShelterList({
         <div className="card-body p-2 px-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
           <div className="d-flex align-items-center gap-2">
             <span className="text-secondary small">จำนวนศูนย์พักพิงที่พบ:</span>
-            <span className="badge bg-primary px-3 py-2 rounded-3">{filteredShelters.length} รายการ</span>
+            <span className="badge bg-primary px-3 py-2 rounded-3">{pagination.total} รายการ</span>
           </div>
           <div className="text-secondary small">
-            หน้า <span className="fw-bold text-primary">{currentPage}</span> จาก <span className="fw-bold">{totalPages || 1}</span>
+            หน้า <span className="fw-bold text-primary">{pagination.page}</span> จาก <span className="fw-bold">{pagination.totalPages || 1}</span>
           </div>
         </div>
       </div>
@@ -282,7 +278,7 @@ export default function ShelterList({
         <nav className="custom-pagination">
           <div className="pagination-container d-flex align-items-center">
             <button className="pag-btn" onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>«</button>
-            <button className="pag-btn" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>‹</button>
+            <button className="pag-btn" onClick={() => setCurrentPage(Math.max(1, currentPage - 1))} disabled={currentPage === 1}>‹</button>
             {(() => {
               const pages = [];
               const showRange = 2;
@@ -297,7 +293,7 @@ export default function ShelterList({
               }
               return pages;
             })()}
-            <button className="pag-btn" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>›</button>
+            <button className="pag-btn" onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))} disabled={currentPage === totalPages}>›</button>
             <button className="pag-btn" onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages}>»</button>
           </div>
         </nav>

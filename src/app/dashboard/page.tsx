@@ -6,7 +6,7 @@ import Supply from '@/models/Supply';
 import DashboardDisplay from '@/components/dashboard/DashboardDisplay';
 import { Shelter as ShelterType, ResourceRequest } from '@/types/shelter';
 import { getCapacityStatus } from '@/utils/shelter-utils';
-import { calculateCurrentOccupancy, getAllShelterOccupancy, getAllShelterMovements } from '@/utils/shelter-server-utils';
+import { calculateCurrentOccupancy, getAllShelterOccupancy, getAllShelterMovements, getGlobalDailyStats } from '@/utils/shelter-server-utils';
 
 interface DashboardResource extends ResourceRequest {
   shelterName: string;
@@ -24,19 +24,22 @@ export default async function DashboardPage() {
   await dbConnect();
 
   // --- Initial Data Fetching (SSR) ---
-  const totalShelters = await Shelter.countDocuments({});
-  
-  // ✅ คำนวณ currentOccupancy และ capacityStatus จาก ShelterLog
-  const allShelters = await Shelter.find({}).select('-dailyLogs').lean();
+  // We'll replicate the optimized fetching from the API here to keep maintenance easy
+  const [totalShelters, occupancyMap, hubs, rawShelters] = await Promise.all([
+    Shelter.countDocuments({}),
+    getAllShelterOccupancy(),
+    Hub.find({}).select('name resources').lean() as Promise<HubData[]>,
+    Shelter.find({}).select('name resources capacity').lean() as Promise<ShelterType[]>
+  ]);
+
   let totalCapacity = 0;
   let totalOccupancy = 0;
   let criticalSheltersCount = 0;
   let warningSheltersCount = 0;
+  const allResources: DashboardResource[] = [];
   
-  // ✅ Optimization: ดึง occupancy ทั้งหมดในครั้งเดียว
-  const occupancyMap = await getAllShelterOccupancy();
-  
-  const sheltersWithOccupancy = allShelters.map((shelter) => {
+  // Process Shelters
+  const sheltersWithOccupancy = rawShelters.map((shelter) => {
     const currentOccupancy = occupancyMap[shelter._id.toString()] || 0;
     totalOccupancy += currentOccupancy;
     totalCapacity += shelter.capacity || 0;
@@ -45,6 +48,12 @@ export default async function DashboardPage() {
     if (status.text === 'ล้นศูนย์') criticalSheltersCount++;
     else if (status.text === 'ใกล้เต็ม') warningSheltersCount++;
     
+    if (shelter.resources) {
+      shelter.resources.forEach(r => {
+        allResources.push({ ...r, shelterName: shelter.name, isHub: false });
+      });
+    }
+
     return {
       ...shelter,
       currentOccupancy,
@@ -52,22 +61,8 @@ export default async function DashboardPage() {
     };
   });
 
-  const allResources: DashboardResource[] = [];
-  
-  const [shelterData, hubData] = await Promise.all([
-    Shelter.find({}).select('name resources capacity').lean() as Promise<ShelterType[]>,
-    Hub.find({}).select('name resources').lean() as Promise<HubData[]>
-  ]);
-  
-  shelterData.forEach(s => {
-    if (s.resources) {
-      s.resources.forEach(r => {
-        allResources.push({ ...r, shelterName: s.name, isHub: false });
-      });
-    }
-  });
-
-  hubData.forEach(h => {
+  // Process Hubs
+  hubs.forEach(h => {
     if (h.resources) {
       h.resources.forEach(r => {
         allResources.push({ ...r, shelterName: h.name, isHub: true });
@@ -75,63 +70,23 @@ export default async function DashboardPage() {
     }
   });
 
-  const totalResourceRequests = allResources.length;
+  const [totalSupplies, outOfStockSupplies, lowStockSupplies, globalDailyStats] = await Promise.all([
+    Supply.countDocuments({}),
+    Supply.countDocuments({ quantity: 0 }),
+    Supply.countDocuments({ quantity: { $gt: 0, $lt: 20 } }),
+    getGlobalDailyStats(90)
+  ]);
 
-  // Status counts
-  const requestStats = {
-    pending: allResources.filter(r => r.status === 'Pending').length,
-    approved: allResources.filter(r => r.status === 'Approved').length,
-    received: allResources.filter(r => r.status === 'Received').length,
-    rejected: allResources.filter(r => r.status === 'Rejected').length
-  };
-
-  const totalSupplies = await Supply.countDocuments({});
-  const outOfStockSupplies = await Supply.countDocuments({ quantity: 0 });
-  const lowStockSupplies = await Supply.countDocuments({ quantity: { $gt: 0, $lt: 20 } });
-  
-  const criticalList = sheltersWithOccupancy.filter(s => s.capacityStatus === 'ล้นศูนย์');
-
-  // ✅ Trend & Movement calculation จาก ShelterLog
-  const daysToTrack = 90;
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - daysToTrack);
-  
-  const logs = await ShelterLog.find({
-    date: { $gte: startDate }
-  }).sort({ date: 1 });
-  
-  const dailyStats: Record<string, { checkIn: number; checkOut: number }> = {};
-  
-  logs.forEach(log => {
-    const dateStr = log.date.toISOString().split('T')[0];
-    if (!dailyStats[dateStr]) dailyStats[dateStr] = { checkIn: 0, checkOut: 0 };
-    
-    if (log.action === 'in') {
-      dailyStats[dateStr].checkIn += log.amount;
-    } else if (log.action === 'out') {
-      dailyStats[dateStr].checkOut += log.amount;
-    }
-  });
-
+  // ✅ Transform globalDailyStats into trend & movement formats
+  let runningOccupancy = totalOccupancy;
   const trendData = [];
   const movementData = [];
-  let currentGlobalOccupancy = totalOccupancy;
-  
-  for (let i = 0; i < daysToTrack; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().split('T')[0];
-    const statsForDay = dailyStats[dateStr] || { checkIn: 0, checkOut: 0 };
-    const net = statsForDay.checkIn - statsForDay.checkOut;
-    
-    trendData.push({ date: dateStr, occupancy: Math.max(0, currentGlobalOccupancy) });
-    movementData.push({ date: dateStr, checkIn: statsForDay.checkIn, checkOut: statsForDay.checkOut });
-    currentGlobalOccupancy -= net;
+  const reversedStats = [...globalDailyStats].reverse();
+  for (const day of reversedStats) {
+    trendData.push({ date: day.date, occupancy: Math.max(0, runningOccupancy) });
+    movementData.push({ date: day.date, checkIn: day.checkIn, checkOut: day.checkOut });
+    runningOccupancy -= (day.checkIn - day.checkOut);
   }
-
-  const recentRequests = allResources
-    .sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime())
-    .slice(0, 5);
 
   const initialData = JSON.parse(JSON.stringify({
     totalShelters,
@@ -139,13 +94,20 @@ export default async function DashboardPage() {
     totalOccupancy,
     criticalShelters: criticalSheltersCount,
     warningShelters: warningSheltersCount,
-    totalResourceRequests,
+    totalResourceRequests: allResources.length,
     totalSupplies,
     lowStockSupplies,
     outOfStockSupplies,
-    criticalList,
-    requestStats,
-    recentRequests,
+    criticalList: sheltersWithOccupancy.filter(s => s.capacityStatus === 'ล้นศูนย์'),
+    requestStats: {
+      pending: allResources.filter(r => r.status === 'Pending').length,
+      approved: allResources.filter(r => r.status === 'Approved').length,
+      received: allResources.filter(r => r.status === 'Received').length,
+      rejected: allResources.filter(r => r.status === 'Rejected').length
+    },
+    recentRequests: allResources
+      .sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime())
+      .slice(0, 5),
     trendData: trendData.reverse(),
     movementData: movementData.reverse()
   }));

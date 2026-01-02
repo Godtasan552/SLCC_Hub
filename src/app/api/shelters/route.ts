@@ -10,29 +10,68 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const days = parseInt(searchParams.get('days') || '7');
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '30');
+    const searchTerm = searchParams.get('searchTerm') || '';
+    const district = searchParams.get('district') || 'All';
+    const status = searchParams.get('status') || 'All';
     
-    const shelters = await Shelter.find({}).sort({ updatedAt: -1 });
+    // Build filter query
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const query: any = {};
+    if (searchTerm) {
+      query.$or = [
+        { name: { $regex: searchTerm, $options: 'i' } },
+        { district: { $regex: searchTerm, $options: 'i' } }
+      ];
+    }
+    if (district !== 'All') {
+      query.district = district;
+    }
+
+    // Fetch total count for pagination
+    const totalCount = await Shelter.countDocuments(query);
+    const totalPages = Math.ceil(totalCount / limit);
     
-    // ✅ Optimization: ดึง occupancy และ movement ทั้งหมดในครั้งเดียว
+    const shelters = await Shelter.find(query)
+      .sort({ updatedAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit);
+    
+    // ✅ Optimization: ดึง occupancy และ movement ทั้งหมดในครั้งเดียวสำหรับข้อมูลหน้านี้
     const [occupancyMap, movementMap] = await Promise.all([
       getAllShelterOccupancy(),
       getAllShelterMovements(days)
     ]);
     
-    const sheltersWithData = shelters.map((shelter) => {
+    let sheltersWithData = shelters.map((shelter) => {
       const currentOccupancy = occupancyMap[shelter._id.toString()] || 0;
-      const status = getCapacityStatus(currentOccupancy, shelter.capacity);
+      const capacityStatus = getCapacityStatus(currentOccupancy, shelter.capacity);
       const recentMovement = movementMap[shelter._id.toString()] || { in: 0, out: 0 };
       
       return {
         ...shelter.toObject(),
         currentOccupancy,
-        capacityStatus: status.text,
+        capacityStatus: capacityStatus.text,
         recentMovement
       };
     });
+
+    // Client-side status filter (since status is calculated from occupancy)
+    if (status !== 'All') {
+      sheltersWithData = sheltersWithData.filter(s => s.capacityStatus === status);
+    }
     
-    return NextResponse.json({ success: true, data: sheltersWithData });
+    return NextResponse.json({ 
+      success: true, 
+      data: sheltersWithData,
+      pagination: {
+        total: totalCount,
+        page,
+        limit,
+        totalPages
+      }
+    });
   } catch (error) {
     console.error('Failed to fetch shelters:', error);
     return NextResponse.json({ success: false, error: 'Failed to fetch shelters' }, { status: 500 });

@@ -154,3 +154,35 @@ export const getDailyStats = async (
     return [];
   }
 };
+
+/**
+ * [Server-side Only] คำนวณสถิติรวมของทุกศูนย์ (ใช้สำหรับ Dashboard Global Stats)
+ */
+export const getGlobalDailyStats = async (days: number): Promise<Array<{ date: string; checkIn: number; checkOut: number }>> => {
+  try {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    startDate.setHours(0, 0, 0, 0);
+
+    const results = await ShelterLog.aggregate([
+      { $match: { date: { $gte: startDate } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
+          checkIn: { $sum: { $cond: [{ $eq: ["$action", "in"] }, "$amount", 0] } },
+          checkOut: { $sum: { $cond: [{ $eq: ["$action", "out"] }, "$amount", 0] } }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    return results.map(res => ({
+      date: res._id,
+      checkIn: res.checkIn,
+      checkOut: res.checkOut
+    }));
+  } catch (error) {
+    console.error('Error getting global daily stats:', error);
+    return [];
+  }
+};
