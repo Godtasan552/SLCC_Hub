@@ -301,13 +301,15 @@ export default function AdminPage() {
         {/* Tab Navigation */}
         <div className="bg-secondary rounded-pill p-1 shadow-sm d-flex" style={{ border: '1px solid var(--border-color)' }}>
             <button 
-                className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'daily' ? 'btn-primary shadow-sm' : 'text-secondary hover-bg-light'}`}
+                className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'daily' ? 'btn-primary shadow-sm text-white' : 'text-white'}`}
+                style={{ opacity: activeTab === 'daily' ? 1 : 0.75 }}
                 onClick={() => setActiveTab('daily')}
             >
                 <i className="bi bi-list-check me-2"></i>อัปเดตรายวัน
             </button>
             <button 
-                className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'management' ? 'btn-primary shadow-sm text-white' : 'text-secondary'}`}
+                className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'management' ? 'btn-primary shadow-sm text-white' : 'text-white'}`}
+                style={{ opacity: activeTab === 'management' ? 1 : 0.75 }}
                 onClick={() => setActiveTab('management')}
             >
                 <i className="bi bi-database-gear me-2"></i>จัดการฐานข้อมูล
@@ -428,9 +430,9 @@ export default function AdminPage() {
                             <div className="mb-3 text-start">
                                 <div className="d-flex justify-content-between align-items-center mb-2">
                                     <label className="small fw-bold text-secondary mb-0">โครงสร้างไฟล์นำเข้า:</label>
-                                    <div className="btn-group btn-group-sm rounded-pill border" style={{ fontSize: '0.65rem' }}>
-                                        <button type="button" className={`btn btn-xs py-0 px-2 ${activeImportSchema === 'excel' ? 'btn-primary text-white' : 'text-secondary'}`} onClick={() => setActiveImportSchema('excel')}>Excel</button>
-                                        <button type="button" className={`btn btn-xs py-0 px-2 ${activeImportSchema === 'json' ? 'btn-primary text-white' : 'text-secondary'}`} onClick={() => setActiveImportSchema('json')}>JSON</button>
+                                    <div className="btn-group btn-group-sm rounded-pill border" style={{ fontSize: '0.65rem', backgroundColor: '#4b5563' }}>
+                                        <button type="button" className={`btn btn-xs py-0 px-2 ${activeImportSchema === 'excel' ? 'btn-primary text-white' : 'text-white'}`} style={{ opacity: activeImportSchema === 'excel' ? 1 : 0.75 }} onClick={() => setActiveImportSchema('excel')}>Excel</button>
+                                        <button type="button" className={`btn btn-xs py-0 px-2 ${activeImportSchema === 'json' ? 'btn-primary text-white' : 'text-white'}`} style={{ opacity: activeImportSchema === 'json' ? 1 : 0.75 }} onClick={() => setActiveImportSchema('json')}>JSON</button>
                                     </div>
                                 </div>
                                 
@@ -595,6 +597,7 @@ export default function AdminPage() {
         }
         .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
         .x-small-text { font-size: 0.72rem; }
+        .hover-opacity-100:hover { opacity: 1 !important; }
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(5px); }
             to { opacity: 1; transform: translateY(0); }

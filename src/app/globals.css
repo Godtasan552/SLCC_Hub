@@ -5,9 +5,9 @@
   --bg-primary: #12141c;
   --bg-secondary: #1a1d26;
   --bg-card: #222632;
-  --text-primary: #f8f9fa;
-  --text-secondary: #adb5bd;
-  --border-color: #3f444b; /* Brighter border for better visibility in dark mode */
+  --text-primary: #ffffff;
+  --text-secondary: #e9ecef;
+  --border-color: #3f444b;
   --table-hover: #2c313c;
   --bg-opacity-primary: rgba(13, 110, 253, 0.15);
   --bg-opacity-success: rgba(25, 135, 84, 0.15);
@@ -17,18 +17,18 @@
 }
 
 :root[data-theme="light"] {
-  --bg-primary: #f8f9fa;
-  --bg-secondary: #f1f3f5;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f3f4f6;
   --bg-card: #ffffff;
-  --text-primary: #1a1d21;
-  --text-secondary: #495057;
-  --border-color: #dee2e6;
-  --table-hover: #f1f3f5;
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --border-color: #e5e7eb;
+  --table-hover: #f9fafb;
   --bg-opacity-primary: rgba(13, 110, 253, 0.08);
   --bg-opacity-success: rgba(25, 135, 84, 0.08);
   --bg-opacity-warning: rgba(255, 193, 7, 0.08);
   --bg-opacity-danger: rgba(220, 53, 69, 0.08);
-  --bg-body: #f8f9fa;
+  --bg-body: #ffffff;
 }
 
 html,
@@ -249,8 +249,13 @@ input:-webkit-autofill:active {
 }
 
 /* Bootstrap Utility Overrides for Readability */
+.text-secondary {
+  color: var(--text-secondary) !important;
+}
+
 .text-muted {
   color: var(--text-secondary) !important;
+  opacity: 0.8;
 }
 
 .small, small {
@@ -260,6 +265,10 @@ input:-webkit-autofill:active {
 
 /* Override Bootstrap BG classes to respect theme */
 .bg-light {
+  background-color: var(--bg-secondary) !important;
+}
+
+.bg-secondary {
   background-color: var(--bg-secondary) !important;
 }
 

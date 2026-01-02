@@ -279,11 +279,19 @@ function SuppliesPageContent() {
            </div>
            <p className="text-secondary small mb-0 ps-1">ระบบบริหารจัดการทรัพยากร สิ่งของบริจาค และเวชภัณฑ์</p>
         </div>
-        <div className="bg-white rounded-pill p-1 shadow-sm d-flex" style={{ border: '1px solid var(--border-color)' }}>
-            <button className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'inventory' ? 'btn-primary shadow-sm text-white' : 'text-secondary hover-bg-light'}`} onClick={() => setActiveTab('inventory')}>
+        <div className="bg-secondary rounded-pill p-1 shadow-sm d-flex" style={{ border: '1px solid var(--border-color)', backgroundColor: '#4b5563' }}>
+            <button 
+                className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'inventory' ? 'btn-primary shadow-sm text-white' : 'text-white'}`} 
+                style={{ opacity: activeTab === 'inventory' ? 1 : 0.75 }}
+                onClick={() => setActiveTab('inventory')}
+            >
                 <i className="bi bi-list-ul me-2"></i>รายการสินค้า
             </button>
-            <button className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'management' ? 'btn-primary shadow-sm text-white' : 'text-secondary hover-bg-light'}`} onClick={() => setActiveTab('management')}>
+            <button 
+                className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'management' ? 'btn-primary shadow-sm text-white' : 'text-white'}`} 
+                style={{ opacity: activeTab === 'management' ? 1 : 0.75 }}
+                onClick={() => setActiveTab('management')}
+            >
                 <i className="bi bi-database-gear me-2"></i>จัดการสต็อก
             </button>
         </div>
@@ -309,9 +317,9 @@ function SuppliesPageContent() {
                         </div>
                         <div className="col-12 col-md-5 d-flex gap-2">
                             {/* View Mode Toggle */}
-                            <div className="btn-group btn-group-sm p-1 bg-secondary rounded-pill border">
-                                <button className={`btn btn-sm rounded-pill px-3 ${viewMode === 'hubs' ? 'btn-primary shadow-sm text-white' : 'text-secondary'}`} onClick={() => setViewMode('hubs')}>🏢 คลังกลาง</button>
-                                <button className={`btn btn-sm rounded-pill px-3 ${viewMode === 'all' ? 'btn-primary shadow-sm text-white' : 'text-secondary'}`} onClick={() => setViewMode('all')}>ทั้งหมด</button>
+                            <div className="btn-group btn-group-sm p-1 rounded-pill border" style={{ backgroundColor: '#4b5563' }}>
+                                <button className={`btn btn-sm rounded-pill px-3 ${viewMode === 'hubs' ? 'btn-primary shadow-sm text-white' : 'text-white'}`} style={{ opacity: viewMode === 'hubs' ? 1 : 0.75 }} onClick={() => setViewMode('hubs')}>🏢 คลังกลาง</button>
+                                <button className={`btn btn-sm rounded-pill px-3 ${viewMode === 'all' ? 'btn-primary shadow-sm text-white' : 'text-white'}`} style={{ opacity: viewMode === 'all' ? 1 : 0.75 }} onClick={() => setViewMode('all')}>ทั้งหมด</button>
                             </div>
                             
                             <select className="form-select form-select-sm border-theme shadow-sm fw-bold w-auto rounded-pill" value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
@@ -578,6 +586,7 @@ function SuppliesPageContent() {
         .border-bottom-theme { border-bottom: 1px solid var(--border-color); }
         .text-primary-theme { color: var(--text-primary); }
         .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
+        .hover-opacity-100:hover { opacity: 1 !important; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
     </div>
