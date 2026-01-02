@@ -6,7 +6,7 @@ import ShelterList from '@/components/dashboard/ShelterList';
 import { Shelter } from "@/types/shelter";
 import { Modal } from 'bootstrap';
 import { useSession } from 'next-auth/react';
-import Swal from 'sweetalert2';
+import { showAlert } from '@/utils/swal-utils';
 
 interface ShelterData {
   name: string;
@@ -104,20 +104,10 @@ export default function AdminPage() {
         amount: modalState.amount 
       });
       setLoading(false);
-      Swal.fire({
-        icon: 'success',
-        title: 'บันทึกข้อมูลเรียบร้อย',
-        text: `${modalState.action === 'in' ? 'รับเข้า' : 'ส่งออก'} ${modalState.amount} คน`,
-        timer: 2000,
-        showConfirmButton: false
-      });
+      showAlert.success('บันทึกข้อมูลเรียบร้อย', `${modalState.action === 'in' ? 'รับเข้า' : 'ส่งออก'} ${modalState.amount} คน`);
     } catch (err) {
       console.error(err);
-      Swal.fire({
-        icon: 'error',
-        title: 'เกิดข้อผิดพลาด',
-        text: 'ไม่สามารถบันทึกข้อมูลได้'
-      });
+      showAlert.error('เกิดข้อผิดพลาด', 'ไม่สามารถบันทึกข้อมูลได้');
     } finally {
       setLoading(false);
     }
@@ -135,59 +125,34 @@ export default function AdminPage() {
     bsEditModalRef.current?.hide();
     try {
         await axios.put(`/api/shelters/${editingShelter._id}`, editingShelter);
-        Swal.fire({
-          icon: 'success',
-          title: 'แก้ไขสำเร็จ',
-          text: `แก้ไขข้อมูล "${editingShelter.name}" เรียบร้อย`,
-          timer: 2000,
-          showConfirmButton: false
-        });
+        showAlert.success('แก้ไขสำเร็จ', `แก้ไขข้อมูล "${editingShelter.name}" เรียบร้อย`);
         fetchShelters();
     } catch (err) {
         console.error(err);
-        Swal.fire({
-          icon: 'error',
-          title: 'แก้ไขล้มเหลว',
-          text: 'ไม่สามารถบันทึกข้อมูลที่แก้ไขได้'
-        });
+        showAlert.error('แก้ไขล้มเหลว', 'ไม่สามารถบันทึกข้อมูลที่แก้ไขได้');
     } finally {
         setLoading(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    const result = await Swal.fire({
-      title: 'คุณแน่ใจหรือไม่?',
-      text: "การลบศูนย์พักพิงนี้ไม่สามารถย้อนกลับได้!",
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
-      confirmButtonText: 'ใช่, ลบเลย!',
-      cancelButtonText: 'ยกเลิก'
-    });
+    const isConfirmed = await showAlert.confirmDelete(
+      'คุณแน่ใจหรือไม่?',
+      'การลบศูนย์พักพิงนี้ไม่สามารถย้อนกลับได้!'
+    );
 
-    if (!result.isConfirmed) return;
+    if (!isConfirmed) return;
 
     setLoading(true);
     try {
         await axios.delete(`/api/shelters/${id}`);
-        Swal.fire({
-          icon: 'success',
-          title: 'ลบเรียบร้อย',
-          timer: 1500,
-          showConfirmButton: false
-        });
+        showAlert.success('ลบเรียบร้อย');
         // Optimistic update
         setShelters(prev => prev.filter(s => s._id !== id));
         fetchShelters();
     } catch (err) {
         console.error(err);
-        Swal.fire({
-          icon: 'error',
-          title: 'ลบล้มเหลว',
-          text: 'เกิดข้อผิดพลาดในการลบข้อมูล'
-        });
+        showAlert.error('ลบล้มเหลว', 'เกิดข้อผิดพลาดในการลบข้อมูล');
     } finally {
         setLoading(false);
     }
@@ -204,23 +169,13 @@ export default function AdminPage() {
         phoneNumbers: manualForm.phoneNumbers ? [manualForm.phoneNumbers] : []
       };
       await axios.post('/api/shelters', dataToSend);
-      Swal.fire({
-        icon: 'success',
-        title: 'เพิ่มสำเร็จ',
-        text: `เพิ่มศูนย์ "${manualForm.name}" เรียบร้อยแล้ว`,
-        timer: 2000,
-        showConfirmButton: false
-      });
+      showAlert.success('เพิ่มสำเร็จ', `เพิ่มศูนย์ "${manualForm.name}" เรียบร้อยแล้ว`);
       setManualForm({ name: '', district: '', subdistrict: '', capacity: 0, phoneNumbers: '' });
       fetchShelters();
     } catch (err: unknown) {
       const error = err as { response?: { data?: { error?: string } }; message: string };
       const errorMessage = error.response?.data?.error || error.message;
-      Swal.fire({
-        icon: 'error',
-        title: 'เพิ่มไม่สำเร็จ',
-        text: errorMessage
-      });
+      showAlert.error('เพิ่มไม่สำเร็จ', errorMessage);
     } finally {
       setLoading(false);
     }
@@ -293,13 +248,7 @@ export default function AdminPage() {
       
       setUploadProgress(100);
       setMessage('นำเข้าไฟล์สำเร็จ!');
-      Swal.fire({
-        icon: 'success',
-        title: 'สำเร็จ',
-        text: 'นำเข้าข้อมูลไฟล์เรียบร้อยแล้ว',
-        timer: 2000,
-        showConfirmButton: false
-      });
+      showAlert.success('สำเร็จ', 'นำเข้าข้อมูลไฟล์เรียบร้อยแล้ว');
       fetchShelters();
 
       // หน่วงเวลา 2 วินาทีก่อนปิด Progress bar
@@ -311,11 +260,7 @@ export default function AdminPage() {
       }, 2000);
 
     } catch (err) {
-      Swal.fire({
-        icon: 'error',
-        title: 'ผิดพลาด',
-        text: 'ไฟล์ไม่ถูกต้อง หรือเกิดข้อผิดพลาดในการนำเข้า'
-      });
+      showAlert.error('ผิดพลาด', 'ไฟล์ไม่ถูกต้อง หรือเกิดข้อผิดพลาดในการนำเข้า');
       console.error(err);
       setLoading(false);
       setUploadProgress(0);
