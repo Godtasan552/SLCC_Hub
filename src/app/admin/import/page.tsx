@@ -6,6 +6,7 @@ import ShelterList from '@/components/dashboard/ShelterList';
 import { Shelter } from "@/types/shelter";
 import { Modal } from 'bootstrap';
 import { useSession } from 'next-auth/react';
+import Swal from 'sweetalert2';
 
 interface ShelterData {
   name: string;
@@ -102,11 +103,21 @@ export default function AdminPage() {
         action: modalState.action, 
         amount: modalState.amount 
       });
-      fetchShelters();
-      showToast(`บันทึกข้อมูลเรียบร้อย: ${modalState.action === 'in' ? 'รับเข้า' : 'ส่งออก'} ${modalState.amount} คน`);
+      setLoading(false);
+      Swal.fire({
+        icon: 'success',
+        title: 'บันทึกข้อมูลเรียบร้อย',
+        text: `${modalState.action === 'in' ? 'รับเข้า' : 'ส่งออก'} ${modalState.amount} คน`,
+        timer: 2000,
+        showConfirmButton: false
+      });
     } catch (err) {
       console.error(err);
-      showToast('เกิดข้อผิดพลาดในการบันทึก');
+      Swal.fire({
+        icon: 'error',
+        title: 'เกิดข้อผิดพลาด',
+        text: 'ไม่สามารถบันทึกข้อมูลได้'
+      });
     } finally {
       setLoading(false);
     }
@@ -124,37 +135,65 @@ export default function AdminPage() {
     bsEditModalRef.current?.hide();
     try {
         await axios.put(`/api/shelters/${editingShelter._id}`, editingShelter);
-        showToast(`แก้ไขข้อมูล "${editingShelter.name}" เรียบร้อย`);
+        Swal.fire({
+          icon: 'success',
+          title: 'แก้ไขสำเร็จ',
+          text: `แก้ไขข้อมูล "${editingShelter.name}" เรียบร้อย`,
+          timer: 2000,
+          showConfirmButton: false
+        });
         fetchShelters();
     } catch (err) {
         console.error(err);
-        showToast('แก้ไขข้อมูลล้มเหลว');
+        Swal.fire({
+          icon: 'error',
+          title: 'แก้ไขล้มเหลว',
+          text: 'ไม่สามารถบันทึกข้อมูลที่แก้ไขได้'
+        });
     } finally {
         setLoading(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('คุณแน่ใจหรือไม่ที่จะลบศูนย์พักพิงนี้? การกระทำนี้ไม่สามารถย้อนกลับได้')) return;
+    const result = await Swal.fire({
+      title: 'คุณแน่ใจหรือไม่?',
+      text: "การลบศูนย์พักพิงนี้ไม่สามารถย้อนกลับได้!",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'ใช่, ลบเลย!',
+      cancelButtonText: 'ยกเลิก'
+    });
+
+    if (!result.isConfirmed) return;
+
     setLoading(true);
     try {
         await axios.delete(`/api/shelters/${id}`);
-        showToast('ลบข้อมูลเรียบร้อย');
+        Swal.fire({
+          icon: 'success',
+          title: 'ลบเรียบร้อย',
+          timer: 1500,
+          showConfirmButton: false
+        });
         // Optimistic update
         setShelters(prev => prev.filter(s => s._id !== id));
         fetchShelters();
     } catch (err) {
         console.error(err);
-        showToast('ลบข้อมูลล้มเหลว');
+        Swal.fire({
+          icon: 'error',
+          title: 'ลบล้มเหลว',
+          text: 'เกิดข้อผิดพลาดในการลบข้อมูล'
+        });
     } finally {
         setLoading(false);
     }
   };
 
-  const showToast = (msg: string) => {
-    setMessage(msg);
-    setTimeout(() => setMessage(''), 3000);
-  };
+
 
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -165,13 +204,23 @@ export default function AdminPage() {
         phoneNumbers: manualForm.phoneNumbers ? [manualForm.phoneNumbers] : []
       };
       await axios.post('/api/shelters', dataToSend);
-      showToast(`เพิ่มศูนย์ "${manualForm.name}" เรียบร้อย`);
+      Swal.fire({
+        icon: 'success',
+        title: 'เพิ่มสำเร็จ',
+        text: `เพิ่มศูนย์ "${manualForm.name}" เรียบร้อยแล้ว`,
+        timer: 2000,
+        showConfirmButton: false
+      });
       setManualForm({ name: '', district: '', subdistrict: '', capacity: 0, phoneNumbers: '' });
       fetchShelters();
     } catch (err: unknown) {
       const error = err as { response?: { data?: { error?: string } }; message: string };
       const errorMessage = error.response?.data?.error || error.message;
-      showToast(`Error: ${errorMessage}`);
+      Swal.fire({
+        icon: 'error',
+        title: 'เพิ่มไม่สำเร็จ',
+        text: errorMessage
+      });
     } finally {
       setLoading(false);
     }
@@ -244,7 +293,13 @@ export default function AdminPage() {
       
       setUploadProgress(100);
       setMessage('นำเข้าไฟล์สำเร็จ!');
-      showToast('นำเข้าไฟล์สำเร็จ');
+      Swal.fire({
+        icon: 'success',
+        title: 'สำเร็จ',
+        text: 'นำเข้าข้อมูลไฟล์เรียบร้อยแล้ว',
+        timer: 2000,
+        showConfirmButton: false
+      });
       fetchShelters();
 
       // หน่วงเวลา 2 วินาทีก่อนปิด Progress bar
@@ -256,12 +311,16 @@ export default function AdminPage() {
       }, 2000);
 
     } catch (err) {
-      showToast('ไฟล์ไม่ถูกต้อง หรือเกิดข้อผิดพลาด');
+      Swal.fire({
+        icon: 'error',
+        title: 'ผิดพลาด',
+        text: 'ไฟล์ไม่ถูกต้อง หรือเกิดข้อผิดพลาดในการนำเข้า'
+      });
       console.error(err);
       setLoading(false);
       setUploadProgress(0);
       setMessage('');
-      e.target.value = '';
+      if (e.target) e.target.value = '';
     }
   };
 
@@ -295,15 +354,7 @@ export default function AdminPage() {
         </div>
       </div>
       
-      {/* Alert Toast (Fixed Top) */}
-      {message && (
-         <div className="position-fixed top-0 start-50 translate-middle-x mt-4 z-index-toast" style={{ zIndex: 1050 }}>
-            <div className={`alert ${message.includes('Error') || message.includes('ผิดพลาด') || message.includes('ล้มเหลว') ? 'alert-danger' : 'alert-success'} shadow-lg d-flex align-items-center py-2 px-4 rounded-pill border-0`}>
-             <i className={`bi ${message.includes('Error') || message.includes('ผิดพลาด') || message.includes('ล้มเหลว') ? 'bi-x-circle-fill' : 'bi-check-circle-fill'} me-2 fs-5`}></i>
-             <span className="fw-bold">{message}</span>
-           </div>
-         </div>
-      )}
+
 
       {/* 2. Content Area */}
       <div className="animate-fade-in">
