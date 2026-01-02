@@ -9,62 +9,116 @@ export async function GET(req: Request) {
   await dbConnect();
   try {
     const { searchParams } = new URL(req.url);
-    const days = parseInt(searchParams.get('days') || '7');
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '30');
     const searchTerm = searchParams.get('searchTerm') || '';
-    const district = searchParams.get('district') || 'All';
-    const status = searchParams.get('status') || 'All';
-    
-    // Build filter query
+    const districtFilter = searchParams.get('district') || 'All';
+    const statusFilter = searchParams.get('status') || 'All';
+    const skip = (page - 1) * limit;
+
+    // 1. สร้าง Base Pipeline
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const query: any = {};
+    const pipeline: any[] = [];
+
+    // Filter เบื้องต้น (Search & District)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const match: any = {};
     if (searchTerm) {
-      query.$or = [
+      match.$or = [
         { name: { $regex: searchTerm, $options: 'i' } },
         { district: { $regex: searchTerm, $options: 'i' } }
       ];
     }
-    if (district !== 'All') {
-      query.district = district;
+    if (districtFilter !== 'All') {
+      match.district = districtFilter;
     }
+    pipeline.push({ $match: match });
 
-    // Fetch total count for pagination
-    const totalCount = await Shelter.countDocuments(query);
-    const totalPages = Math.ceil(totalCount / limit);
-    
-    const shelters = await Shelter.find(query)
-      .sort({ updatedAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit);
-    
-    // ✅ Optimization: ดึง occupancy และ movement ทั้งหมดในครั้งเดียวสำหรับข้อมูลหน้านี้
-    const [occupancyMap, movementMap] = await Promise.all([
-      getAllShelterOccupancy(),
-      getAllShelterMovements(days)
-    ]);
-    
-    let sheltersWithData = shelters.map((shelter) => {
-      const currentOccupancy = occupancyMap[shelter._id.toString()] || 0;
-      const capacityStatus = getCapacityStatus(currentOccupancy, shelter.capacity);
-      const recentMovement = movementMap[shelter._id.toString()] || { in: 0, out: 0 };
-      
-      return {
-        ...shelter.toObject(),
-        currentOccupancy,
-        capacityStatus: capacityStatus.text,
-        recentMovement
-      };
+    // 2. Lookup เพื่อคำนวณ Occupancy (ใช้ logic เดียวกับ getAllShelterOccupancy แต่ทำใน Pipeline)
+    pipeline.push({
+      $lookup: {
+        from: 'shelterlogs', // ชื่อ collection ใน MongoDB
+        localField: '_id',
+        foreignField: 'shelterId',
+        as: 'logs'
+      }
     });
 
-    // Client-side status filter (since status is calculated from occupancy)
-    if (status !== 'All') {
-      sheltersWithData = sheltersWithData.filter(s => s.capacityStatus === status);
+    pipeline.push({
+      $addFields: {
+        currentOccupancy: {
+          $max: [
+            0,
+            {
+              $subtract: [
+                { $sum: { $map: { input: "$logs", as: "log", in: { $cond: [{ $eq: ["$$log.action", "in"] }, "$$log.amount", 0] } } } },
+                { $sum: { $map: { input: "$logs", as: "log", in: { $cond: [{ $eq: ["$$log.action", "out"] }, "$$log.amount", 0] } } } }
+              ]
+            }
+          ]
+        }
+      }
+    });
+
+    // 3. คำนวณ Capacity Status
+    pipeline.push({
+      $addFields: {
+        percent: { 
+          $cond: [
+            { $gt: ["$capacity", 0] }, 
+            { $multiply: [{ $divide: ["$currentOccupancy", "$capacity"] }, 100] }, 
+            0 
+          ] 
+        }
+      }
+    });
+
+    pipeline.push({
+      $addFields: {
+        capacityStatus: {
+          $cond: [
+            { $gt: ["$percent", 100] }, "ล้นศูนย์",
+            { $cond: [{ $gte: ["$percent", 80] }, "ใกล้เต็ม", "รองรับได้"] }
+          ]
+        }
+      }
+    });
+
+    // 4. กรองด้วย Status (ถ้ามีการเลือก)
+    if (statusFilter !== 'All') {
+      pipeline.push({ $match: { capacityStatus: statusFilter } });
     }
+
+    // 5. ใช้ Facet เพื่อทำ Pagination และนับจำนวนทั้งหมดในทีเดียว
+    pipeline.push({
+      $facet: {
+        metadata: [{ $count: "total" }],
+        data: [
+          { $sort: { updatedAt: -1 } },
+          { $skip: skip },
+          { $limit: limit },
+          { $project: { logs: 0, percent: 0 } }
+        ]
+      }
+    });
+
+    const results = await Shelter.aggregate(pipeline);
+    const rawData = results[0].data;
+    const totalCount = results[0].metadata[0]?.total || 0;
+    const totalPages = Math.ceil(totalCount / limit);
+
+    // ✅ เพิ่ม recentMovement กลับเข้าไป (ใช้ logic เดิมเพราะเร็วและครอบคลุมกว่าการทำ complex lookup ใน pipeline)
+    const days = parseInt(new URL(req.url).searchParams.get('days') || '7');
+    const movementMap = await getAllShelterMovements(days);
     
+    const data = rawData.map((s: IShelter) => ({
+      ...s,
+      recentMovement: movementMap[s._id?.toString() || ''] || { in: 0, out: 0 }
+    }));
+
     return NextResponse.json({ 
       success: true, 
-      data: sheltersWithData,
+      data,
       pagination: {
         total: totalCount,
         page,
