@@ -6,19 +6,22 @@ import { getCapacityStatus } from '@/utils/shelter-utils';
 import { calculateCurrentOccupancy } from '@/utils/shelter-server-utils';
 import { getAggregatedMovement } from '@/utils/shelter-server-utils';
 
-export async function GET() {
+export async function GET(req: Request) {
   await dbConnect();
   try {
+    const { searchParams } = new URL(req.url);
+    const days = parseInt(searchParams.get('days') || '7');
+    
     const shelters = await Shelter.find({}).sort({ updatedAt: -1 });
     
     // คำนวณ currentOccupancy, capacityStatus และ recentMovement สำหรับแต่ละศูนย์
-    const sheltersWithOccupancy = await Promise.all(
+    const sheltersWithData = await Promise.all(
       shelters.map(async (shelter) => {
         const currentOccupancy = await calculateCurrentOccupancy(shelter._id);
         const status = getCapacityStatus(currentOccupancy, shelter.capacity);
         
-        // ✅ คำนวณ movement ย้อนหลัง 7 วัน (default)
-        const recentMovement = await getAggregatedMovement(shelter._id, 7);
+        // ✅ คำนวณ movement ตามจำนวนวันที่กำหนด (default 7)
+        const recentMovement = await getAggregatedMovement(shelter._id, days);
         
         return {
           ...shelter.toObject(),
@@ -29,7 +32,7 @@ export async function GET() {
       })
     );
     
-    return NextResponse.json({ success: true, data: sheltersWithOccupancy });
+    return NextResponse.json({ success: true, data: sheltersWithData });
   } catch (error) {
     console.error('Failed to fetch shelters:', error);
     return NextResponse.json({ success: false, error: 'Failed to fetch shelters' }, { status: 500 });

@@ -61,12 +61,12 @@ export default function AdminPage() {
   // --- Fetch Data ---
   const fetchShelters = useCallback(async () => {
     try {
-      const res = await axios.get('/api/shelters');
+      const res = await axios.get(`/api/shelters?days=${timeRange}`);
       setShelters(res.data.data);
     } catch (err) {
       console.error('Fetch shelters failed:', err);
     }
-  }, []);
+  }, [timeRange]);
 
   useEffect(() => {
     fetchShelters();
