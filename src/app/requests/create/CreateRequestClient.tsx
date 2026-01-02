@@ -12,7 +12,7 @@ interface Location {
 }
 
 interface CartItem extends Partial<Supply> {
-  requestQuantity: number;
+  requestQuantity: number | string;
 }
 
 export default function CreateRequestClient() {
@@ -73,17 +73,19 @@ export default function CreateRequestClient() {
       if (exists) {
         return prev.filter(item => item._id !== supply._id);
       } else {
-        return [...prev, { ...supply, requestQuantity: 1 }];
+        return [...prev, { ...supply, requestQuantity: '' }];
       }
     });
   };
 
-  const updateCartQuantity = (id: string, qty: number) => {
+  const updateCartQuantity = (id: string, qty: number | string) => {
     setCart(prev => prev.map(item => {
       if (item._id === id) {
+        if (qty === '') return { ...item, requestQuantity: '' };
+        
+        const numQty = parseInt(String(qty)) || 0;
         const maxAvailable = item.quantity || 0;
-        // ปรับจำนวนไม่ให้ต่ำกว่า 1 และไม่ให้เกินจำนวนที่มีในสต็อก
-        const safeQty = Math.max(1, Math.min(qty, maxAvailable));
+        const safeQty = Math.max(0, Math.min(numQty, maxAvailable));
         return { ...item, requestQuantity: safeQty };
       }
       return item;
@@ -97,15 +99,28 @@ export default function CreateRequestClient() {
       // Create a request for each item in the cart for the target shelter
       // In this system, a Shelter Request records what the shelter needs.
       // We will match the items with the ones from the Hub.
-      const requests = cart.map(item => ({
-        itemName: item.name,
-        category: item.category,
-        amount: item.requestQuantity,
-        unit: item.unit,
-        urgency: 'low',
-        status: 'Pending',
-        requestedAt: new Date()
-      }));
+      const requests = cart
+        .map(item => {
+          const amountNum = parseInt(String(item.requestQuantity));
+          if (isNaN(amountNum) || amountNum <= 0) return null;
+          
+          return {
+            itemName: item.name,
+            category: item.category,
+            amount: amountNum,
+            unit: item.unit,
+            urgency: 'low',
+            status: 'Pending',
+            requestedAt: new Date()
+          };
+        })
+        .filter(item => item !== null);
+
+      if (requests.length === 0) {
+        showAlert.error('ข้อมูลไม่ถูกต้อง', 'กรุณาระบุจำนวนที่มากกว่า 0 สำหรับรายการที่เลือก');
+        setLoading(false);
+        return;
+      }
 
       await axios.post(`/api/shelters/${selectedShelterId}/resources`, { resources: requests });
       showAlert.success('สำเร็จ', 'สร้างคำร้องขอเรียบร้อยแล้ว');
@@ -376,25 +391,26 @@ export default function CreateRequestClient() {
                                     </div>
                                     <div className="d-flex align-items-center">
                                         <div className="input-group input-group-sm w-75">
-                                            <button className="btn btn-outline-secondary" onClick={() => updateCartQuantity(item._id!, item.requestQuantity - 1)}>-</button>
+                                            <button className="btn btn-outline-secondary" onClick={() => updateCartQuantity(item._id!, (parseInt(String(item.requestQuantity)) || 0) - 1)}>-</button>
                                             <input 
                                               type="number" 
                                               className="form-control text-center fw-bold" 
                                               value={item.requestQuantity} 
+                                              placeholder="0"
                                               max={item.quantity}
-                                              onChange={(e) => updateCartQuantity(item._id!, parseInt(e.target.value) || 1)} 
+                                              onChange={(e) => updateCartQuantity(item._id!, e.target.value)} 
                                             />
                                             <button 
                                               className="btn btn-outline-secondary" 
-                                              onClick={() => updateCartQuantity(item._id!, item.requestQuantity + 1)}
-                                              disabled={item.requestQuantity >= (item.quantity || 0)}
+                                              onClick={() => updateCartQuantity(item._id!, (parseInt(String(item.requestQuantity)) || 0) + 1)}
+                                              disabled={(parseInt(String(item.requestQuantity)) || 0) >= (item.quantity || 0)}
                                             >
                                               +
                                             </button>
                                         </div>
                                         <span className="ms-auto small text-muted text-end" style={{ minWidth: '40px' }}>{item.unit}</span>
                                     </div>
-                                    {item.requestQuantity >= (item.quantity || 0) && (
+                                    {Number(item.requestQuantity) >= (item.quantity || 0) && (
                                       <div className="text-danger" style={{ fontSize: '0.65rem', marginTop: '4px' }}>
                                         <i className="bi bi-exclamation-circle me-1"></i>
                                         ถึงขีดจำกัดจำนวนที่มีในคลังแล้ว

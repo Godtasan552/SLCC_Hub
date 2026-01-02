@@ -19,10 +19,16 @@ export default function ResourceRequest({
   apiUrl,
   onSuccess 
 }: ResourceRequestProps) {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    category: string;
+    itemName: string;
+    amount: number | string;
+    unit: string;
+    urgency: string;
+  }>({
     category: initialItem?.category || SupplyCategory.MEDICINE,
     itemName: initialItem?.name || '',
-    amount: 1,
+    amount: '',
     unit: initialItem?.unit || '',
     urgency: 'medium'
   });
@@ -47,9 +53,16 @@ export default function ResourceRequest({
       showAlert.error('ข้อมูลไม่ครบ', 'โปรดเลือกชื่อสิ่งของ');
       return;
     }
+
+    const amountNum = parseInt(String(formData.amount));
+    if (isNaN(amountNum) || amountNum <= 0) {
+      showAlert.error('ข้อมูลไม่ถูกต้อง', 'กรุณาระบุจำนวนที่มากกว่า 0');
+      return;
+    }
+
     try {
       const url = apiUrl || `/api/shelters/${shelterId}/resources`;
-      await axios.post(url, formData);
+      await axios.post(url, { ...formData, amount: amountNum });
       showAlert.success('สำเร็จ', 'ส่งคำขอสำเร็จ');
       if (onSuccess) onSuccess();
     } catch (err) {
@@ -103,9 +116,19 @@ export default function ResourceRequest({
               <input 
                 type="number" 
                 className="form-control" 
-                min="1"
+                placeholder="ระบุจำนวน"
                 value={formData.amount}
-                onChange={(e) => setFormData({...formData, amount: parseInt(e.target.value) || 1 })}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '') {
+                    setFormData({...formData, amount: ''});
+                  } else {
+                    const num = parseInt(val);
+                    if (!isNaN(num)) {
+                      setFormData({...formData, amount: Math.max(0, num)});
+                    }
+                  }
+                }}
               />
             </div>
             

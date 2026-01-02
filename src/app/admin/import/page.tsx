@@ -36,11 +36,11 @@ export default function AdminPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   
   // Action Modal State (In/Out)
-  const [modalState, setModalState] = useState<{ isOpen: boolean, shelter: Shelter | null, action: 'in' | 'out', amount: number }>({
+  const [modalState, setModalState] = useState<{ isOpen: boolean, shelter: Shelter | null, action: 'in' | 'out', amount: number | string }>({
     isOpen: false,
     shelter: null,
     action: 'in',
-    amount: 1
+    amount: ''
   });
   const modalRef = useRef<HTMLDivElement>(null);
   const bsModalRef = useRef<Modal | null>(null);
@@ -88,12 +88,19 @@ export default function AdminPage() {
   const openActionModal = (id: string, action: 'in' | 'out') => {
     const targetShelter = shelters.find(s => s._id === id);
     if (!targetShelter) return;
-    setModalState({ isOpen: true, shelter: targetShelter, action, amount: 1 });
+    setModalState({ isOpen: true, shelter: targetShelter, action, amount: '' });
     bsModalRef.current?.show();
   };
 
   const confirmAction = async () => {
     if (!modalState.shelter) return;
+    
+    const amountNum = parseInt(String(modalState.amount));
+    if (isNaN(amountNum) || amountNum <= 0) {
+      showAlert.error('ข้อมูลไม่ถูกต้อง', 'กรุณาระบุจำนวนที่มากกว่า 0');
+      return;
+    }
+
     setLoading(true);
     bsModalRef.current?.hide();
     try {
@@ -101,10 +108,10 @@ export default function AdminPage() {
       await axios.post('/api/shelter-logs', { 
         shelterId: modalState.shelter._id,
         action: modalState.action, 
-        amount: modalState.amount 
+        amount: amountNum 
       });
       setLoading(false);
-      showAlert.success('บันทึกข้อมูลเรียบร้อย', `${modalState.action === 'in' ? 'รับเข้า' : 'ส่งออก'} ${modalState.amount} คน`);
+      showAlert.success('บันทึกข้อมูลเรียบร้อย', `${modalState.action === 'in' ? 'รับเข้า' : 'ส่งออก'} ${amountNum} คน`);
     } catch (err) {
       console.error(err);
       showAlert.error('เกิดข้อผิดพลาด', 'ไม่สามารถบันทึกข้อมูลได้');
@@ -489,9 +496,25 @@ export default function AdminPage() {
                     </div>
                     <label className="form-label small fw-bold text-secondary">จำนวนคน</label>
                     <div className="input-group mb-3">
-                        <button className="btn btn-outline-secondary" type="button" onClick={() => setModalState(prev => ({...prev, amount: Math.max(1, prev.amount - 1)}))}>-</button>
-                        <input type="number" className="form-control text-center fw-bold fs-5" value={modalState.amount} onChange={(e) => setModalState(prev => ({...prev, amount: Math.max(1, parseInt(e.target.value) || 0)}))} />
-                        <button className="btn btn-outline-secondary" type="button" onClick={() => setModalState(prev => ({...prev, amount: prev.amount + 1}))}>+</button>
+                        <button className="btn btn-outline-secondary" type="button" onClick={() => setModalState(prev => ({...prev, amount: Math.max(0, (parseInt(String(prev.amount)) || 0) - 1)}))}>-</button>
+                        <input 
+                            type="number" 
+                            className="form-control text-center fw-bold fs-5" 
+                            value={modalState.amount} 
+                            placeholder="ระบุจำนวน"
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === '') {
+                                    setModalState(prev => ({ ...prev, amount: '' }));
+                                } else {
+                                    const num = parseInt(val);
+                                    if (!isNaN(num)) {
+                                        setModalState(prev => ({ ...prev, amount: Math.max(0, num) }));
+                                    }
+                                }
+                            }} 
+                        />
+                        <button className="btn btn-outline-secondary" type="button" onClick={() => setModalState(prev => ({...prev, amount: (parseInt(String(prev.amount)) || 0) + 1}))}>+</button>
                     </div>
                     <button onClick={confirmAction} className={`btn w-100 py-2 fw-bold rounded-3 ${modalState.action === 'in' ? 'btn-success' : 'btn-danger'}`} disabled={loading}>
                         {loading ? 'กำลังบันทึก...' : 'ยืนยันรายการ'}
