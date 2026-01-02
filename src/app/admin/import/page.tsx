@@ -32,6 +32,7 @@ export default function AdminPage() {
   const [shelters, setShelters] = useState<Shelter[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [timeRange, setTimeRange] = useState(1);
+  const [uploadProgress, setUploadProgress] = useState(0);
   
   // Action Modal State (In/Out)
   const [modalState, setModalState] = useState<{ isOpen: boolean, shelter: Shelter | null, action: 'in' | 'out', amount: number }>({
@@ -175,25 +176,38 @@ export default function AdminPage() {
     }
   };
 
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setLoading(true);
+    setUploadProgress(0);
     setMessage('กำลังประมวลผลไฟล์...');
 
     try {
       let dataToImport: ShelterData[] = [];
+      
+      // Simulate progress during file reading
+      setUploadProgress(10);
+      
       if (file.name.endsWith('.json')) {
         const text = await file.text();
+        setUploadProgress(30);
         const json = JSON.parse(text);
         dataToImport = json.data || json;
+        setUploadProgress(50);
       } else if (file.name.endsWith('.xlsx')) {
         const arrayBuffer = await file.arrayBuffer();
+        setUploadProgress(20);
         const workbook = new ExcelJS.Workbook();
         await workbook.xlsx.load(arrayBuffer);
+        setUploadProgress(40);
         const worksheet = workbook.getWorksheet(1);
         if (worksheet) {
+          const totalRows = worksheet.rowCount;
+          let processedRows = 0;
+          
           worksheet.eachRow((row, rowNumber) => {
             if (rowNumber > 1) { 
               dataToImport.push({
@@ -204,10 +218,29 @@ export default function AdminPage() {
                 phoneNumbers: row.getCell(5).value ? [String(row.getCell(5).value)] : []
               });
             }
+            processedRows++;
+            // Update progress during parsing (40% to 60%)
+            const parseProgress = 40 + Math.round((processedRows / totalRows) * 20);
+            setUploadProgress(parseProgress);
           });
         }
       }
-      await axios.patch('/api/shelters', { data: dataToImport });
+      
+      setUploadProgress(65);
+      setMessage(`กำลังอัปโหลด ${dataToImport.length} รายการ...`);
+      
+      await axios.patch('/api/shelters', { data: dataToImport }, {
+        onUploadProgress: (progressEvent) => {
+            if (progressEvent.total) {
+                // Map upload progress from 65% to 100%
+                const uploadPercent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                const totalProgress = 65 + Math.round(uploadPercent * 0.35);
+                setUploadProgress(totalProgress);
+            }
+        }
+      });
+      
+      setUploadProgress(100);
       showToast('นำเข้าไฟล์สำเร็จ');
       fetchShelters();
     } catch (err) {
@@ -215,6 +248,7 @@ export default function AdminPage() {
       console.error(err);
     } finally {
       setLoading(false);
+      setUploadProgress(0);
       e.target.value = '';
     }
   };
@@ -331,14 +365,33 @@ export default function AdminPage() {
                             <h6 className="mb-0 fw-bold text-success"><i className="bi bi-file-earmark-excel me-2"></i>นำเข้า Excel / JSON</h6>
                         </div>
                         <div className="card-body p-4 d-flex flex-column justify-content-center text-center">
-                            <div className="upload-box p-5 rounded-4 border-2 border-dashed mb-3 cursor-pointer transition-all">
-                                <i className="bi bi-cloud-arrow-up-fill text-success" style={{ fontSize: '3rem', opacity: 0.8 }}></i>
-                                <h5 className="mt-3 fw-bold" style={{ color: 'var(--text-primary)' }}>ลากไฟล์มาวาง หรือ คลิกเพื่อเลือกไฟล์</h5>
-                                <p className="text-secondary small">รองรับไฟล์มาตรฐาน .xlsx และ .json</p>
-                                <button className="btn btn-outline-success btn-sm rounded-pill px-4 mt-2" onClick={() => document.getElementById('fileIn')?.click()}>
-                                    Browse Files
-                                </button>
-                                <input type="file" id="fileIn" className="d-none" accept=".json,.xlsx" onChange={handleFileUpload} />
+                            <div className="upload-box p-5 rounded-4 border-2 border-dashed mb-3 cursor-pointer transition-all" onClick={() => !loading && document.getElementById('fileIn')?.click()}>
+                                {loading && uploadProgress > 0 ? (
+                                    <div className="animate-fade-in py-3">
+                                        <h5 className="mb-3 text-success fw-bold">🚀 กำลังอัปโหลดข้อมูล... {uploadProgress}%</h5>
+                                        <div className="progress rounded-pill shadow-sm" style={{ height: '20px', width: '80%', margin: '0 auto' }}>
+                                            <div 
+                                                className="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                                                role="progressbar" 
+                                                style={{ width: `${uploadProgress}%`, transition: 'width 0.3s ease-in-out' }} 
+                                                aria-valuenow={uploadProgress} 
+                                                aria-valuemin={0} 
+                                                aria-valuemax={100}
+                                            >
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <i className="bi bi-cloud-arrow-up-fill text-success" style={{ fontSize: '3rem', opacity: 0.8 }}></i>
+                                        <h5 className="mt-3 fw-bold" style={{ color: 'var(--text-primary)' }}>ลากไฟล์มาวาง หรือ คลิกเพื่อเลือกไฟล์</h5>
+                                        <p className="text-secondary small">รองรับไฟล์มาตรฐาน .xlsx และ .json</p>
+                                        <button className="btn btn-outline-success btn-sm rounded-pill px-4 mt-2" disabled={loading}>
+                                            Browse Files
+                                        </button>
+                                    </>
+                                )}
+                                <input type="file" id="fileIn" className="d-none" accept=".json,.xlsx" onChange={handleFileUpload} disabled={loading} />
                             </div>
                             <div className="mb-3 text-start">
                                 <div className="d-flex justify-content-between align-items-center mb-2">
