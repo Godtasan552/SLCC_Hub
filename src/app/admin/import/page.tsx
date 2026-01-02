@@ -55,7 +55,6 @@ export default function AdminPage() {
     district: '',
     subdistrict: '',
     capacity: 0,
-    currentOccupancy: 0,
     phoneNumbers: ''
   });
 
@@ -97,9 +96,11 @@ export default function AdminPage() {
     setLoading(true);
     bsModalRef.current?.hide();
     try {
-      await axios.put(`/api/shelters/${modalState.shelter._id}`, { 
-          action: modalState.action, 
-          amount: modalState.amount 
+      // ✅ ใช้ API ใหม่ที่บันทึกลง ShelterLog
+      await axios.post('/api/shelter-logs', { 
+        shelterId: modalState.shelter._id,
+        action: modalState.action, 
+        amount: modalState.amount 
       });
       fetchShelters();
       showToast(`บันทึกข้อมูลเรียบร้อย: ${modalState.action === 'in' ? 'รับเข้า' : 'ส่งออก'} ${modalState.amount} คน`);
@@ -165,7 +166,7 @@ export default function AdminPage() {
       };
       await axios.post('/api/shelters', dataToSend);
       showToast(`เพิ่มศูนย์ "${manualForm.name}" เรียบร้อย`);
-      setManualForm({ name: '', district: '', subdistrict: '', capacity: 0, currentOccupancy: 0, phoneNumbers: '' });
+      setManualForm({ name: '', district: '', subdistrict: '', capacity: 0, phoneNumbers: '' });
       fetchShelters();
     } catch (err: unknown) {
       const error = err as { response?: { data?: { error?: string } }; message: string };

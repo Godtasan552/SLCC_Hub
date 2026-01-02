@@ -1,9 +1,11 @@
 import dbConnect from '@/lib/dbConnect';
 import Shelter from '@/models/Shelter';
+import ShelterLog from '@/models/ShelterLog';
 import Hub from '@/models/Hub';
 import Supply from '@/models/Supply';
 import DashboardDisplay from '@/components/dashboard/DashboardDisplay';
-import { Shelter as ShelterType, DailyLog, ResourceRequest } from '@/types/shelter';
+import { Shelter as ShelterType, ResourceRequest } from '@/types/shelter';
+import { calculateCurrentOccupancy } from '@/utils/shelter-utils';
 
 interface DashboardResource extends ResourceRequest {
   shelterName: string;
@@ -22,21 +24,40 @@ export default async function DashboardPage() {
 
   // --- Initial Data Fetching (SSR) ---
   const totalShelters = await Shelter.countDocuments({});
-  const criticalSheltersCount = await Shelter.countDocuments({ capacityStatus: 'ล้นศูนย์' });
-  const warningSheltersCount = await Shelter.countDocuments({ capacityStatus: 'ใกล้เต็ม' });
-
+  
+  // ✅ คำนวณ currentOccupancy และ capacityStatus จาก ShelterLog
+  const allShelters = await Shelter.find({}).lean();
   let totalCapacity = 0;
   let totalOccupancy = 0;
+  let criticalSheltersCount = 0;
+  let warningSheltersCount = 0;
+  
+  const sheltersWithOccupancy = await Promise.all(
+    allShelters.map(async (shelter) => {
+      const currentOccupancy = await calculateCurrentOccupancy(shelter._id);
+      totalOccupancy += currentOccupancy;
+      totalCapacity += shelter.capacity || 0;
+      
+      const ratio = (currentOccupancy / (shelter.capacity || 1)) * 100;
+      if (ratio >= 100) criticalSheltersCount++;
+      else if (ratio >= 80) warningSheltersCount++;
+      
+      return {
+        ...shelter,
+        currentOccupancy,
+        capacityStatus: ratio >= 100 ? 'ล้นศูนย์' : ratio >= 80 ? 'ใกล้เต็ม' : 'รองรับได้'
+      };
+    })
+  );
+
   const allResources: DashboardResource[] = [];
   
   const [shelterData, hubData] = await Promise.all([
-    Shelter.find({}).select('name resources capacity currentOccupancy').lean() as Promise<ShelterType[]>,
+    Shelter.find({}).select('name resources capacity').lean() as Promise<ShelterType[]>,
     Hub.find({}).select('name resources').lean() as Promise<HubData[]>
   ]);
   
   shelterData.forEach(s => {
-    totalCapacity += (s.capacity || 0);
-    totalOccupancy += (s.currentOccupancy || 0);
     if (s.resources) {
       s.resources.forEach(r => {
         allResources.push({ ...r, shelterName: s.name, isHub: false });
@@ -66,40 +87,44 @@ export default async function DashboardPage() {
   const outOfStockSupplies = await Supply.countDocuments({ quantity: 0 });
   const lowStockSupplies = await Supply.countDocuments({ quantity: { $gt: 0, $lt: 20 } });
   
-  const criticalList = JSON.parse(JSON.stringify(
-    await Shelter.find({ capacityStatus: 'ล้นศูนย์' }).lean()
-  ));
+  const criticalList = sheltersWithOccupancy.filter(s => s.capacityStatus === 'ล้นศูนย์');
 
-  // Trend & Movement calculation for initial load
-  const allSheltersRaw = await Shelter.find({}, 'currentOccupancy dailyLogs').lean();
-  const allSheltersForTrend = allSheltersRaw as unknown as ShelterType[];
-  
+  // ✅ Trend & Movement calculation จาก ShelterLog
   const daysToTrack = 90;
-  const trendData = [];
-  const movementData = [];
-  const now = new Date();
-  const dailyStats: Record<string, { net: number, checkIn: number, checkOut: number }> = {};
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - daysToTrack);
   
-  allSheltersForTrend.forEach((s) => {
-    if (s.dailyLogs) {
-      s.dailyLogs.forEach((log: DailyLog) => {
-        if (!dailyStats[log.date]) dailyStats[log.date] = { net: 0, checkIn: 0, checkOut: 0 };
-        dailyStats[log.date].net += (log.checkIn || 0) - (log.checkOut || 0);
-        dailyStats[log.date].checkIn += (log.checkIn || 0);
-        dailyStats[log.date].checkOut += (log.checkOut || 0);
-      });
+  const logs = await ShelterLog.find({
+    date: { $gte: startDate }
+  }).sort({ date: 1 });
+  
+  const dailyStats: Record<string, { checkIn: number; checkOut: number }> = {};
+  
+  logs.forEach(log => {
+    const dateStr = log.date.toISOString().split('T')[0];
+    if (!dailyStats[dateStr]) dailyStats[dateStr] = { checkIn: 0, checkOut: 0 };
+    
+    if (log.action === 'in') {
+      dailyStats[dateStr].checkIn += log.amount;
+    } else if (log.action === 'out') {
+      dailyStats[dateStr].checkOut += log.amount;
     }
   });
 
+  const trendData = [];
+  const movementData = [];
   let currentGlobalOccupancy = totalOccupancy;
+  
   for (let i = 0; i < daysToTrack; i++) {
-    const d = new Date(now);
+    const d = new Date();
     d.setDate(d.getDate() - i);
     const dateStr = d.toISOString().split('T')[0];
-    const statsForDay = dailyStats[dateStr] || { net: 0, checkIn: 0, checkOut: 0 };
+    const statsForDay = dailyStats[dateStr] || { checkIn: 0, checkOut: 0 };
+    const net = statsForDay.checkIn - statsForDay.checkOut;
+    
     trendData.push({ date: dateStr, occupancy: Math.max(0, currentGlobalOccupancy) });
     movementData.push({ date: dateStr, checkIn: statsForDay.checkIn, checkOut: statsForDay.checkOut });
-    currentGlobalOccupancy -= statsForDay.net;
+    currentGlobalOccupancy -= net;
   }
 
   const recentRequests = allResources

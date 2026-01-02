@@ -2,79 +2,58 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import Shelter from '@/models/Shelter';
+import ShelterLog from '@/models/ShelterLog';
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await dbConnect();
     const body = await req.json();
-    const { currentOccupancy, action, amount, name, district, subdistrict, capacity, phoneNumbers } = body;
+    const { action, amount, name, district, subdistrict, capacity, phoneNumbers } = body;
     const { id } = await params;
 
     const shelter = await Shelter.findById(id);
     if (!shelter) return NextResponse.json({ error: 'ไม่พบข้อมูล' }, { status: 404 });
 
-    // --- Update General Info ---
-    if (name) shelter.name = name;
-    if (district) shelter.district = district;
-    if (subdistrict !== undefined) shelter.subdistrict = subdistrict;
-    if (capacity) shelter.capacity = capacity;
-    if (phoneNumbers) shelter.phoneNumbers = phoneNumbers;
+    // --- Case 1: Update General Info (Admin Edit) ---
+    if (name || district || subdistrict !== undefined || capacity || phoneNumbers) {
+      if (name) shelter.name = name;
+      if (district) shelter.district = district;
+      if (subdistrict !== undefined) shelter.subdistrict = subdistrict;
+      if (capacity) shelter.capacity = capacity;
+      if (phoneNumbers) shelter.phoneNumbers = phoneNumbers;
+      
+      await shelter.save();
+      return NextResponse.json({ success: true, data: shelter });
+    }
 
-    // --- Update Occupancy Logic ---
-    // คำนวณวันที่ปัจจุบันประเทศไทย (UTC+7) รูปแบบ YYYY-MM-DD
-    const thDate = new Date(new Date().getTime() + (7 * 60 * 60 * 1000)).toISOString().split('T')[0];
-
-    const oldOccupancy = shelter.currentOccupancy || 0;
-    let newOccupancy = oldOccupancy;
-
-    // 1. กรณีระบุจำนวนใหม่ตรงๆ (Manual Edit / Import)
-    if (currentOccupancy !== undefined) {
-      newOccupancy = Number(currentOccupancy);
-    } 
-    // 2. กรณีใช้ปุ่ม Check-in / Check-out
-    else if (action && amount) {
+    // --- Case 2: Check-in / Check-out (Daily Operations) ---
+    if (action && amount) {
       const val = Number(amount) || 0;
-      if (action === 'in') newOccupancy += val;
-      else if (action === 'out') newOccupancy = Math.max(0, newOccupancy - val);
-    }
-
-    // คำนวณส่วนต่างเพื่อบันทึกประวัติ (Movement)
-    const diff = newOccupancy - oldOccupancy;
-
-    if (diff !== 0) {
-      if (!shelter.dailyLogs) shelter.dailyLogs = [];
       
-      interface DailyLog { date: string; checkIn: number; checkOut: number; }
-      let logIndex = shelter.dailyLogs.findIndex((log: DailyLog) => log.date === thDate);
-      
-      if (logIndex === -1) {
-        shelter.dailyLogs.push({ date: thDate, checkIn: 0, checkOut: 0 });
-        logIndex = shelter.dailyLogs.length - 1;
+      if (!['in', 'out'].includes(action)) {
+        return NextResponse.json({ error: 'action ต้องเป็น "in" หรือ "out"' }, { status: 400 });
       }
 
-      if (diff > 0) {
-        shelter.dailyLogs[logIndex].checkIn = (shelter.dailyLogs[logIndex].checkIn || 0) + diff;
-      } else {
-        shelter.dailyLogs[logIndex].checkOut = (shelter.dailyLogs[logIndex].checkOut || 0) + Math.abs(diff);
+      if (val <= 0) {
+        return NextResponse.json({ error: 'จำนวนต้องมากกว่า 0' }, { status: 400 });
       }
-      
-      // บังคับให้ Mongoose บันทึกการเปลี่ยนแปลงใน Array
-      shelter.markModified('dailyLogs');
+
+      // ✅ บันทึกลง ShelterLog แทนการอัปเดต currentOccupancy โดยตรง
+      await ShelterLog.create({
+        shelterId: id,
+        action,
+        amount: val
+      });
+
+      return NextResponse.json({ 
+        success: true, 
+        message: `บันทึก${action === 'in' ? 'รับเข้า' : 'ส่งออก'} ${val} คน เรียบร้อย` 
+      });
     }
 
-    // บันทึกสถานะใหม่
-    let newStatus = 'รองรับได้';
-    const currentCap = capacity || shelter.capacity || 1;
-    const ratio = (newOccupancy / currentCap) * 100;
-    if (ratio >= 100) newStatus = 'ล้นศูนย์';
-    else if (ratio >= 80) newStatus = 'ใกล้เต็ม';
+    // --- Case 3: No valid operation ---
+    return NextResponse.json({ error: 'ไม่มีข้อมูลที่จะอัปเดต' }, { status: 400 });
 
-    shelter.currentOccupancy = newOccupancy;
-    shelter.capacityStatus = newStatus;
-    shelter.updatedAt = new Date();
-    
-    await shelter.save();
-    return NextResponse.json({ success: true, data: shelter });
   } catch (error) {
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 400 });
   }

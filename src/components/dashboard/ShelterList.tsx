@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { Shelter } from "@/types/shelter";
-import { getAggregatedMovement, getCapacityStatus } from "@/utils/shelter-utils";
+import { getCapacityStatus } from "@/utils/shelter-utils";
 
 interface ShelterListProps {
   shelters: Shelter[];
@@ -39,7 +39,7 @@ export default function ShelterList({
       const matchSearch = (s.name?.toLowerCase().includes(searchTerm.toLowerCase())) || 
                           (s.district?.toLowerCase().includes(searchTerm.toLowerCase()));
       
-      const status = getCapacityStatus(s.currentOccupancy, s.capacity);
+      const status = getCapacityStatus(s.currentOccupancy ?? 0, s.capacity);
       const matchCapacity = filterCapacity === 'All' || status.text === filterCapacity;
       
       const matchDistrict = filterDistrict === 'All' || s.district === filterDistrict;
@@ -194,8 +194,10 @@ export default function ShelterList({
           </thead>
           <tbody>
             {paginatedShelters.map((shelter) => {
-              const status = getCapacityStatus(shelter.currentOccupancy, shelter.capacity);
-              const movement = getAggregatedMovement(shelter.dailyLogs, timeRange);
+              const status = getCapacityStatus(shelter.currentOccupancy ?? 0, shelter.capacity);
+              // ✅ ใช้ข้อมูล movement ที่คำนวณมาจาก backend แล้ว
+              // หรือ default เป็น { in: 0, out: 0 } ถ้ายังไม่มี
+              const movement = shelter.recentMovement || { in: 0, out: 0 };
 
               return (
                 <tr key={shelter._id} className="border-bottom-theme">
@@ -231,7 +233,7 @@ export default function ShelterList({
                     </div>
                   </td>
                   <td className="text-center fw-bold d-none d-md-table-cell py-3">
-                     {shelter.currentOccupancy} / {shelter.capacity}
+                     {shelter.currentOccupancy ?? 0} / {shelter.capacity}
                   </td>
                   <td className="py-3">
                     <span className={`badge rounded-pill bg-${status.color}-subtle text-${status.color} px-2 py-1`} style={{ fontSize: '0.75rem' }}>

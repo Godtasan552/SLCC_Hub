@@ -2,12 +2,34 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import Shelter from '@/models/Shelter';
 import { Shelter as IShelter } from '@/types/shelter';
+import { getCapacityStatus } from '@/utils/shelter-utils';
+import { calculateCurrentOccupancy } from '@/utils/shelter-server-utils';
+import { getAggregatedMovement } from '@/utils/shelter-server-utils';
 
 export async function GET() {
   await dbConnect();
   try {
     const shelters = await Shelter.find({}).sort({ updatedAt: -1 });
-    return NextResponse.json({ success: true, data: shelters });
+    
+    // คำนวณ currentOccupancy, capacityStatus และ recentMovement สำหรับแต่ละศูนย์
+    const sheltersWithOccupancy = await Promise.all(
+      shelters.map(async (shelter) => {
+        const currentOccupancy = await calculateCurrentOccupancy(shelter._id);
+        const status = getCapacityStatus(currentOccupancy, shelter.capacity);
+        
+        // ✅ คำนวณ movement ย้อนหลัง 7 วัน (default)
+        const recentMovement = await getAggregatedMovement(shelter._id, 7);
+        
+        return {
+          ...shelter.toObject(),
+          currentOccupancy,
+          capacityStatus: status.text,
+          recentMovement
+        };
+      })
+    );
+    
+    return NextResponse.json({ success: true, data: sheltersWithOccupancy });
   } catch (error) {
     console.error('Failed to fetch shelters:', error);
     return NextResponse.json({ success: false, error: 'Failed to fetch shelters' }, { status: 500 });
@@ -43,9 +65,9 @@ export async function PATCH(req: Request) {
     const results = [];
     for (const item of data) {
       try {
-        // ลบ _id ออกเพื่อป้องกัน Duplicate Key error หรือ Immutable field error
+        // ลบ fields ที่ไม่ควรอัปเดตผ่าน import
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { _id, ...updateData } = item;
+        const { _id, currentOccupancy, capacityStatus, dailyLogs, ...updateData } = item;
         
         // Data Sanitization FIRST (before lookup)
         const sanitizedName = (item.name || '').trim();
@@ -60,15 +82,13 @@ export async function PATCH(req: Request) {
         if (updateData.capacity === null || updateData.capacity === undefined || isNaN(Number(updateData.capacity))) {
             updateData.capacity = 0;
         }
-        if (updateData.currentOccupancy === null || updateData.currentOccupancy === undefined || isNaN(Number(updateData.currentOccupancy))) {
-            updateData.currentOccupancy = 0;
-        }
 
         // Use sanitized name for lookup
         const existing = await Shelter.findOne({ name: sanitizedName });
 
         if (existing) {
           // Update existing - EXCLUDE name field to prevent unique constraint violation
+          // และ EXCLUDE currentOccupancy, capacityStatus, dailyLogs
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { name, ...fieldsToUpdate } = updateData;
           Object.assign(existing, fieldsToUpdate);
