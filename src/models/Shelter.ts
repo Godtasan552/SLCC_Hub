@@ -33,7 +33,6 @@ const ShelterSchema = new Schema({
 });
 
 // เพิ่ม Index เพื่อความเร็วในการรัน Aggregation
-ShelterSchema.index({ name: 1 });
 ShelterSchema.index({ district: 1 });
 
 export default models.Shelter || model('Shelter', ShelterSchema);
