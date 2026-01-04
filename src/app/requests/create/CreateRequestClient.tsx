@@ -19,6 +19,7 @@ interface CartItem {
   icon: string;
   requestQuantity: number | string;
   sourceHubId?: string;
+  sourceHubName?: string;
   totalStockAvailable?: number;
 }
 
@@ -37,6 +38,10 @@ export default function CreateRequestClient() {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 18;
+  
+  // Shelter Filter States
+  const [shelterSearch, setShelterSearch] = useState('');
+  const [shelterDistrict, setShelterDistrict] = useState('All');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -58,40 +63,36 @@ export default function CreateRequestClient() {
     fetchData();
   }, []);
 
-  // Transform allSupplies into unique catalog items
-  const groupedSupplies = useMemo(() => {
-    const groups: Record<string, { name: string, category: string, defaultUnit: string, icon: string, totalStock: number }> = {};
-    
-    allSupplies.forEach(s => {
-      if (s.quantity <= 0) return;
-      // Key can just be the name since we want to group same names together even if categories slightly differ, 
-      // but usually name+category is safer.
-      const key = `${s.name}`; 
-      if (!groups[key]) {
+  // Transform allSupplies into unique catalog items (NO GROUPING)
+  const catalogItems = useMemo(() => {
+    return allSupplies
+      .filter(s => s.quantity > 0)
+      .map(s => {
         const standard = STANDARD_ITEMS.find(si => si.name === s.name);
-        groups[key] = {
+        const hub = hubs.find(h => h._id === s.shelterId);
+        return {
+          _id: s._id, // Keep unique ID
           name: s.name,
           category: s.category || 'อื่นๆ',
           defaultUnit: s.unit || 'ชิ้น',
           icon: standard?.icon || 'bi-box-seam',
-          totalStock: 0
+          totalStock: s.quantity,
+          sourceHubId: s.shelterId,
+          sourceHubName: hub?.name || 'ไม่ระบุคลัง'
         };
-      }
-      groups[key].totalStock += s.quantity;
-    });
-    
-    return Object.values(groups).sort((a, b) => a.name.localeCompare(b.name));
-  }, [allSupplies]);
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [allSupplies, hubs]);
 
   // Filter based on category and search
   const filteredCatalog = useMemo(() => {
-    const filtered = groupedSupplies.filter(item => {
+    const filtered = catalogItems.filter(item => {
       const matchCat = activeCategory === 'ทั้งหมด' || item.category === activeCategory;
       const matchSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
       return matchCat && matchSearch;
     });
     return filtered;
-  }, [activeCategory, searchTerm, groupedSupplies]);
+  }, [activeCategory, searchTerm, catalogItems]);
 
   // Pagination logic
   const totalPages = Math.ceil(filteredCatalog.length / itemsPerPage);
@@ -105,14 +106,29 @@ export default function CreateRequestClient() {
   }, [activeCategory, searchTerm]);
 
   const categories = useMemo(() => {
-    return ['ทั้งหมด', ...new Set(groupedSupplies.map(s => s.category))];
-  }, [groupedSupplies]);
+    return ['ทั้งหมด', ...new Set(catalogItems.map(s => s.category))];
+  }, [catalogItems]);
+
+  // Filtered Shelters Logic
+  const uniqueDistricts = useMemo(() => {
+    return Array.from(new Set(shelters.map(s => s.district).filter(Boolean))) as string[];
+  }, [shelters]);
+
+  const filteredShelters = useMemo(() => {
+    return shelters.filter(s => {
+        const matchName = s.name.toLowerCase().includes(shelterSearch.toLowerCase());
+        const matchDistrict = shelterDistrict === 'All' || s.district === shelterDistrict;
+        return matchName && matchDistrict;
+    });
+  }, [shelters, shelterSearch, shelterDistrict]);
 
   const toggleCartItem = (item: any) => {
     setCart(prev => {
-      const exists = prev.find(c => c.name === item.name);
+      // Check if this SPECIFIC item from this SPECIFIC hub is already in cart
+      const exists = prev.find(c => c.sourceHubId === item.sourceHubId && c.name === item.name);
+      
       if (exists) {
-        return prev.filter(c => c.name !== item.name);
+        return prev.filter(c => !(c.sourceHubId === item.sourceHubId && c.name === item.name));
       } else {
         return [...prev, { 
           name: item.name, 
@@ -120,15 +136,17 @@ export default function CreateRequestClient() {
           defaultUnit: item.defaultUnit, 
           icon: item.icon, 
           requestQuantity: 1,
-          totalStockAvailable: item.totalStock
+          totalStockAvailable: item.totalStock,
+          sourceHubId: item.sourceHubId,
+          sourceHubName: item.sourceHubName
         }];
       }
     });
   };
 
-  const updateCartQuantity = (name: string, qty: number | string) => {
+  const updateCartQuantity = (name: string, hubId: string | undefined, qty: number | string) => {
     setCart(prev => prev.map(item => {
-      if (item.name === name) {
+      if (item.name === name && item.sourceHubId === hubId) {
         if (qty === '') return { ...item, requestQuantity: '' };
         const numQty = Math.max(0, parseInt(String(qty)) || 0);
         return { ...item, requestQuantity: numQty };
@@ -203,18 +221,18 @@ export default function CreateRequestClient() {
       <div className="row justify-content-center mb-5">
         <div className="col-md-10">
           <div className="d-flex justify-content-between position-relative">
-            {[1, 2, 3, 4].map((s) => (
+            {[1, 2, 3].map((s) => (
               <div key={s} className="d-flex flex-column align-items-center" style={{ zIndex: 2 }}>
                 <div className={`rounded-circle d-flex align-items-center justify-content-center border-3 ${step >= s ? 'bg-primary text-white border-primary' : 'border-theme'}`} style={{ width: '40px', height: '40px', fontWeight: 'bold', backgroundColor: step >= s ? '' : 'var(--bg-secondary)', color: step >= s ? '' : 'var(--text-secondary)' }}>
                   {s}
                 </div>
                 <span className={`small mt-2 fw-bold ${step >= s ? 'text-primary' : 'text-theme-secondary'}`}>
-                  {s === 1 ? 'เลือกสิ่งของ' : s === 2 ? 'ระบุจำนวนและคลัง' : s === 3 ? 'เลือกศูนย์ปลายทาง' : 'ยืนยัน'}
+                  {s === 1 ? 'เลือกสิ่งของ' : s === 2 ? 'เลือกศูนย์ปลายทาง' : 'ยืนยัน'}
                 </span>
               </div>
             ))}
             <div className="position-absolute top-50 start-0 translate-middle-y w-100" style={{ height: '4px', zIndex: 1, backgroundColor: 'var(--border-color)' }}>
-              <div className="bg-primary h-100 transition-all" style={{ width: `${((step - 1) / 3) * 100}%` }}></div>
+              <div className="bg-primary h-100 transition-all" style={{ width: `${((step - 1) / 2) * 100}%` }}></div>
             </div>
           </div>
         </div>
@@ -266,24 +284,33 @@ export default function CreateRequestClient() {
                       {/* Items Grid */}
                       <div className="row g-2 overflow-auto pr-2" style={{ maxHeight: '550px', minHeight: '300px' }}>
                         {paginatedCatalog.map(item => {
-                          const isSelected = cart.find(c => c.name === item.name);
+                          const isSelected = cart.find(c => c.name === item.name && c.sourceHubId === item.sourceHubId);
                           return (
                             <div key={item.name} className="col-6 col-sm-4 col-md-3 col-lg-2 px-1 mb-2">
                               <div 
-                                className={`card h-100 cursor-pointer border transition-all p-1 text-center position-relative ${isSelected ? 'border-primary shadow-sm bg-primary bg-opacity-5' : 'border-light bg-light bg-opacity-10'}`}
-                                style={{ borderRadius: '10px' }}
+                                className={`card cursor-pointer border transition-all p-2 text-center position-relative ${isSelected ? 'border-primary shadow-sm bg-primary bg-opacity-5' : 'border-secondary bg-light bg-opacity-10'}`}
+                                style={{ 
+                                  borderRadius: '12px', 
+                                  aspectRatio: '4 / 5',
+                                  borderWidth: '2px',
+                                  display: 'flex',
+                                  flexDirection: 'column'
+                                }}
                                 onClick={() => toggleCartItem(item)}
                               >
-                                {isSelected && <div className="position-absolute top-0 end-0 p-1"><i className="bi bi-check-circle-fill text-primary" style={{ fontSize: '0.7rem' }}></i></div>}
-                                <div className="d-flex flex-column align-items-center mb-1">
-                                   <div className={`p-1 rounded-circle mb-1 ${isSelected ? 'bg-primary text-white' : 'bg-white text-primary border'}`} style={{ width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                      <i className={`bi ${item.icon} fs-6`}></i>
+                                {isSelected && <div className="position-absolute top-0 end-0 p-2"><i className="bi bi-check-circle-fill text-primary" style={{ fontSize: '0.9rem' }}></i></div>}
+                                <div className="d-flex flex-column align-items-center justify-content-center flex-grow-1 p-1">
+                                   <div className={`p-2 rounded-circle mb-2 ${isSelected ? 'bg-primary text-white' : 'bg-white text-primary border border-2'}`} style={{ width: '42px', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                      <i className={`bi ${item.icon} fs-5`}></i>
                                    </div>
-                                   <div className="text-muted" style={{ fontSize: '0.55rem', letterSpacing: '-0.2px' }}>{item.category}</div>
-                                   <div className="fw-bold px-1" style={{ fontSize: '0.65rem', lineHeight: '1.2', height: '1.6rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{item.name}</div>
+                                   <div className="text-muted mb-1 text-truncate w-100" style={{ fontSize: '0.6rem', letterSpacing: '-0.1px' }}>{item.category}</div>
+                                   <div className="fw-bold px-1 text-center w-100" style={{ fontSize: '0.75rem', lineHeight: '1.2', maxHeight: '2.4em', overflow: 'hidden' }}>{item.name}</div>
+                                   <div className="text-secondary small mt-1 text-truncate w-100" style={{ fontSize: '0.6rem' }}>
+                                      <i className="bi bi-building me-1"></i>{item.sourceHubName}
+                                   </div>
                                 </div>
-                                <div className="mt-auto pt-1 border-top d-flex justify-content-between px-2" style={{ fontSize: '0.55rem' }}>
-                                   <span className="text-success fw-bold">คงเหลือ: {item.totalStock}</span>
+                                <div className="mt-auto pt-2 border-top border-2 d-flex justify-content-between px-1" style={{ fontSize: '0.7rem' }}>
+                                   <span className="text-success fw-bold">เหลือ: {item.totalStock}</span>
                                    <span className="text-muted">{item.defaultUnit}</span>
                                 </div>
                               </div>
@@ -321,100 +348,54 @@ export default function CreateRequestClient() {
                       
                       {cart.length > 0 && (
                         <div className="mt-4 text-end">
-                            <button className="btn btn-primary px-5 py-2 rounded-pill fw-bold shadow-sm" onClick={() => setStep(2)}>
-                                ถัดไป: ระบุจำนวนและคลัง <i className="bi bi-arrow-right ms-2"></i>
+                            <button 
+                                className="btn btn-primary px-5 py-2 rounded-pill fw-bold shadow-sm" 
+                                onClick={() => setStep(2)}
+                                disabled={cart.some(c => !c.requestQuantity || parseInt(String(c.requestQuantity)) <= 0)}
+                            >
+                                ถัดไป: เลือกศูนย์ปลายทาง <i className="bi bi-arrow-right ms-2"></i>
                             </button>
                         </div>
                       )}
                     </div>
                   )}
 
-                  {/* STEP 2: SPECIFY QUANTITY AND SOURCE HUB */}
+                  {/* STEP 2: SELECT DESTINATION */}
                   {step === 2 && (
                     <div className="animate-fade-in">
-                       <div className="d-flex justify-content-between align-items-center mb-4">
-                          <h4 className="fw-bold mb-0">📦 ขั้นตอนที่ 2: ระบุจำนวนและคลังต้นทาง</h4>
-                          <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setStep(1)}><i className="bi bi-arrow-left"></i> ย้อนกลับ</button>
-                       </div>
-
-                       <div className="overflow-auto pr-2" style={{ maxHeight: '550px' }}>
-                          {cart.map(item => (
-                             <div key={item.name} className="card border-theme mb-3 shadow-sm overflow-hidden">
-                                <div className="card-body p-3">
-                                   <div className="row align-items-center">
-                                      <div className="col-md-4">
-                                         <div className="d-flex align-items-center">
-                                            <div className="p-2 bg-secondary rounded-3 me-3"><i className={`bi ${item.icon} text-primary`}></i></div>
-                                            <div>
-                                               <div className="fw-bold small">{item.name}</div>
-                                               <div className="text-muted" style={{ fontSize: '0.7rem' }}>{item.category}</div>
-                                            </div>
-                                         </div>
-                                      </div>
-                                      <div className="col-md-3">
-                                         <div className="input-group input-group-sm">
-                                            <button className="btn btn-outline-secondary" onClick={() => updateCartQuantity(item.name, (parseInt(String(item.requestQuantity)) || 0) - 1)}>-</button>
-                                            <input 
-                                              type="number" 
-                                              className="form-control text-center fw-bold" 
-                                              value={item.requestQuantity} 
-                                              onKeyDown={(e) => {
-                                                  if (['-', '+', 'e', 'E', '.'].includes(e.key)) {
-                                                      e.preventDefault();
-                                                  }
-                                               }}
-                                              onChange={(e) => updateCartQuantity(item.name, e.target.value)} 
-                                            />
-                                            <button className="btn btn-outline-secondary" onClick={() => updateCartQuantity(item.name, (parseInt(String(item.requestQuantity)) || 0) + 1)}>+</button>
-                                            <span className="input-group-text bg-transparent border-0 small text-muted">{item.defaultUnit}</span>
-                                         </div>
-                                      </div>
-                                      <div className="col-md-5">
-                                         <select 
-                                           className="form-select form-select-sm border-theme shadow-none" 
-                                           value={item.sourceHubId || ''} 
-                                           onChange={(e) => updateCartHub(item.name, e.target.value)}
-                                         >
-                                            <option value="">-- เลือกคลังต้นทาง --</option>
-                                            {hubs.map(hub => {
-                                               const stock = getStockInHub(item.name, hub._id);
-                                               return (
-                                                  <option key={hub._id} value={hub._id} disabled={stock <= 0}>
-                                                     {hub.name} (มี {stock} {item.defaultUnit})
-                                                  </option>
-                                               );
-                                            })}
-                                         </select>
-                                      </div>
-                                   </div>
-                                </div>
-                             </div>
-                          ))}
-                       </div>
-
-                       <div className="mt-4 d-flex justify-content-between">
-                          <div className="text-muted small d-flex align-items-center">
-                             <i className="bi bi-info-circle me-2"></i> กรุณาเลือกคลังที่มีสินค้าเพียงพอ
-                          </div>
-                          <button 
-                            className="btn btn-primary px-5 py-2 rounded-pill fw-bold" 
-                            onClick={() => setStep(3)}
-                            disabled={cart.some(c => !c.sourceHubId || !c.requestQuantity)}
-                          >
-                             ถัดไป: เลือกศูนย์ปลายทาง <i className="bi bi-arrow-right ms-2"></i>
-                          </button>
-                       </div>
-                    </div>
-                  )}
-
-                  {/* STEP 3: SELECT DESTINATION */}
-                  {step === 3 && (
-                    <div className="animate-fade-in">
-                       <h4 className="fw-bold mb-4">🏠 ขั้นตอนที่ 3: เลือกศูนย์พักพิงปลายทาง (Target Shelter)</h4>
+                       <h4 className="fw-bold mb-4">🏠 ขั้นตอนที่ 2: เลือกศูนย์พักพิงปลายทาง (Target Shelter)</h4>
                        <p className="text-secondary mb-4">ระบุว่าสิ่งของเหล่านี้จะถูกส่งไปที่ศูนย์พักพิงใด</p>
                        
+                       {/* Search & Filter Bar */}
+                       <div className="row g-2 mb-4">
+                         <div className="col-md-8">
+                            <div className="input-group">
+                               <span className="input-group-text bg-card border-theme"><i className="bi bi-search"></i></span>
+                               <input 
+                                 type="text" 
+                                 className="form-control border-theme shadow-none" 
+                                 placeholder="ค้นหาชื่อศูนย์พักพิง..." 
+                                 value={shelterSearch}
+                                 onChange={(e) => setShelterSearch(e.target.value)}
+                               />
+                            </div>
+                         </div>
+                         <div className="col-md-4">
+                            <select 
+                                className="form-select border-theme shadow-none"
+                                value={shelterDistrict}
+                                onChange={(e) => setShelterDistrict(e.target.value)}
+                            >
+                                <option value="All">ทุกเขต/อำเภอ</option>
+                                {uniqueDistricts.map(d => (
+                                    <option key={d} value={d}>อ. {d}</option>
+                                ))}
+                            </select>
+                         </div>
+                       </div>
+
                        <div className="row g-3 mb-5 overflow-auto" style={{ maxHeight: '450px' }}>
-                         {shelters.map(shelter => (
+                         {filteredShelters.map(shelter => (
                            <div key={shelter._id} className="col-md-6">
                               <div 
                                 className={`card h-100 cursor-pointer border-2 transition-all p-3 d-flex flex-row align-items-center ${selectedShelterId === shelter._id ? 'border-success bg-success bg-opacity-10 shadow-sm' : 'border-theme'}`}
@@ -431,19 +412,25 @@ export default function CreateRequestClient() {
                               </div>
                            </div>
                          ))}
+                         {filteredShelters.length === 0 && (
+                            <div className="col-12 text-center text-muted py-5">
+                                <i className="bi bi-geo-alt fs-1 opacity-25 d-block mb-3"></i>
+                                ไม่พบศูนย์พักพิงที่ค้นหา
+                            </div>
+                         )}
                        </div>
 
                        <div className="d-flex justify-content-between mt-auto">
-                          <button className="btn btn-outline-secondary px-4 rounded-pill fw-bold" onClick={() => setStep(2)}>ย้อนกลับ</button>
+                          <button className="btn btn-outline-secondary px-4 rounded-pill fw-bold" onClick={() => setStep(1)}>ย้อนกลับ</button>
                           {selectedShelterId && (
-                            <button className="btn btn-primary px-5 rounded-pill fw-bold shadow" onClick={() => setStep(4)}>ถัดไป: ตรวจสอบความถูกต้อง <i className="bi bi-arrow-right"></i></button>
+                            <button className="btn btn-primary px-5 rounded-pill fw-bold shadow" onClick={() => setStep(3)}>ถัดไป: ตรวจสอบความถูกต้อง <i className="bi bi-arrow-right"></i></button>
                           )}
                        </div>
                     </div>
                   )}
 
-                  {/* STEP 4: CONFIRMATION */}
-                  {step === 4 && (
+                  {/* STEP 3: CONFIRMATION */}
+                  {step === 3 && (
                     <div className="animate-fade-in">
                         <div className="text-center mb-5">
                             <div className="bg-success text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style={{ width: '80px', height: '80px' }}>
@@ -489,7 +476,7 @@ export default function CreateRequestClient() {
                         </div>
 
                         <div className="d-flex gap-3 mt-4">
-                            <button className="btn btn-outline-secondary flex-grow-1 py-3 rounded-pill fw-bold" onClick={() => setStep(3)}>แก้ไขข้อมูล</button>
+                            <button className="btn btn-outline-secondary flex-grow-1 py-3 rounded-pill fw-bold" onClick={() => setStep(2)}>แก้ไขข้อมูล</button>
                             <button className="btn btn-primary flex-grow-2 py-3 px-5 rounded-pill fw-bold shadow-lg" onClick={handleSubmit} disabled={loading}>
                                 {loading ? 'กำลังส่งข้อมูล...' : 'ยืนยันและสร้างคำร้องขอ'}
                             </button>
@@ -508,27 +495,37 @@ export default function CreateRequestClient() {
 
                     <div className="cart-container overflow-auto pe-2" style={{ maxHeight: '600px' }}>
                         {cart.map(item => {
-                            const stock = item.sourceHubId ? getStockInHub(item.name, item.sourceHubId) : 0;
+                            const stock = item.totalStockAvailable || 0;
                             return (
-                                <div key={item.name} className="card border-light shadow-sm mb-3">
+                                <div key={`${item.name}-${item.sourceHubId}`} className="card border-light shadow-sm mb-3">
                                     <div className="card-body p-3">
                                         <div className="d-flex justify-content-between mb-2">
-                                            <div className="fw-bold small">{item.name}</div>
+                                            <div>
+                                                <div className="fw-bold small">{item.name}</div>
+                                                <div className="text-secondary" style={{ fontSize: '0.65rem' }}>
+                                                    <i className="bi bi-building me-1"></i>{item.sourceHubName}
+                                                </div>
+                                            </div>
                                             <button className="btn-close" style={{ transform: 'scale(0.7)' }} onClick={() => toggleCartItem(item)}></button>
                                         </div>
                                         <div className="d-flex align-items-center mb-1">
                                             <div className="input-group input-group-sm w-75">
-                                                <button className="btn btn-outline-secondary" onClick={() => updateCartQuantity(item.name, (parseInt(String(item.requestQuantity)) || 0) - 1)}>-</button>
+                                                <button className="btn btn-outline-secondary" onClick={() => updateCartQuantity(item.name, item.sourceHubId, (parseInt(String(item.requestQuantity)) || 0) - 1)}>-</button>
                                                 <input 
                                                   type="number" 
                                                   className="form-control text-center fw-bold" 
                                                   value={item.requestQuantity} 
                                                   placeholder="0"
-                                                  onChange={(e) => updateCartQuantity(item.name, e.target.value)} 
+                                                  onKeyDown={(e) => {
+                                                      if (['-', '+', 'e', 'E', '.'].includes(e.key)) {
+                                                          e.preventDefault();
+                                                      }
+                                                   }}
+                                                  onChange={(e) => updateCartQuantity(item.name, item.sourceHubId, e.target.value)} 
                                                 />
                                                 <button 
                                                   className="btn btn-outline-secondary" 
-                                                  onClick={() => updateCartQuantity(item.name, (parseInt(String(item.requestQuantity)) || 0) + 1)}
+                                                  onClick={() => updateCartQuantity(item.name, item.sourceHubId, (parseInt(String(item.requestQuantity)) || 0) + 1)}
                                                 >
                                                   +
                                                 </button>
