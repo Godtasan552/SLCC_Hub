@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
 import { showAlert } from '@/utils/swal-utils';
+import Swal from 'sweetalert2';
 
 interface Resource {
   _id: string;
@@ -16,6 +17,8 @@ interface Resource {
   requestedAt: Date | string;
   shelterName: string;
   shelterId: string;
+  sourceHubId?: string;
+  sourceHubName?: string;
 }
 
 interface RequestListClientProps {
@@ -47,6 +50,57 @@ export default function RequestListClient({ initialRequests }: RequestListClient
   const categories = useMemo(() => {
     return ['All', ...new Set(initialRequests.map(r => r.category))];
   }, [initialRequests]);
+
+  const handleApproveWithAdjustment = async (req: Resource) => {
+    const { value: formValues } = await Swal.fire({
+      title: 'อนุมัติคำร้องขอ',
+      html: `
+        <div class="text-start">
+          <label class="form-label small fw-bold">รายการ: ${req.itemName}</label>
+          <div class="mb-3">
+            <label for="swal-amount" class="form-label small">ระบุจำนวนที่จะอนุมัติ (${req.unit})</label>
+            <input id="swal-amount" type="number" class="form-control" value="${req.amount}">
+          </div>
+          <div class="alert alert-warning p-2 small">
+            <i class="bi bi-info-circle me-1"></i> เมื่ออนุมัติแล้ว ระบบจะตัดสต็อกออกจากคลังต้นทางทันที
+          </div>
+        </div>
+      `,
+      focusConfirm: false,
+      showCancelButton: true,
+      confirmButtonText: 'อนุมัติรายการ',
+      cancelButtonText: 'ยกเลิก',
+      preConfirm: () => {
+        const amount = (document.getElementById('swal-amount') as HTMLInputElement).value;
+        if (!amount || parseInt(amount) <= 0) {
+          Swal.showValidationMessage('กรุณาระบุจำนวนที่ถูกต้อง');
+          return false;
+        }
+        return { amount: parseInt(amount) };
+      }
+    });
+
+    if (formValues) {
+      setLoadingId(req._id);
+      try {
+        const res = await axios.patch(`/api/shelters/${req.shelterId}/resources/${req._id}`, {
+          status: 'Approved',
+          amount: formValues.amount
+        });
+        
+        if (res.data.success) {
+          showAlert.success('สำเร็จ', 'อนุมัติและตัดสต็อกเรียบร้อยแล้ว');
+          router.refresh(); 
+        }
+      } catch (err: any) {
+        console.error('Approval failed:', err);
+        const msg = err.response?.data?.message || 'ไม่สามารถอนุมัติรายการได้';
+        showAlert.error('ผิดพลาด', msg);
+      } finally {
+        setLoadingId(null);
+      }
+    }
+  };
 
   const handleReceive = async (shelterId: string, resourceId: string) => {
     const isConfirmed = await showAlert.confirmDelete(
@@ -214,6 +268,7 @@ export default function RequestListClient({ initialRequests }: RequestListClient
               <th className="ps-4">ศูนย์พักพิง</th>
               <th>รายการ</th>
               <th>จำนวน</th>
+              <th>คลังต้นทาง</th>
               <th>ความด่วน</th>
               <th>สถานะ</th>
               <th>วันที่ขอ</th>
@@ -230,6 +285,7 @@ export default function RequestListClient({ initialRequests }: RequestListClient
                     <small style={{ color: 'var(--text-secondary)' }}>{req.category}</small>
                   </td>
                   <td><span className="fw-bold text-primary">{req.amount}</span> {req.unit}</td>
+                  <td className="small text-muted">{req.sourceHubName || '-'}</td>
                   <td>{getUrgencyBadge(req.urgency)}</td>
                   <td>{getStatusBadge(req.status)}</td>
                   <td className="small" style={{ color: 'var(--text-secondary)' }}>
@@ -242,6 +298,15 @@ export default function RequestListClient({ initialRequests }: RequestListClient
                     }).format(new Date(req.requestedAt))}
                   </td>
                   <td className="text-end pe-4">
+                    {req.status === 'Pending' && (
+                      <button 
+                        className="btn btn-sm btn-primary px-3 rounded-pill fw-bold"
+                        disabled={loadingId === req._id}
+                        onClick={() => handleApproveWithAdjustment(req)}
+                      >
+                        {loadingId === req._id ? '⏳' : '✅ อนุมัติ'}
+                      </button>
+                    )}
                     {req.status === 'Approved' && (
                       <button 
                         className="btn btn-sm btn-success px-3 rounded-pill fw-bold"

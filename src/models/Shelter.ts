@@ -11,6 +11,8 @@ const ResourceRequestSchema = new Schema({
   itemType: { type: String }, // ประเภทแยกย่อย เช่น "ยาสามัญ", "ยาฆ่าเชื้อ"
   amount: { type: Number, default: 0 },
   unit: { type: String }, // แผง, กล่อง, กิโลกรัม
+  sourceHubId: { type: String }, // ID of the hub providing the item
+  sourceHubName: { type: String }, // Name of the hub for display
   urgency: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
   status: { type: String, enum: ['Pending', 'Approved', 'Received', 'Rejected'], default: 'Pending' },
   requestedAt: { type: Date, default: Date.now }

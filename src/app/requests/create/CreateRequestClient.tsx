@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { Supply } from '@/types/supply';
 import { showAlert } from '@/utils/swal-utils';
+import { STANDARD_ITEMS, StandardItem } from '@/constants/standardItems';
 
 interface Location {
   _id: string;
@@ -11,8 +12,9 @@ interface Location {
   type?: string;
 }
 
-interface CartItem extends Partial<Supply> {
+interface CartItem extends StandardItem {
   requestQuantity: number | string;
+  sourceHubId?: string;
 }
 
 export default function CreateRequestClient() {
@@ -49,56 +51,67 @@ export default function CreateRequestClient() {
     fetchData();
   }, []);
 
-  // Filter supplies based on selected Hub
-  const hubSupplies = useMemo(() => {
-    if (!selectedHubId) return [];
-    return allSupplies.filter(s => s.shelterId === selectedHubId && s.quantity > 0);
-  }, [selectedHubId, allSupplies]);
+  // Helper to find total stock across all hubs
+  const getStockInAllHubs = (itemName: string) => {
+    return allSupplies
+      .filter(s => s.name === itemName)
+      .reduce((sum, s) => sum + s.quantity, 0);
+  };
+
+  // Filter standard items based on category, search AND availability
+  const filteredCatalog = useMemo(() => {
+    return STANDARD_ITEMS.filter(item => {
+      const matchCat = activeCategory === 'ทั้งหมด' || item.category === activeCategory;
+      const matchSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const hasStock = getStockInAllHubs(item.name) > 0;
+      return matchCat && matchSearch && hasStock;
+    });
+  }, [activeCategory, searchTerm, allSupplies]);
 
   const categories = useMemo(() => {
-    return ['ทั้งหมด', ...new Set(hubSupplies.map(s => s.category))];
-  }, [hubSupplies]);
+    // Only show categories that have items in stock
+    const availableItems = STANDARD_ITEMS.filter(item => getStockInAllHubs(item.name) > 0);
+    return ['ทั้งหมด', ...new Set(availableItems.map(s => s.category))];
+  }, [allSupplies]);
 
-  const filteredSupplies = useMemo(() => {
-    return hubSupplies.filter(s => {
-      const matchCat = activeCategory === 'ทั้งหมด' || s.category === activeCategory;
-      const matchSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchCat && matchSearch;
-    });
-  }, [hubSupplies, activeCategory, searchTerm]);
-
-  const toggleCartItem = (supply: Supply) => {
+  const toggleCartItem = (item: StandardItem) => {
     setCart(prev => {
-      const exists = prev.find(item => item._id === supply._id);
+      const exists = prev.find(c => c.name === item.name);
       if (exists) {
-        return prev.filter(item => item._id !== supply._id);
+        return prev.filter(c => c.name !== item.name);
       } else {
-        return [...prev, { ...supply, requestQuantity: '' }];
+        return [...prev, { ...item, requestQuantity: 1 }];
       }
     });
   };
 
-  const updateCartQuantity = (id: string, qty: number | string) => {
+  const updateCartQuantity = (name: string, qty: number | string) => {
     setCart(prev => prev.map(item => {
-      if (item._id === id) {
+      if (item.name === name) {
         if (qty === '') return { ...item, requestQuantity: '' };
-        
-        const numQty = parseInt(String(qty)) || 0;
-        const maxAvailable = item.quantity || 0;
-        const safeQty = Math.max(0, Math.min(numQty, maxAvailable));
-        return { ...item, requestQuantity: safeQty };
+        const numQty = Math.max(0, parseInt(String(qty)) || 0);
+        return { ...item, requestQuantity: numQty };
       }
       return item;
     }));
+  };
+
+  const updateCartHub = (name: string, hubId: string) => {
+    setCart(prev => prev.map(item => {
+      if (item.name === name) return { ...item, sourceHubId: hubId };
+      return item;
+    }));
+  };
+
+  // Helper to find stock in a specific hub for a given item name
+  const getStockInHub = (itemName: string, hubId: string) => {
+    return allSupplies.find(s => s.name === itemName && s.shelterId === hubId)?.quantity || 0;
   };
 
   const handleSubmit = async () => {
     if (!selectedShelterId || cart.length === 0) return;
     setLoading(true);
     try {
-      // Create a request for each item in the cart for the target shelter
-      // In this system, a Shelter Request records what the shelter needs.
-      // We will match the items with the ones from the Hub.
       const requests = cart
         .map(item => {
           const amountNum = parseInt(String(item.requestQuantity));
@@ -108,7 +121,9 @@ export default function CreateRequestClient() {
             itemName: item.name,
             category: item.category,
             amount: amountNum,
-            unit: item.unit,
+            unit: item.defaultUnit,
+            sourceHubId: item.sourceHubId,
+            sourceHubName: hubs.find(h => h._id === item.sourceHubId)?.name || 'Unknown',
             urgency: 'low',
             status: 'Pending',
             requestedAt: new Date()
@@ -153,7 +168,7 @@ export default function CreateRequestClient() {
                   {s}
                 </div>
                 <span className={`small mt-2 fw-bold ${step >= s ? 'text-primary' : 'text-theme-secondary'}`}>
-                  {s === 1 ? 'เลือกคลังต้นทาง' : s === 2 ? 'เลือกสิ่งของ' : s === 3 ? 'เลือกศูนย์ปลายทาง' : 'ยืนยัน'}
+                  {s === 1 ? 'เลือกสิ่งของ' : s === 2 ? 'ระบุจำนวนและคลัง' : s === 3 ? 'เลือกศูนย์ปลายทาง' : 'ยืนยัน'}
                 </span>
               </div>
             ))}
@@ -172,44 +187,11 @@ export default function CreateRequestClient() {
                 {/* Main Content Pane */}
                 <div className="col-lg-8 p-4 bg-card">
                   
-                  {/* STEP 1: SELECT HUB */}
+                  {/* STEP 1: SELECT ITEMS (CATALOG) */}
                   {step === 1 && (
                     <div className="animate-fade-in">
-                      <h4 className="fw-bold mb-4">📍 ขั้นตอนที่ 1: เลือกคลังต้นทาง (Source Hub)</h4>
-                      <p className="text-secondary mb-4">ระบุคลังกลางที่คุณต้องการตรวจสอบสต็อกและเบิกจ่ายสินค้าไปช่วยศูนย์พักพิง</p>
+                      <h4 className="fw-bold mb-4">🛒 ขั้นตอนที่ 1: เลือกสิ่งของที่ต้องการ (Catalog)</h4>
                       
-                      <div className="row g-3">
-                        {hubs.map(hub => (
-                          <div key={hub._id} className="col-md-6">
-                            <div 
-                              className={`card h-100 cursor-pointer border-2 transition-all hover-shadow ${selectedHubId === hub._id ? 'border-primary bg-primary bg-opacity-10' : 'border-theme'}`}
-                              onClick={() => { setSelectedHubId(hub._id); setStep(2); }}
-                            >
-                              <div className="card-body p-4 text-center">
-                                <i className="bi bi-building-fill text-primary mb-2 fs-1"></i>
-                                <h5 className="fw-bold mb-0">{hub.name}</h5>
-                                <small className="text-secondary">อ.{hub.district}</small>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* STEP 2: SELECT ITEMS */}
-                  {step === 2 && (
-                    <div className="animate-fade-in">
-                      <div className="d-flex justify-content-between align-items-end mb-4">
-                        <div>
-                          <h4 className="fw-bold mb-1">📦 ขั้นตอนที่ 2: เลือกสิ่งของที่ต้องการ</h4>
-                          <small className="text-primary fw-bold">คลัง: {hubs.find(h => h._id === selectedHubId)?.name}</small>
-                        </div>
-                        <div className="d-flex gap-2">
-                           <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setStep(1)}><i className="bi bi-arrow-left"></i> ย้อนกลับ</button>
-                        </div>
-                      </div>
-
                       {/* Filter Bar */}
                       <div className="row g-2 mb-4">
                         <div className="col-md-5">
@@ -225,11 +207,12 @@ export default function CreateRequestClient() {
                           </div>
                         </div>
                         <div className="col-md-7">
-                           <div className="d-flex gap-1 overflow-auto no-scrollbar pb-1">
+                           <div className="d-flex flex-wrap gap-2">
                               {categories.map(cat => (
                                 <button 
                                   key={cat} 
-                                  className={`btn btn-sm rounded-pill whitespace-nowrap px-3 ${activeCategory === cat ? 'btn-primary text-white' : 'btn-secondary text-theme-secondary'}`}
+                                  className={`btn btn-sm rounded-pill px-3 py-1 ${activeCategory === cat ? 'btn-primary text-white' : 'btn-outline-secondary'}`}
+                                  style={{ fontSize: '0.75rem' }}
                                   onClick={() => setActiveCategory(cat)}
                                 >
                                   {cat}
@@ -240,43 +223,119 @@ export default function CreateRequestClient() {
                       </div>
 
                       {/* Items Grid */}
-                      <div className="row g-3 overflow-auto pr-2" style={{ maxHeight: '500px' }}>
-                        {filteredSupplies.map(supply => {
-                          const isSelected = cart.find(c => c._id === supply._id);
+                      <div className="row g-2 overflow-auto pr-2" style={{ maxHeight: '600px' }}>
+                        {filteredCatalog.map(item => {
+                          const isSelected = cart.find(c => c.name === item.name);
                           return (
-                            <div key={supply._id} className="col-md-4">
+                            <div key={item.name} className="col-6 col-sm-4 col-md-3 col-lg-2 px-1 mb-2">
                               <div 
-                                className={`card h-100 cursor-pointer border-2 transition-all p-3 text-center position-relative ${isSelected ? 'border-primary shadow-sm bg-primary bg-opacity-10' : 'border-theme bg-secondary bg-opacity-50'}`}
-                                onClick={() => toggleCartItem(supply)}
+                                className={`card h-100 cursor-pointer border transition-all p-1 text-center position-relative ${isSelected ? 'border-primary shadow-sm bg-primary bg-opacity-5' : 'border-light bg-light bg-opacity-10'}`}
+                                style={{ borderRadius: '10px' }}
+                                onClick={() => toggleCartItem(item)}
                               >
-                                {isSelected && <div className="position-absolute top-0 end-0 p-2"><i className="bi bi-check-circle-fill text-primary fs-5"></i></div>}
-                                <div className="small text-muted mb-1" style={{ fontSize: '0.65rem' }}>{supply.category}</div>
-                                <div className="fw-bold small mb-2">{supply.name}</div>
-                                <div className="mt-auto pt-2 border-top mt-2">
-                                  <div className="d-flex justify-content-between align-items-center">
-                                    <span className="small text-muted">คงเหลือ:</span>
-                                    <span className={`fw-bold ${supply.quantity > 0 ? 'text-success' : 'text-danger'}`}>
-                                      {supply.quantity} {supply.unit}
-                                    </span>
-                                  </div>
+                                {isSelected && <div className="position-absolute top-0 end-0 p-1"><i className="bi bi-check-circle-fill text-primary" style={{ fontSize: '0.7rem' }}></i></div>}
+                                <div className="d-flex flex-column align-items-center mb-1">
+                                   <div className={`p-1 rounded-circle mb-1 ${isSelected ? 'bg-primary text-white' : 'bg-white text-primary border'}`} style={{ width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                      <i className={`bi ${item.icon} fs-6`}></i>
+                                   </div>
+                                   <div className="text-muted" style={{ fontSize: '0.55rem', letterSpacing: '-0.2px' }}>{item.category}</div>
+                                   <div className="fw-bold px-1" style={{ fontSize: '0.65rem', lineHeight: '1.2', height: '1.6rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{item.name}</div>
+                                </div>
+                                <div className="mt-auto pt-1 border-top" style={{ fontSize: '0.55rem' }}>
+                                   <span className="text-muted">{item.defaultUnit}</span>
                                 </div>
                               </div>
                             </div>
                           )
                         })}
-                        {filteredSupplies.length === 0 && (
+                        {filteredCatalog.length === 0 && (
                           <div className="col-12 text-center py-5 text-muted">
-                             <i className="bi bi-inbox fs-1 d-block opacity-25"></i>
-                             ไม่มีสินค้าในคลังนี้ หรือไม่ตรงกับการค้นหา
+                            <i className="bi bi-search fs-1 d-block mb-3 opacity-25"></i>
+                            พบรายการสิ่งของ หรือไม่มีของในคลังตอนนี้
                           </div>
                         )}
                       </div>
                       
                       {cart.length > 0 && (
                         <div className="mt-4 text-end">
-                            <button className="btn btn-primary px-5 rounded-pill fw-bold" onClick={() => setStep(3)}>ถัดไป: เลือกศูนย์ปลายทาง <i className="bi bi-arrow-right"></i></button>
+                            <button className="btn btn-primary px-5 py-2 rounded-pill fw-bold shadow-sm" onClick={() => setStep(2)}>
+                                ถัดไป: ระบุจำนวนและคลัง <i className="bi bi-arrow-right ms-2"></i>
+                            </button>
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {/* STEP 2: SPECIFY QUANTITY AND SOURCE HUB */}
+                  {step === 2 && (
+                    <div className="animate-fade-in">
+                       <div className="d-flex justify-content-between align-items-center mb-4">
+                          <h4 className="fw-bold mb-0">📦 ขั้นตอนที่ 2: ระบุจำนวนและคลังต้นทาง</h4>
+                          <button className="btn btn-outline-secondary btn-sm rounded-pill" onClick={() => setStep(1)}><i className="bi bi-arrow-left"></i> ย้อนกลับ</button>
+                       </div>
+
+                       <div className="overflow-auto pr-2" style={{ maxHeight: '550px' }}>
+                          {cart.map(item => (
+                             <div key={item.name} className="card border-theme mb-3 shadow-sm overflow-hidden">
+                                <div className="card-body p-3">
+                                   <div className="row align-items-center">
+                                      <div className="col-md-4">
+                                         <div className="d-flex align-items-center">
+                                            <div className="p-2 bg-secondary rounded-3 me-3"><i className={`bi ${item.icon} text-primary`}></i></div>
+                                            <div>
+                                               <div className="fw-bold small">{item.name}</div>
+                                               <div className="text-muted" style={{ fontSize: '0.7rem' }}>{item.category}</div>
+                                            </div>
+                                         </div>
+                                      </div>
+                                      <div className="col-md-3">
+                                         <div className="input-group input-group-sm">
+                                            <button className="btn btn-outline-secondary" onClick={() => updateCartQuantity(item.name, (parseInt(String(item.requestQuantity)) || 0) - 1)}>-</button>
+                                            <input 
+                                              type="number" 
+                                              className="form-control text-center fw-bold" 
+                                              value={item.requestQuantity} 
+                                              onChange={(e) => updateCartQuantity(item.name, e.target.value)} 
+                                            />
+                                            <button className="btn btn-outline-secondary" onClick={() => updateCartQuantity(item.name, (parseInt(String(item.requestQuantity)) || 0) + 1)}>+</button>
+                                            <span className="input-group-text bg-transparent border-0 small text-muted">{item.defaultUnit}</span>
+                                         </div>
+                                      </div>
+                                      <div className="col-md-5">
+                                         <select 
+                                           className="form-select form-select-sm border-theme shadow-none" 
+                                           value={item.sourceHubId || ''} 
+                                           onChange={(e) => updateCartHub(item.name, e.target.value)}
+                                         >
+                                            <option value="">-- เลือกคลังต้นทาง --</option>
+                                            {hubs.map(hub => {
+                                               const stock = getStockInHub(item.name, hub._id);
+                                               return (
+                                                  <option key={hub._id} value={hub._id} disabled={stock <= 0}>
+                                                     {hub.name} (มี {stock} {item.defaultUnit})
+                                                  </option>
+                                               );
+                                            })}
+                                         </select>
+                                      </div>
+                                   </div>
+                                </div>
+                             </div>
+                          ))}
+                       </div>
+
+                       <div className="mt-4 d-flex justify-content-between">
+                          <div className="text-muted small d-flex align-items-center">
+                             <i className="bi bi-info-circle me-2"></i> กรุณาเลือกคลังที่มีสินค้าเพียงพอ
+                          </div>
+                          <button 
+                            className="btn btn-primary px-5 py-2 rounded-pill fw-bold" 
+                            onClick={() => setStep(3)}
+                            disabled={cart.some(c => !c.sourceHubId || !c.requestQuantity)}
+                          >
+                             ถัดไป: เลือกศูนย์ปลายทาง <i className="bi bi-arrow-right ms-2"></i>
+                          </button>
+                       </div>
                     </div>
                   )}
 
@@ -328,16 +387,10 @@ export default function CreateRequestClient() {
 
                         <div className="card border-0 bg-secondary p-4 rounded-4 mb-4">
                             <div className="row text-center">
-                                <div className="col-5">
-                                    <div className="small text-muted">หุบต้นทาง</div>
-                                    <div className="fw-bold fs-5 text-primary">{hubs.find(h => h._id === selectedHubId)?.name}</div>
-                                </div>
-                                <div className="col-2 d-flex align-items-center justify-content-center">
-                                    <i className="bi bi-arrow-right-circle-fill text-secondary fs-3"></i>
-                                </div>
-                                <div className="col-5">
-                                    <div className="small text-muted">ศูนย์ปลายทาง</div>
-                                    <div className="fw-bold fs-5 text-success">{shelters.find(s => s._id === selectedShelterId)?.name}</div>
+                                <div className="col-12">
+                                    <div className="small text-muted mb-1">ศูนย์รับของปลายทาง</div>
+                                    <div className="fw-bold fs-4 text-success"><i className="bi bi-house-door-fill me-2"></i>{shelters.find(s => s._id === selectedShelterId)?.name}</div>
+                                    <div className="small text-muted mt-1">อ. {shelters.find(s => s._id === selectedShelterId)?.district}</div>
                                 </div>
                             </div>
                         </div>
@@ -348,15 +401,19 @@ export default function CreateRequestClient() {
                                     <tr>
                                         <th className="ps-3 py-2">รายการ</th>
                                         <th className="text-center">จำนวนที่ขอ</th>
+                                        <th className="text-center">คลังต้นทาง</th>
                                         <th className="text-end pe-3">หน่วย</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {cart.map(item => (
-                                        <tr key={item._id}>
+                                        <tr key={item.name}>
                                             <td className="ps-3 fw-bold">{item.name}</td>
                                             <td className="text-center">{item.requestQuantity}</td>
-                                            <td className="text-end pe-3 text-muted">{item.unit}</td>
+                                            <td className="text-center small">
+                                               {hubs.find(h => h._id === item.sourceHubId)?.name || 'ไม่ระบุ'}
+                                            </td>
+                                            <td className="text-end pe-3 text-muted">{item.defaultUnit}</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -366,7 +423,7 @@ export default function CreateRequestClient() {
                         <div className="d-flex gap-3 mt-4">
                             <button className="btn btn-outline-secondary flex-grow-1 py-3 rounded-pill fw-bold" onClick={() => setStep(3)}>แก้ไขข้อมูล</button>
                             <button className="btn btn-primary flex-grow-2 py-3 px-5 rounded-pill fw-bold shadow-lg" onClick={handleSubmit} disabled={loading}>
-                                {loading ? 'กำลังส่งข้อมูล...' : 'ยืนยันและส่งคำขอ'}
+                                {loading ? 'กำลังส่งข้อมูล...' : 'ยืนยันและสร้างคำร้องขอ'}
                             </button>
                         </div>
                     </div>
@@ -382,43 +439,44 @@ export default function CreateRequestClient() {
                     </div>
 
                     <div className="cart-container overflow-auto pe-2" style={{ maxHeight: '600px' }}>
-                        {cart.map(item => (
-                            <div key={item._id} className="card border-light shadow-sm mb-3">
-                                <div className="card-body p-3">
-                                    <div className="d-flex justify-content-between mb-2">
-                                        <div className="fw-bold small">{item.name}</div>
-                                        <button className="btn-close" style={{ transform: 'scale(0.7)' }} onClick={() => toggleCartItem(item as Supply)}></button>
-                                    </div>
-                                    <div className="d-flex align-items-center">
-                                        <div className="input-group input-group-sm w-75">
-                                            <button className="btn btn-outline-secondary" onClick={() => updateCartQuantity(item._id!, (parseInt(String(item.requestQuantity)) || 0) - 1)}>-</button>
-                                            <input 
-                                              type="number" 
-                                              className="form-control text-center fw-bold" 
-                                              value={item.requestQuantity} 
-                                              placeholder="0"
-                                              max={item.quantity}
-                                              onChange={(e) => updateCartQuantity(item._id!, e.target.value)} 
-                                            />
-                                            <button 
-                                              className="btn btn-outline-secondary" 
-                                              onClick={() => updateCartQuantity(item._id!, (parseInt(String(item.requestQuantity)) || 0) + 1)}
-                                              disabled={(parseInt(String(item.requestQuantity)) || 0) >= (item.quantity || 0)}
-                                            >
-                                              +
-                                            </button>
+                        {cart.map(item => {
+                            const stock = item.sourceHubId ? getStockInHub(item.name, item.sourceHubId) : 0;
+                            return (
+                                <div key={item.name} className="card border-light shadow-sm mb-3">
+                                    <div className="card-body p-3">
+                                        <div className="d-flex justify-content-between mb-2">
+                                            <div className="fw-bold small">{item.name}</div>
+                                            <button className="btn-close" style={{ transform: 'scale(0.7)' }} onClick={() => toggleCartItem(item)}></button>
                                         </div>
-                                        <span className="ms-auto small text-muted text-end" style={{ minWidth: '40px' }}>{item.unit}</span>
+                                        <div className="d-flex align-items-center mb-1">
+                                            <div className="input-group input-group-sm w-75">
+                                                <button className="btn btn-outline-secondary" onClick={() => updateCartQuantity(item.name, (parseInt(String(item.requestQuantity)) || 0) - 1)}>-</button>
+                                                <input 
+                                                  type="number" 
+                                                  className="form-control text-center fw-bold" 
+                                                  value={item.requestQuantity} 
+                                                  placeholder="0"
+                                                  onChange={(e) => updateCartQuantity(item.name, e.target.value)} 
+                                                />
+                                                <button 
+                                                  className="btn btn-outline-secondary" 
+                                                  onClick={() => updateCartQuantity(item.name, (parseInt(String(item.requestQuantity)) || 0) + 1)}
+                                                >
+                                                  +
+                                                </button>
+                                            </div>
+                                            <span className="ms-auto small text-muted text-end" style={{ minWidth: '40px' }}>{item.defaultUnit}</span>
+                                        </div>
+                                        {item.sourceHubId && (
+                                          <div className={`x-small ${Number(item.requestQuantity) > stock ? 'text-danger' : 'text-success'}`}>
+                                            <i className="bi bi-info-circle me-1"></i>
+                                            สต็อก: {stock} {item.defaultUnit}
+                                          </div>
+                                        )}
                                     </div>
-                                    {Number(item.requestQuantity) >= (item.quantity || 0) && (
-                                      <div className="text-danger" style={{ fontSize: '0.65rem', marginTop: '4px' }}>
-                                        <i className="bi bi-exclamation-circle me-1"></i>
-                                        ถึงขีดจำกัดจำนวนที่มีในคลังแล้ว
-                                      </div>
-                                    )}
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                         {cart.length === 0 && (
                             <div className="text-center py-5 text-muted opacity-50">
                                 <i className="bi bi-cart-x fs-1 d-block mb-2"></i>
