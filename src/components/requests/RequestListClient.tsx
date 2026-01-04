@@ -70,6 +70,16 @@ export default function RequestListClient({ initialRequests }: RequestListClient
       showCancelButton: true,
       confirmButtonText: 'อนุมัติรายการ',
       cancelButtonText: 'ยกเลิก',
+      didOpen: () => {
+        const input = document.getElementById('swal-amount') as HTMLInputElement;
+        if (input) {
+          input.onkeydown = (e) => {
+            if (['-', '+', 'e', 'E', '.'].includes(e.key)) {
+              e.preventDefault();
+            }
+          };
+        }
+      },
       preConfirm: () => {
         const amount = (document.getElementById('swal-amount') as HTMLInputElement).value;
         if (!amount || parseInt(amount) <= 0) {

@@ -79,5 +79,44 @@ export const showAlert = {
       }
     });
     return value;
+  },
+
+  // 🔢 รับค่าตัวเลขจากผู้ใช้ (Number Prompt)
+  numberPrompt: async (title: string, inputLabel: string, defaultValue: number | string = 0) => {
+    const { value } = await Swal.fire({
+      title,
+      input: 'number',
+      inputLabel,
+      inputValue: defaultValue,
+      showCancelButton: true,
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#6e7881',
+      confirmButtonText: 'ตกลง',
+      cancelButtonText: 'ยกเลิก',
+      position: 'top',
+      inputAttributes: {
+        min: '0',
+        step: '1'
+      },
+      didOpen: () => {
+        const input = Swal.getInput();
+        if (input) {
+          input.onkeydown = (e) => {
+            if (['-', '+', 'e', 'E', '.'].includes(e.key)) {
+              e.preventDefault();
+            }
+          };
+        }
+      },
+      inputValidator: (value) => {
+        if (!value) {
+          return 'กรุณาระบุจำนวน!';
+        }
+        if (parseFloat(value) < 0) {
+          return 'จำนวนต้องไม่ติดลบ!';
+        }
+      }
+    });
+    return value;
   }
 };

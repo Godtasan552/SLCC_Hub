@@ -232,8 +232,8 @@ function SuppliesPageContent() {
   };
 
   const handleUpdateQuantity = async (id: string, currentQty: number, name: string) => {
-    const val = await showAlert.prompt(`แก้ไขจำนวน: ${name}`, 'ระบุจำนวนใหม่ที่ต้องการ:', String(currentQty));
-    if (!val || isNaN(parseInt(val))) return;
+    const val = await showAlert.numberPrompt(`แก้ไขจำนวน: ${name}`, 'ระบุจำนวนใหม่ที่ต้องการ:', currentQty);
+    if (val === undefined || val === null) return;
     
     const newQty = parseInt(val);
     if (newQty < 0) {
@@ -455,6 +455,11 @@ function SuppliesPageContent() {
                                             value={manualForm.quantity} 
                                             min="0"
                                             placeholder="ระบุจำนวน..."
+                                            onKeyDown={(e) => {
+                                                if (['-', '+', 'e', 'E', '.'].includes(e.key)) {
+                                                    e.preventDefault();
+                                                }
+                                            }}
                                             onChange={(e) => {
                                                 const val = e.target.value;
                                                 if (val === '' || parseInt(val) >= 0) {

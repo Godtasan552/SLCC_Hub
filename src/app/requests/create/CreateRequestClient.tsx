@@ -12,9 +12,14 @@ interface Location {
   type?: string;
 }
 
-interface CartItem extends StandardItem {
+interface CartItem {
+  name: string;
+  category: string;
+  defaultUnit: string;
+  icon: string;
   requestQuantity: number | string;
   sourceHubId?: string;
+  totalStockAvailable?: number;
 }
 
 export default function CreateRequestClient() {
@@ -30,6 +35,8 @@ export default function CreateRequestClient() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [activeCategory, setActiveCategory] = useState<string>('ทั้งหมด');
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 18;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -51,36 +58,70 @@ export default function CreateRequestClient() {
     fetchData();
   }, []);
 
-  // Helper to find total stock across all hubs
-  const getStockInAllHubs = (itemName: string) => {
-    return allSupplies
-      .filter(s => s.name === itemName)
-      .reduce((sum, s) => sum + s.quantity, 0);
-  };
-
-  // Filter standard items based on category, search AND availability
-  const filteredCatalog = useMemo(() => {
-    return STANDARD_ITEMS.filter(item => {
-      const matchCat = activeCategory === 'ทั้งหมด' || item.category === activeCategory;
-      const matchSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
-      const hasStock = getStockInAllHubs(item.name) > 0;
-      return matchCat && matchSearch && hasStock;
+  // Transform allSupplies into unique catalog items
+  const groupedSupplies = useMemo(() => {
+    const groups: Record<string, { name: string, category: string, defaultUnit: string, icon: string, totalStock: number }> = {};
+    
+    allSupplies.forEach(s => {
+      if (s.quantity <= 0) return;
+      // Key can just be the name since we want to group same names together even if categories slightly differ, 
+      // but usually name+category is safer.
+      const key = `${s.name}`; 
+      if (!groups[key]) {
+        const standard = STANDARD_ITEMS.find(si => si.name === s.name);
+        groups[key] = {
+          name: s.name,
+          category: s.category || 'อื่นๆ',
+          defaultUnit: s.unit || 'ชิ้น',
+          icon: standard?.icon || 'bi-box-seam',
+          totalStock: 0
+        };
+      }
+      groups[key].totalStock += s.quantity;
     });
-  }, [activeCategory, searchTerm, allSupplies]);
-
-  const categories = useMemo(() => {
-    // Only show categories that have items in stock
-    const availableItems = STANDARD_ITEMS.filter(item => getStockInAllHubs(item.name) > 0);
-    return ['ทั้งหมด', ...new Set(availableItems.map(s => s.category))];
+    
+    return Object.values(groups).sort((a, b) => a.name.localeCompare(b.name));
   }, [allSupplies]);
 
-  const toggleCartItem = (item: StandardItem) => {
+  // Filter based on category and search
+  const filteredCatalog = useMemo(() => {
+    const filtered = groupedSupplies.filter(item => {
+      const matchCat = activeCategory === 'ทั้งหมด' || item.category === activeCategory;
+      const matchSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
+      return matchCat && matchSearch;
+    });
+    return filtered;
+  }, [activeCategory, searchTerm, groupedSupplies]);
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredCatalog.length / itemsPerPage);
+  const paginatedCatalog = useMemo(() => {
+    return filteredCatalog.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  }, [filteredCatalog, currentPage]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeCategory, searchTerm]);
+
+  const categories = useMemo(() => {
+    return ['ทั้งหมด', ...new Set(groupedSupplies.map(s => s.category))];
+  }, [groupedSupplies]);
+
+  const toggleCartItem = (item: any) => {
     setCart(prev => {
       const exists = prev.find(c => c.name === item.name);
       if (exists) {
         return prev.filter(c => c.name !== item.name);
       } else {
-        return [...prev, { ...item, requestQuantity: 1 }];
+        return [...prev, { 
+          name: item.name, 
+          category: item.category, 
+          defaultUnit: item.defaultUnit, 
+          icon: item.icon, 
+          requestQuantity: 1,
+          totalStockAvailable: item.totalStock
+        }];
       }
     });
   };
@@ -223,8 +264,8 @@ export default function CreateRequestClient() {
                       </div>
 
                       {/* Items Grid */}
-                      <div className="row g-2 overflow-auto pr-2" style={{ maxHeight: '600px' }}>
-                        {filteredCatalog.map(item => {
+                      <div className="row g-2 overflow-auto pr-2" style={{ maxHeight: '550px', minHeight: '300px' }}>
+                        {paginatedCatalog.map(item => {
                           const isSelected = cart.find(c => c.name === item.name);
                           return (
                             <div key={item.name} className="col-6 col-sm-4 col-md-3 col-lg-2 px-1 mb-2">
@@ -241,20 +282,42 @@ export default function CreateRequestClient() {
                                    <div className="text-muted" style={{ fontSize: '0.55rem', letterSpacing: '-0.2px' }}>{item.category}</div>
                                    <div className="fw-bold px-1" style={{ fontSize: '0.65rem', lineHeight: '1.2', height: '1.6rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{item.name}</div>
                                 </div>
-                                <div className="mt-auto pt-1 border-top" style={{ fontSize: '0.55rem' }}>
+                                <div className="mt-auto pt-1 border-top d-flex justify-content-between px-2" style={{ fontSize: '0.55rem' }}>
+                                   <span className="text-success fw-bold">คงเหลือ: {item.totalStock}</span>
                                    <span className="text-muted">{item.defaultUnit}</span>
                                 </div>
                               </div>
                             </div>
                           )
                         })}
-                        {filteredCatalog.length === 0 && (
+                        {paginatedCatalog.length === 0 && (
                           <div className="col-12 text-center py-5 text-muted">
                             <i className="bi bi-search fs-1 d-block mb-3 opacity-25"></i>
-                            พบรายการสิ่งของ หรือไม่มีของในคลังตอนนี้
+                            ไม่พบรายการสิ่งของ หรือไม่มีของในคลังตอนนี้
                           </div>
                         )}
                       </div>
+
+                      {/* Pagination UI */}
+                      {totalPages > 1 && (
+                        <div className="d-flex justify-content-center align-items-center gap-2 mt-3 pb-2 border-bottom">
+                            <button 
+                                className="btn btn-sm btn-outline-secondary rounded-pill px-3" 
+                                disabled={currentPage === 1}
+                                onClick={() => setCurrentPage(p => p - 1)}
+                            >
+                                <i className="bi bi-chevron-left"></i>
+                            </button>
+                            <span className="small fw-bold mx-2">หน้า {currentPage} จาก {totalPages}</span>
+                            <button 
+                                className="btn btn-sm btn-outline-secondary rounded-pill px-3" 
+                                disabled={currentPage === totalPages}
+                                onClick={() => setCurrentPage(p => p + 1)}
+                            >
+                                <i className="bi bi-chevron-right"></i>
+                            </button>
+                        </div>
+                      )}
                       
                       {cart.length > 0 && (
                         <div className="mt-4 text-end">
@@ -295,6 +358,11 @@ export default function CreateRequestClient() {
                                               type="number" 
                                               className="form-control text-center fw-bold" 
                                               value={item.requestQuantity} 
+                                              onKeyDown={(e) => {
+                                                  if (['-', '+', 'e', 'E', '.'].includes(e.key)) {
+                                                      e.preventDefault();
+                                                  }
+                                               }}
                                               onChange={(e) => updateCartQuantity(item.name, e.target.value)} 
                                             />
                                             <button className="btn btn-outline-secondary" onClick={() => updateCartQuantity(item.name, (parseInt(String(item.requestQuantity)) || 0) + 1)}>+</button>
