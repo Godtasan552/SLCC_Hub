@@ -42,6 +42,11 @@ export async function POST(req: NextRequest) {
     await dbConnect();
     
     const body = await req.json();
+    
+    if (body.quantity !== undefined && Number(body.quantity) < 0) {
+      return NextResponse.json({ success: false, error: 'จำนวนต้องไม่ติดลบ' }, { status: 400 });
+    }
+
     const supply = await Supply.create(body);
     
     return NextResponse.json({ 
@@ -75,6 +80,11 @@ export async function PATCH(req: NextRequest) {
     
     for (const item of data) {
       try {
+        if (item.quantity !== undefined && Number(item.quantity) < 0) {
+          results.push({ action: 'error', item, error: 'จำนวนต้องไม่ติดลบ' });
+          continue;
+        }
+
         // ตรวจสอบว่ามีสิ่งของนี้อยู่แล้วหรือไม่
         const query: Record<string, string | null | object> = { 
           name: item.name, 

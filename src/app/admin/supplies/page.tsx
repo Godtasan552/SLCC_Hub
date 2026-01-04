@@ -35,7 +35,7 @@ function SuppliesPageContent() {
   const [manualForm, setManualForm] = useState({
     name: '',
     category: SupplyCategory.FOOD_AND_WATER,
-    quantity: 0,
+    quantity: '' as string | number,
     unit: 'ชิ้น',
     description: '',
     shelterId: hubFilter || '', // Pre-fill if hub param exists
@@ -125,14 +125,22 @@ function SuppliesPageContent() {
     try {
       const payload = {
         ...manualForm,
+        quantity: Number(manualForm.quantity) || 0,
         shelterId: manualForm.shelterId || null
       };
+
+      if (payload.quantity < 0) {
+        showAlert.error('ข้อมูลไม่ถูกต้อง', 'จำนวนต้องไม่ติดลบ');
+        setLoading(false);
+        return;
+      }
+
       await axios.post('/api/supplies', payload);
       showAlert.success('บันทึกสำเร็จ', `บันทึกข้อมูล "${manualForm.name}" เรียบร้อยแล้ว`);
       setManualForm({ 
         name: '', 
         category: SupplyCategory.FOOD_AND_WATER, 
-        quantity: 0, 
+        quantity: '', 
         unit: 'ชิ้น',
         description: '',
         shelterId: '',
@@ -226,9 +234,16 @@ function SuppliesPageContent() {
   const handleUpdateQuantity = async (id: string, currentQty: number, name: string) => {
     const val = await showAlert.prompt(`แก้ไขจำนวน: ${name}`, 'ระบุจำนวนใหม่ที่ต้องการ:', String(currentQty));
     if (!val || isNaN(parseInt(val))) return;
+    
+    const newQty = parseInt(val);
+    if (newQty < 0) {
+      showAlert.error('ผิดพลาด', 'จำนวนเงินต้องไม่ติดลบ');
+      return;
+    }
+
     try {
       setLoading(true);
-      await axios.put(`/api/supplies/${id}`, { quantity: parseInt(val) });
+      await axios.put(`/api/supplies/${id}`, { quantity: newQty });
       fetchSupplies();
       showAlert.success('อัพเดทสำเร็จ', `อัพเดทจำนวน "${name}" สำเร็จ`);
     } catch (err) {
@@ -432,10 +447,22 @@ function SuppliesPageContent() {
                                             {Object.values(SupplyCategory).filter(c => c !== 'ทั้งหมด').map(cat => (<option key={cat} value={cat}>{cat}</option>))}
                                         </select>
                                     </div>
-                                    <div className="col-md-3">
-                                        <label className="form-label small fw-bold text-secondary">จำนวน</label>
-                                        <input type="number" className="form-control border" value={manualForm.quantity} onChange={(e) => setManualForm({...manualForm, quantity: Number(e.target.value)})} />
-                                    </div>
+                                     <div className="col-md-3">
+                                         <label className="form-label small fw-bold text-secondary">จำนวน</label>
+                                         <input 
+                                            type="number" 
+                                            className="form-control border" 
+                                            value={manualForm.quantity} 
+                                            min="0"
+                                            placeholder="ระบุจำนวน..."
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                if (val === '' || parseInt(val) >= 0) {
+                                                    setManualForm({...manualForm, quantity: val});
+                                                }
+                                            }} 
+                                         />
+                                     </div>
                                     <div className="col-md-3">
                                         <label className="form-label small fw-bold text-secondary">หน่วย</label>
                                         <input 
@@ -451,7 +478,7 @@ function SuppliesPageContent() {
                                         <input type="text" className="form-control border" value={manualForm.description} onChange={(e) => setManualForm({...manualForm, description: e.target.value})} placeholder="ระบุรายละเอียด เช่น วันหมดอายุ..." />
                                     </div>
                                     <div className="col-md-12">
-                                        <label className="form-label small fw-bold text-secondary">ผู้บริจาค</label>
+                                        <label className="form-label small fw-bold text-secondary">ผู้บริจาค <span className="fw-normal opacity-75">(ถ้ามี)</span></label>
                                         <input type="text" className="form-control border" value={manualForm.supplier} onChange={(e) => setManualForm({...manualForm, supplier: e.target.value})} placeholder="ระบุชื่อผู้บริจาค..." />
                                     </div>
                                     <div className="col-12 mt-4 pt-2">

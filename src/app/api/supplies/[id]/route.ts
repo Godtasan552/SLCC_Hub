@@ -43,6 +43,10 @@ export async function PUT(
     
     const body = await req.json();
     
+    if (body.quantity !== undefined && Number(body.quantity) < 0) {
+      return NextResponse.json({ success: false, error: 'จำนวนต้องไม่ติดลบ' }, { status: 400 });
+    }
+    
     const supply = await Supply.findByIdAndUpdate(
       id,
       { ...body, updatedAt: new Date() },
