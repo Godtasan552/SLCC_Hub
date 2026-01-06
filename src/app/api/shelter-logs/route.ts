@@ -55,6 +55,9 @@ export async function POST(req: Request) {
       note
     });
 
+    // ✅ อัปเดตเวลาล่าสุดของ Shelter ด้วย
+    await Shelter.findByIdAndUpdate(shelterId, { updatedAt: new Date() });
+
     return NextResponse.json({ 
       success: true, 
       data: log,
@@ -163,6 +166,16 @@ export async function PATCH(req: Request) {
 
     if (logsToCreate.length > 0) {
       const result = await ShelterLog.insertMany(logsToCreate);
+
+      // ✅ อัปเดตเวลาล่าสุดของศูนย์พักพิงทุกแห่งที่เกี่ยวข้อง
+      const uniqueShelterIds = [...new Set(logsToCreate.map(l => l.shelterId))];
+      if (uniqueShelterIds.length > 0) {
+        await Shelter.updateMany(
+          { _id: { $in: uniqueShelterIds } },
+          { $set: { updatedAt: new Date() } }
+        );
+      }
+
       return NextResponse.json({
         success: true,
         summary: {
