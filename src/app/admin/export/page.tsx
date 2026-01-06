@@ -122,13 +122,15 @@ export default function ExportPage() {
           ];
 
           data.forEach(item => {
-            const rate = item.capacity > 0 ? ((item.currentOccupancy / item.capacity) * 100).toFixed(1) + '%' : '0%';
+            const currentOcc = item.currentOccupancy ?? 0;
+            const cap = item.capacity ?? 0;
+            const rate = cap > 0 ? ((currentOcc / cap) * 100).toFixed(1) + '%' : '0%';
             sheet.addRow({
               name: item.name,
               district: item.district,
               subdistrict: item.subdistrict,
-              capacity: item.capacity,
-              currentOccupancy: item.currentOccupancy,
+              capacity: cap,
+              currentOccupancy: currentOcc,
               rate: rate,
               phoneNumbers: item.phoneNumbers?.join(', ') || ''
             });
@@ -234,7 +236,7 @@ export default function ExportPage() {
         </div>
       </div>
 
-       <div className="mt-5 p-4 rounded-4 bg-light border text-center">
+       <div className="mt-5 p-4 rounded-4 bg-secondary border text-center">
             <i className="bi bi-info-circle text-primary fs-4 mb-2 d-block"></i>
             <h6 className="fw-bold">ข้อมูลที่คุณดาวน์โหลดไป สามารถนำไปแก้ไขและ Upload กลับเข้าระบบได้ทันที</h6>
             <p className="text-secondary small mb-0">ระบบรองรับการอัปเดตข้อมูลเดิมตามชื่อรายการ (Name) และการเพิ่มข้อมูลใหม่โดยอัตโนมัติ</p>

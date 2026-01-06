@@ -42,6 +42,11 @@ export async function POST(req: NextRequest) {
     await dbConnect();
     
     const body = await req.json();
+    
+    if (body.quantity !== undefined && Number(body.quantity) < 0) {
+      return NextResponse.json({ success: false, error: 'จำนวนต้องไม่ติดลบ' }, { status: 400 });
+    }
+
     const supply = await Supply.create(body);
     
     return NextResponse.json({ 
@@ -71,55 +76,78 @@ export async function PATCH(req: NextRequest) {
       );
     }
     
-    const results = [];
+    // เตรียม Operations สำหรับ BulkWrite
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const operations: any[] = [];
+    const errors: { item: any, error: string }[] = [];
     
     for (const item of data) {
-      try {
-        // ตรวจสอบว่ามีสิ่งของนี้อยู่แล้วหรือไม่
-        const query: Record<string, string | null | object> = { 
+        if (item.quantity !== undefined && Number(item.quantity) < 0) {
+          errors.push({ item, error: 'จำนวนต้องไม่ติดลบ' });
+          continue;
+        }
+
+        // สร้าง Filter Query
+        const filter: Record<string, any> = { 
           name: item.name, 
           category: item.category
         };
         
         if (item.shelterId) {
-          query.shelterId = item.shelterId;
+          filter.shelterId = item.shelterId;
         } else if (item.shelterName) {
-           query.shelterName = item.shelterName;
+           filter.shelterName = item.shelterName;
         } else {
-           // กรณีของกลาง (ไม่มีศูนย์)
-           query.shelterId = null;
-           query.shelterName = { $in: [null, ''] };
+           filter.shelterId = null;
+           filter.shelterName = { $in: [null, ''] }; // ของกลาง
         }
 
-        const existing = await Supply.findOne(query);
-        
-        if (existing) {
-          // อัพเดทข้อมูล
-          existing.quantity = item.quantity !== undefined ? item.quantity : existing.quantity;
-          existing.unit = item.unit || existing.unit;
-          existing.description = item.description || existing.description;
-          existing.expiryDate = item.expiryDate || existing.expiryDate;
-          existing.supplier = item.supplier || existing.supplier;
-          existing.notes = item.notes || existing.notes;
-          existing.shelterName = item.shelterName || existing.shelterName;
-          await existing.save();
-          results.push({ action: 'updated', item: existing });
-        } else {
-          // สร้างใหม่
-          const newSupply = await Supply.create(item);
-          results.push({ action: 'created', item: newSupply });
-        }
-      } catch (err) {
-        console.error('Error processing item:', item, err);
-        results.push({ action: 'error', item, error: String(err) });
-      }
+        // สร้าง Update Operation (Upsert)
+        operations.push({
+          updateOne: {
+            filter: filter,
+            update: {
+              $set: {
+                name: item.name,
+                category: item.category,
+                quantity: Number(item.quantity),
+                unit: item.unit || 'ชิ้น',
+                description: item.description || '',
+                expiryDate: item.expiryDate || null,
+                supplier: item.supplier || '',
+                notes: item.notes || '',
+                shelterId: item.shelterId || undefined, // undefined will be ignored by $set if not present
+                shelterName: item.shelterName || 'คลังกลาง (Central Hub)',
+                updatedAt: new Date()
+              },
+              $setOnInsert: {
+                createdAt: new Date()
+              }
+            },
+            upsert: true
+          }
+        });
+    }
+
+    // Execute Bulk Write (ถ้ามีข้อมูล)
+    let result = null;
+    if (operations.length > 0) {
+      // ordered: false เพื่อให้ error ตัวเดียวไม่หยุดการทำงานของตัวอื่น
+      result = await Supply.bulkWrite(operations, { ordered: false });
     }
     
     return NextResponse.json({ 
       success: true, 
-      message: `Processed ${results.length} items`,
-      results 
+      message: `Processed ${operations.length} items`,
+      summary: {
+         matched: result?.matchedCount || 0,
+         modified: result?.modifiedCount || 0,
+         upserted: result?.upsertedCount || 0,
+         errors: errors.length
+      },
+      errors: errors.length > 0 ? errors : undefined
     });
+
   } catch (error) {
     console.error('Error bulk importing supplies:', error);
     return NextResponse.json(

@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
+import { showAlert } from '@/utils/swal-utils';
 
 interface Resource {
   _id: string;
@@ -15,6 +16,9 @@ interface Resource {
   requestedAt: Date | string;
   shelterName: string;
   shelterId: string;
+  sourceHubId?: string;
+  sourceHubName?: string;
+  isHub: boolean;
 }
 
 interface RequestListClientProps {
@@ -48,7 +52,11 @@ export default function RequestListClient({ initialRequests }: RequestListClient
   }, [initialRequests]);
 
   const handleReceive = async (shelterId: string, resourceId: string) => {
-    if (!confirm('ยืนยันว่าได้รับทรัพยากรชิ้นนี้แล้ว?')) return;
+    const isConfirmed = await showAlert.confirmDelete(
+      'ยืนยันการรับของ?',
+      'คุณได้รับทรัพยากรชิ้นนี้เรียบร้อยแล้วใช่หรือไม่?'
+    );
+    if (!isConfirmed) return;
     
     setLoadingId(resourceId);
     try {
@@ -57,12 +65,40 @@ export default function RequestListClient({ initialRequests }: RequestListClient
       });
       
       if (res.data.success) {
-        alert('ยืนยันการรับของเรียบร้อย');
+        showAlert.success('เรียบร้อย', 'ยืนยันการรับของเรียบร้อย');
         router.refresh(); 
       }
     } catch (err) {
       console.error('Confirm receipt failed:', err);
-      alert('เกิดข้อผิดพลาดในการยืนยันรายการ');
+      showAlert.error('เกิดข้อผิดพลาด', 'ไม่สามารถยืนยันรายการได้');
+    } finally {
+      setLoadingId(null);
+    }
+  };
+
+  const handleCancel = async (shelterId: string, resourceId: string, isHub: boolean, itemName: string) => {
+    const isConfirmed = await showAlert.confirmDelete(
+      'ยืนยันการยกเลิก?',
+      `คุณต้องการยกเลิกคำร้องขอ "${itemName}" ใช่หรือไม่?`
+    );
+    if (!isConfirmed) return;
+
+    setLoadingId(resourceId);
+    try {
+      // Note: We'll assume the item source (Hub/Shelter) based on the flag passed from UI
+      const endpoint = isHub 
+        ? `/api/hubs/${shelterId}/resources/${resourceId}`
+        : `/api/shelters/${shelterId}/resources/${resourceId}`;
+        
+      const res = await axios.delete(endpoint);
+      if (res.data.success) {
+        showAlert.success('สำเร็จ', 'ยกเลิกคำร้องขอเรียบร้อยแล้ว');
+        router.refresh();
+      }
+    } catch (err: any) {
+      console.error('Cancel failed:', err);
+      const msg = err.response?.data?.message || 'ไม่สามารถยกเลิกคำร้องขอได้';
+      showAlert.error('ผิดพลาด', msg);
     } finally {
       setLoadingId(null);
     }
@@ -71,8 +107,8 @@ export default function RequestListClient({ initialRequests }: RequestListClient
   const getUrgencyBadge = (urgency: string) => {
     switch (urgency) {
       case 'high': return <span className="badge bg-danger">ด่วนมาก</span>;
-      case 'medium': return <span className="badge bg-warning text-dark">ด่วน</span>;
-      case 'low': return <span className="badge bg-info text-dark">ปกติ</span>;
+      case 'medium': return <span className="badge bg-warning text-black">ด่วน</span>;
+      case 'low': return <span className="badge bg-info text-black">ปกติ</span>;
       default: return <span className="badge bg-secondary">ทั่วไป</span>;
     }
   };
@@ -81,7 +117,7 @@ export default function RequestListClient({ initialRequests }: RequestListClient
     switch (status) {
       case 'Pending': return <span className="badge rounded-pill border border-warning text-warning">⏳ รออนุมัติ</span>;
       case 'Approved': return <span className="badge rounded-pill bg-success text-white">✅ อนุมัติแล้ว</span>;
-      case 'Received': return <span className="badge rounded-pill bg-info text-white">📥 ได้รับแล้ว</span>;
+      case 'Received': return <span className="badge rounded-pill bg-info text-black">📥 ได้รับแล้ว</span>;
       case 'Rejected': return <span className="badge rounded-pill bg-danger text-white">❌ ปฏิเสธแล้ว</span>;
       default: return <span className="badge rounded-pill bg-secondary">{status}</span>;
     }
@@ -133,7 +169,7 @@ export default function RequestListClient({ initialRequests }: RequestListClient
                 }}>
             <div className="card-body d-flex align-items-center py-2 px-3">
               <div className="d-flex align-items-center justify-content-center rounded-3 bg-warning p-0 me-3 shadow-warning" style={{ width: '56px', height: '56px', minWidth: '56px', backgroundColor: '#ffbc00 !important' }}>
-                <i className="bi bi-bell-fill fs-2 text-dark"></i>
+                <i className="bi bi-bell-fill fs-2 text-black"></i>
               </div>
               <div>
                 <h6 className="text-warning fw-bold mb-0" style={{ fontSize: '0.95rem' }}>ของด่วนมาก (รออนุมัติ)</h6>
@@ -209,6 +245,7 @@ export default function RequestListClient({ initialRequests }: RequestListClient
               <th className="ps-4">ศูนย์พักพิง</th>
               <th>รายการ</th>
               <th>จำนวน</th>
+              <th>คลังต้นทาง</th>
               <th>ความด่วน</th>
               <th>สถานะ</th>
               <th>วันที่ขอ</th>
@@ -225,6 +262,7 @@ export default function RequestListClient({ initialRequests }: RequestListClient
                     <small style={{ color: 'var(--text-secondary)' }}>{req.category}</small>
                   </td>
                   <td><span className="fw-bold text-primary">{req.amount}</span> {req.unit}</td>
+                  <td className="small text-muted">{req.sourceHubName || '-'}</td>
                   <td>{getUrgencyBadge(req.urgency)}</td>
                   <td>{getStatusBadge(req.status)}</td>
                   <td className="small" style={{ color: 'var(--text-secondary)' }}>
@@ -237,15 +275,41 @@ export default function RequestListClient({ initialRequests }: RequestListClient
                     }).format(new Date(req.requestedAt))}
                   </td>
                   <td className="text-end pe-4">
-                    {req.status === 'Approved' && (
-                      <button 
-                        className="btn btn-sm btn-success px-3 rounded-pill fw-bold"
-                        disabled={loadingId === req._id}
-                        onClick={() => handleReceive(req.shelterId, req._id)}
-                      >
-                        {loadingId === req._id ? '⏳' : '📥 ยืนยันรับของ'}
-                      </button>
-                    )}
+                    <div className="d-flex justify-content-end gap-2">
+                      {req.status === 'Approved' && (
+                        <button 
+                          className="btn btn-sm btn-success px-3 rounded-pill fw-bold"
+                          disabled={loadingId === req._id}
+                          onClick={() => handleReceive(req.shelterId, req._id)}
+                        >
+                          {loadingId === req._id ? '⏳' : '📥 ยืนยันรับของ'}
+                        </button>
+                      )}
+                      {req.status === 'Pending' && (
+                        <>
+                          <span className="badge rounded-pill bg-warning text-black px-3 d-flex align-items-center">
+                            ⏳ รออนุมัติ
+                          </span>
+                          <button 
+                            className="btn btn-sm btn-outline-danger px-3 rounded-pill fw-bold"
+                            disabled={loadingId === req._id}
+                            onClick={() => handleCancel(req.shelterId, req._id, req.isHub, req.itemName)}
+                          >
+                            {loadingId === req._id ? '⏳' : '🚫 ยกเลิก'}
+                          </button>
+                        </>
+                      )}
+                      {req.status === 'Received' && (
+                        <span className="badge rounded-pill bg-info text-black px-3 d-flex align-items-center">
+                          ✅ ได้รับแล้ว
+                        </span>
+                      )}
+                      {req.status === 'Rejected' && (
+                        <span className="badge rounded-pill bg-danger text-white px-3 d-flex align-items-center">
+                          ❌ ปฏิเสธแล้ว
+                        </span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))

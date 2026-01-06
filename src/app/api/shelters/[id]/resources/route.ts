@@ -26,6 +26,12 @@ export async function POST(
           { status: 400 }
         );
       }
+      if (Number(res.amount) <= 0) {
+        return NextResponse.json(
+          { success: false, error: 'จำนวนต้องมากกว่า 0' },
+          { status: 400 }
+        );
+      }
     }
 
     // Add metadata to each resource

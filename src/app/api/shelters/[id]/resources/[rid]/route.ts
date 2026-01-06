@@ -13,60 +13,134 @@ export async function PATCH(
     const body = await req.json();
     const { status } = body;
 
-    if (!status) {
-      return NextResponse.json({ success: false, message: 'กรุณาระบุสถานะ' }, { status: 400 });
+    // 1. Find the shelter and resource first to get sourceHubId and itemName
+    const initialShelter = await Shelter.findById(id);
+    if (!initialShelter) {
+      return NextResponse.json({ success: false, message: 'ไม่พบศูนย์พักพิง' }, { status: 404 });
+    }
+    const resource = initialShelter.resources.id(rid);
+    if (!resource) {
+      return NextResponse.json({ success: false, message: 'ไม่พบคำร้อง' }, { status: 404 });
     }
 
-    // 1. Update the status in Shelter model
-    const shelter = await Shelter.findOneAndUpdate(
-      {
-        _id: id,
-        'resources._id': rid,
-      },
-      {
-        $set: { 'resources.$.status': status }
-      },
-      { new: true }
-    );
+    // 2. Handle Stock Deduction if status becomes 'Approved'
+    if (status === 'Approved') {
+      const finalAmount = typeof body.amount === 'number' ? body.amount : resource.amount;
+      
+      if (finalAmount <= 0) {
+        return NextResponse.json({ success: false, message: 'จำนวนต้องมากกว่า 0' }, { status: 400 });
+      }
 
-    if (!shelter) {
-      return NextResponse.json(
-        { success: false, message: 'ไม่พบคำร้อง' },
-        { status: 404 }
-      );
-    }
-
-    // 2. If status is 'Received', increment targeted shelter's supply
-    if (status === 'Received') {
-      const resource = shelter.resources.id(rid);
-      if (resource) {
-        // Find existing supply in this shelter or create new
-        const existingSupply = await Supply.findOne({
-          shelterId: id,
-          name: resource.itemName,
-          category: resource.category
+      if (resource.sourceHubId) {
+        const sourceHubSupply = await Supply.findOne({
+          shelterId: resource.sourceHubId,
+          name: resource.itemName
         });
 
-        if (existingSupply) {
-          existingSupply.quantity += resource.amount;
-          await existingSupply.save();
-        } else {
-          await Supply.create({
-            name: resource.itemName,
-            category: resource.category,
-            quantity: resource.amount,
-            unit: resource.unit,
-            shelterId: id,
-            shelterName: shelter.name,
-            description: 'ได้รับจากการเบิกจ่ายส่วนกลาง (Disbursement)'
-          });
+        if (!sourceHubSupply || sourceHubSupply.quantity < finalAmount) {
+          return NextResponse.json({ 
+            success: false, 
+            message: `สินค้าในคลังต้นทางไม่พอ (มี ${sourceHubSupply?.quantity || 0} ${resource.unit})` 
+          }, { status: 400 });
         }
+
+        // Deduct stock
+        sourceHubSupply.quantity -= finalAmount;
+        await sourceHubSupply.save();
       }
+
+      // Update the status and potentially the amount
+      await Shelter.findOneAndUpdate(
+        { _id: id, 'resources._id': rid },
+        { 
+          $set: { 
+            'resources.$.status': 'Approved',
+            'resources.$.amount': finalAmount 
+          } 
+        }
+      );
+    } else if (status === 'Received') {
+      // Logic for Received (increment destination stock)
+      await Shelter.findOneAndUpdate(
+        { _id: id, 'resources._id': rid },
+        { $set: { 'resources.$.status': 'Received' } }
+      );
+
+      // Find existing supply in this shelter or create new
+      const existingSupply = await Supply.findOne({
+        shelterId: id,
+        name: resource.itemName,
+        category: resource.category
+      });
+
+      if (existingSupply) {
+        existingSupply.quantity += resource.amount;
+        await existingSupply.save();
+      } else {
+        await Supply.create({
+          name: resource.itemName,
+          category: resource.category,
+          quantity: resource.amount,
+          unit: resource.unit,
+          shelterId: id,
+          shelterName: initialShelter.name,
+          description: 'ได้รับจากการเบิกจ่ายส่วนกลาง (Disbursement)'
+        });
+      }
+    } else {
+      // General status update (Rejected, etc.)
+      await Shelter.findOneAndUpdate(
+        { _id: id, 'resources._id': rid },
+        { $set: { 'resources.$.status': status } }
+      );
     }
 
     return NextResponse.json({
       success: true,
-      message: `เปลี่ยนสถานะเป็น "${status}" เรียบร้อยแล้ว`
+      message: `ดำเนินการสถานะ "${status}" เรียบร้อยแล้ว`
+    });
+
+  } catch (error: unknown) {
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ success: false, message: errorMsg }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  req: Request,
+  { params }: { params: Promise<{ id: string; rid: string }> }
+) {
+  try {
+    await dbConnect();
+    const { id, rid } = await params;
+
+    // 1. Find the shelter and check the resource status
+    const shelter = await Shelter.findById(id);
+    if (!shelter) {
+      return NextResponse.json({ success: false, message: 'ไม่พบศูนย์พักพิง' }, { status: 404 });
+    }
+
+    const resource = shelter.resources.id(rid);
+    if (!resource) {
+      return NextResponse.json({ success: false, message: 'ไม่พบคำร้อง' }, { status: 404 });
+    }
+
+    // 2. Only allow deletion if status is 'Pending'
+    if (resource.status !== 'Pending') {
+      return NextResponse.json({ 
+        success: false, 
+        message: 'ไม่สามารถยกเลิกได้ เนื่องจากรายการถูกดำเนินการไปแล้ว' 
+      }, { status: 400 });
+    }
+
+    // 3. Remove the resource using $pull
+    await Shelter.findByIdAndUpdate(id, {
+      $pull: { resources: { _id: rid } }
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: 'ยกเลิกคำร้องขอเรียบร้อยแล้ว'
     });
 
   } catch (error: unknown) {

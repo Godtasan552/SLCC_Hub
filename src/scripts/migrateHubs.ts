@@ -41,6 +41,7 @@ const HubSchema = new Schema({
   name: { type: String, required: true, unique: true },
   district: String,
   subdistrict: String,
+  phoneNumbers: [String],
   resources: [ResourceRequestSchema],
   updatedAt: Date
 });
@@ -67,6 +68,7 @@ async function migrate() {
             name: record.name,
             district: record.district,
             subdistrict: record.subdistrict,
+            phoneNumbers: record.phoneNumbers || [],
             resources: record.resources,
             updatedAt: record.updatedAt || new Date()
         });

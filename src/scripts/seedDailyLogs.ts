@@ -14,13 +14,7 @@ if (!MONGODB_URI) {
   process.exit(1);
 }
 
-// ---- Local Schema Definitions to avoid Next.js import errors in standalone script ----
-
-const DailyOccupancySchema = new Schema({
-  date: { type: String, required: true }, // Format "YYYY-MM-DD"
-  checkIn: { type: Number, default: 0 },
-  checkOut: { type: Number, default: 0 }
-});
+// ---- Local Schema Definitions ----
 
 const ShelterSchema = new Schema({
   name: { type: String, required: true },
@@ -28,53 +22,63 @@ const ShelterSchema = new Schema({
   district: { type: String, required: true },
   subdistrict: { type: String },
   capacity: { type: Number, default: 0 },
-  currentOccupancy: { type: Number, default: 0 },
-  capacityStatus: { type: String },
-  dailyLogs: [DailyOccupancySchema],
   updatedAt: { type: Date, default: Date.now }
 });
 
+const ShelterLogSchema = new Schema({
+  shelterId: { type: mongoose.Schema.Types.ObjectId, ref: 'Shelter', required: true },
+  action: { type: String, enum: ['in', 'out'], required: true },
+  amount: { type: Number, required: true },
+  date: { type: Date, default: Date.now },
+  note: { type: String }
+});
+
 const Shelter = models.Shelter || model('Shelter', ShelterSchema);
+const ShelterLog = models.ShelterLog || model('ShelterLog', ShelterLogSchema);
 
 // -------------------------------------------------------
 
 async function seedData() {
-  console.log('🌱 [Seed] Starting Population Simulation...');
+  console.log('🌱 [Seed] Starting Population Simulation (Direct to ShelterLog)...');
   
   try {
     console.log('🔄 Connecting to MongoDB...');
     await mongoose.connect(MONGODB_URI as string);
     console.log('✅ Connected.');
 
-    // Fetch all records from the shelters collection
-    console.log('🔎 Searching for records in "Shelter" model...');
-    const allCenters = await Shelter.find({});
-    console.log(`🔍 Total records in 'shelters' collection: ${allCenters.length}`);
-
-    const shelters = allCenters.filter(c => !c.type || c.type === 'Shelter');
-    console.log(`📊 Found ${shelters.length} active Shelters to process. Starting simulation...`);
+    // Fetch all active shelters
+    const shelters = await Shelter.find({ type: 'Shelter' });
+    console.log(`📊 Found ${shelters.length} active Shelters. Clearing old logs and re-seeding...`);
 
     if (shelters.length === 0) {
-      console.log('⚠️ No shelters found to update. Check your database collection name or content.');
+      console.log('⚠️ No shelters found to update.');
       return;
     }
 
-    let totalUpdated = 0;
+    // Optional: Clear existing logs for these shelters to have a clean simulation
+    const shelterIds = shelters.map(s => s._id);
+    await ShelterLog.deleteMany({ shelterId: { $in: shelterIds } });
+    console.log('🧹 Cleared existing ShelterLogs for these shelters.');
+
+    let totalLogsCreated = 0;
+    let centersProcessed = 0;
 
     for (const shelter of shelters) {
-      // Default capacity if not set to prevent math errors
       const capacity = shelter.capacity || 100;
       
-      const dailyLogs = [];
       // Start with a small random number of people (5-15% of capacity)
-      let runningOccupancy = Math.floor(Math.random() * (capacity * 0.1)) + Math.floor(capacity * 0.05);
+      let currentOccupancy = Math.floor(Math.random() * (capacity * 0.1)) + Math.floor(capacity * 0.05);
       
       const daysHistory = 30; // 30 days of data
+      const logsToInsert = [];
       
       for (let i = daysHistory; i >= 0; i--) {
         const date = new Date();
         date.setDate(date.getDate() - i);
-        const dateStr = date.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+        
+        // Random time during the day
+        const morning = new Date(date); morning.setHours(9, 0, 0);
+        const evening = new Date(date); evening.setHours(17, 0, 0);
 
         // Simulation parameters
         const isBigShelter = capacity > 300;
@@ -82,66 +86,58 @@ async function seedData() {
 
         // 1. Check In: Random influx
         let checkIn = 0;
-        const rand = Math.random();
-        if (rand > 0.8) { // Busy day (event/rain)
+        if (Math.random() > 0.8) {
           checkIn = Math.floor(Math.random() * activityScale * 3);
         } else {
           checkIn = Math.floor(Math.random() * activityScale);
         }
 
+        if (checkIn > 0) {
+          logsToInsert.push({
+            shelterId: shelter._id,
+            action: 'in',
+            amount: checkIn,
+            date: morning,
+            note: 'Simulated Influx'
+          });
+        }
+
         // 2. Check Out: People leaving
+        const canLeave = currentOccupancy + checkIn;
         let checkOut = 0;
-        const canLeave = runningOccupancy + checkIn;
-        
-        // As we get closer to today (i=0), simulation might have more checkouts (recovery phase)
         if (i < 7) {
           checkOut = Math.floor(Math.random() * (canLeave * 0.3));
         } else {
           checkOut = Math.floor(Math.random() * (canLeave * 0.1));
         }
 
-        runningOccupancy = runningOccupancy + checkIn - checkOut;
-        
-        // Constraints
-        if (runningOccupancy < 0) runningOccupancy = 0;
-        
-        // Peak capacity simulation (can go up to 120% in emergencies)
-        if (runningOccupancy > capacity * 1.2) {
-          runningOccupancy = Math.floor(capacity * 1.2);
+        if (checkOut > 0) {
+          logsToInsert.push({
+            shelterId: shelter._id,
+            action: 'out',
+            amount: checkOut,
+            date: evening,
+            note: 'Simulated Departure'
+          });
         }
 
-        dailyLogs.push({
-          date: dateStr,
-          checkIn,
-          checkOut
-        });
+        currentOccupancy = currentOccupancy + checkIn - checkOut;
+        if (currentOccupancy < 0) currentOccupancy = 0;
       }
 
-      // Final update to the shelter document
-      shelter.dailyLogs = dailyLogs;
-      shelter.currentOccupancy = runningOccupancy;
-      
-      // Update Status String
-      const occupancyRate = (runningOccupancy / capacity) * 100;
-      if (occupancyRate >= 100) {
-        shelter.capacityStatus = 'ล้นศูนย์';
-      } else if (occupancyRate >= 80) {
-        shelter.capacityStatus = 'ใกล้เต็ม';
-      } else {
-        shelter.capacityStatus = 'รองรับได้';
+      if (logsToInsert.length > 0) {
+        await ShelterLog.insertMany(logsToInsert);
+        totalLogsCreated += logsToInsert.length;
       }
 
-      shelter.updatedAt = new Date();
-      await shelter.save();
-      totalUpdated++;
-      
-      if (totalUpdated % 10 === 0) {
-        console.log(`⏳ Progress: ${totalUpdated}/${shelters.length} centers updated...`);
+      centersProcessed++;
+      if (centersProcessed % 5 === 0) {
+        console.log(`⏳ Progress: ${centersProcessed}/${shelters.length} centers processed...`);
       }
     }
 
-    console.log(`\n✨ Success! Generated 30-day history for ${totalUpdated} centers.`);
-    console.log('📈 All charts should now display randomized data trends.');
+    console.log(`\n✨ Success! Created ${totalLogsCreated} logs for ${centersProcessed} centers.`);
+    console.log('📈 Dashboards will now show trends based on the new ShelterLog model.');
 
   } catch (error) {
     console.error('❌ Seeding Error:', error);

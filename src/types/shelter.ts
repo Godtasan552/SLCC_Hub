@@ -1,3 +1,4 @@
+// ❌ DailyLog ไม่ใช้แล้ว (เก็บไว้เพื่อ backward compatibility ชั่วคราว)
 export interface DailyLog {
   date: string;
   checkIn: number;
@@ -22,11 +23,21 @@ export interface Shelter {
   district: string;
   subdistrict?: string;
   capacity: number;
-  currentOccupancy: number;
   phoneNumbers?: string[];
-  capacityStatus?: string;
   resources?: ResourceRequest[];
+  
+  // ✅ Fields ที่คำนวณจาก backend (optional)
+  currentOccupancy?: number;      // คำนวณจาก ShelterLog
+  capacityStatus?: string;        // คำนวณจาก currentOccupancy
+  recentMovement?: {              // คำนวณจาก ShelterLog ตาม timeRange
+    in: number;
+    out: number;
+  };
+  
+  // ❌ ไม่ใช้แล้ว (เก็บไว้เพื่อ backward compatibility ชั่วคราว)
   dailyLogs?: DailyLog[];
+  
+  createdAt?: string;
   updatedAt?: string;
 }
 

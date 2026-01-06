@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import ShelterModel from '@/models/Shelter';
+import ShelterLog from '@/models/ShelterLog';
 import HubModel from '@/models/Hub';
 import Supply from '@/models/Supply';
-import { Shelter as ShelterType, DailyLog, ResourceRequest } from '@/types/shelter';
+import { ResourceRequest } from '@/types/shelter';
+import { getCapacityStatus } from '@/utils/shelter-utils';
+import { calculateCurrentOccupancy, getAllShelterOccupancy, getAllShelterMovements, getGlobalDailyStats } from '@/utils/shelter-server-utils';
 
 interface DashboardResource extends ResourceRequest {
   shelterName: string;
@@ -11,9 +14,9 @@ interface DashboardResource extends ResourceRequest {
 }
 
 interface LeanShelter {
+  _id: string;
   name: string;
   capacity?: number;
-  currentOccupancy?: number;
   resources?: ResourceRequest[];
 }
 
@@ -28,42 +31,52 @@ export async function GET() {
   await dbConnect();
 
   try {
-    const totalShelters = await ShelterModel.countDocuments({});
-    const criticalSheltersCount = await ShelterModel.countDocuments({ capacityStatus: 'ล้นศูนย์' });
-    const warningSheltersCount = await ShelterModel.countDocuments({ capacityStatus: 'ใกล้เต็ม' });
-
-    const [shelterData, hubData] = await Promise.all([
-      ShelterModel.find({}).select('name resources capacity currentOccupancy').lean() as Promise<LeanShelter[]>,
-      HubModel.find({}).select('name resources').lean() as Promise<LeanHub[]>
+    // ✅ Optimization: ดึงข้อมูลที่จำเป็นในครั้งเดียวแบบ Parallel
+    const [totalShelters, occupancyMap, hubs, rawShelters] = await Promise.all([
+      ShelterModel.countDocuments({}),
+      getAllShelterOccupancy(),
+      HubModel.find({}).select('name resources').lean() as Promise<LeanHub[]>,
+      ShelterModel.find({}).select('name resources capacity').lean() as Promise<LeanShelter[]>
     ]);
-    
+
     let totalCapacity = 0;
     let totalOccupancy = 0;
-    
-    // Inject names and flatten resources
+    let criticalSheltersCount = 0;
+    let warningSheltersCount = 0;
     const allResources: DashboardResource[] = [];
     
-    shelterData.forEach((s: LeanShelter) => {
-      totalCapacity += (s.capacity || 0);
-      totalOccupancy += (s.currentOccupancy || 0);
-      if (s.resources && s.resources.length > 0) {
-        s.resources.forEach((r: ResourceRequest) => {
-           allResources.push({ ...r, shelterName: s.name, isHub: false });
+    // Process Shelters
+    const sheltersWithOccupancy = rawShelters.map((shelter) => {
+      const currentOccupancy = occupancyMap[shelter._id.toString()] || 0;
+      totalOccupancy += currentOccupancy;
+      totalCapacity += shelter.capacity || 0;
+      
+      const status = getCapacityStatus(currentOccupancy, shelter.capacity || 0);
+      if (status.text === 'ล้นศูนย์') criticalSheltersCount++;
+      else if (status.text === 'ใกล้เต็ม') warningSheltersCount++;
+      
+      if (shelter.resources) {
+        shelter.resources.forEach(r => {
+          allResources.push({ ...r, shelterName: shelter.name, isHub: false });
         });
       }
+
+      return {
+        ...shelter,
+        currentOccupancy,
+        capacityStatus: status.text
+      };
     });
 
-    hubData.forEach((h: LeanHub) => {
-      if (h.resources && h.resources.length > 0) {
-        h.resources.forEach((r: ResourceRequest) => {
-           allResources.push({ ...r, shelterName: h.name, isHub: true });
+    // Process Hubs
+    hubs.forEach(h => {
+      if (h.resources) {
+        h.resources.forEach(r => {
+          allResources.push({ ...r, shelterName: h.name, isHub: true });
         });
       }
     });
     
-    const totalResourceRequests = allResources.length;
-
-    // Status counts
     const requestStats = {
       pending: allResources.filter(r => r.status === 'Pending').length,
       approved: allResources.filter(r => r.status === 'Approved').length,
@@ -71,49 +84,27 @@ export async function GET() {
       rejected: allResources.filter(r => r.status === 'Rejected').length
     };
 
-    const totalSupplies = await Supply.countDocuments({});
-    const outOfStockSupplies = await Supply.countDocuments({ quantity: 0 });
-    const lowStockSupplies = await Supply.countDocuments({ quantity: { $gt: 0, $lt: 20 } });
+    const [totalSupplies, outOfStockSupplies, lowStockSupplies, globalDailyStats] = await Promise.all([
+      Supply.countDocuments({}),
+      Supply.countDocuments({ quantity: 0 }),
+      Supply.countDocuments({ quantity: { $gt: 0, $lt: 20 } }),
+      getGlobalDailyStats(90)
+    ]);
     
-    // Fetch critical shelters list
-    const criticalList = await ShelterModel.find({ capacityStatus: 'ล้นศูนย์' }).lean();
-
-    // --- Trend & Movement Calculation ---
-    const allSheltersForTrend = await ShelterModel.find({}, 'currentOccupancy dailyLogs').lean();
-    const daysToTrack = 90;
+    // ✅ Transform globalDailyStats into trend & movement formats
+    let runningOccupancy = totalOccupancy;
     const trendData = [];
     const movementData = [];
-    const now = new Date();
-    const dailyStats: Record<string, { net: number, checkIn: number, checkOut: number }> = {};
-    
-    allSheltersForTrend.forEach((s) => {
-      const shelter = s as unknown as ShelterType;
-      if (shelter.dailyLogs) {
-        shelter.dailyLogs.forEach((log: DailyLog) => {
-          if (!dailyStats[log.date]) dailyStats[log.date] = { net: 0, checkIn: 0, checkOut: 0 };
-          dailyStats[log.date].net += (log.checkIn || 0) - (log.checkOut || 0);
-          dailyStats[log.date].checkIn += (log.checkIn || 0);
-          dailyStats[log.date].checkOut += (log.checkOut || 0);
-        });
-      }
-    });
 
-    let currentGlobalOccupancy = totalOccupancy;
-    for (let i = 0; i < daysToTrack; i++) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
-      const statsForDay = dailyStats[dateStr] || { net: 0, checkIn: 0, checkOut: 0 };
-
-      trendData.push({ date: dateStr, occupancy: Math.max(0, currentGlobalOccupancy) });
-      movementData.push({ date: dateStr, checkIn: statsForDay.checkIn, checkOut: statsForDay.checkOut });
-      currentGlobalOccupancy -= statsForDay.net;
+    // TrendData needs current total backwards, or just use the points.
+    // The previous logic was subtracting net from current to go back in time.
+    // Let's replicate that with the aggregated data but more efficiently.
+    const reversedStats = [...globalDailyStats].reverse();
+    for (const day of reversedStats) {
+      trendData.push({ date: day.date, occupancy: Math.max(0, runningOccupancy) });
+      movementData.push({ date: day.date, checkIn: day.checkIn, checkOut: day.checkOut });
+      runningOccupancy -= (day.checkIn - day.checkOut);
     }
-
-    // Get 5 most recent requests for activity feed
-    const recentRequests = allResources
-      .sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime())
-      .slice(0, 5);
 
     const stats = {
       totalShelters,
@@ -121,26 +112,22 @@ export async function GET() {
       totalOccupancy,
       criticalShelters: criticalSheltersCount,
       warningShelters: warningSheltersCount,
-      totalResourceRequests,
+      totalResourceRequests: allResources.length,
       totalSupplies,
       lowStockSupplies,
       outOfStockSupplies,
-      criticalList,
+      criticalList: sheltersWithOccupancy.filter(s => s.capacityStatus === 'ล้นศูนย์'),
       requestStats,
-      recentRequests,
+      recentRequests: allResources
+        .sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime())
+        .slice(0, 5),
       trendData: trendData.reverse(),
       movementData: movementData.reverse()
     };
 
-    return NextResponse.json({
-      success: true,
-      data: stats
-    });
+    return NextResponse.json({ success: true, data: stats });
   } catch (error) {
     console.error('Fetch dashboard stats failed:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch dashboard stats' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: 'Failed' }, { status: 500 });
   }
 }

@@ -41,7 +41,7 @@ export default function SuppliesPage() {
   const categories = ['ทั้งหมด', ...Object.values(SupplyCategory).filter(c => c !== SupplyCategory.ALL)];
 
   return (
-    <div className="container-fluid px-4 py-4" style={{ maxWidth: '1600px', minHeight: '100vh', backgroundColor: 'var(--bg-body)' }}>
+    <div className="container-fluid px-4 py-4" style={{ maxWidth: '1600px', minHeight: '100vh', backgroundColor: 'var(--bg-primary)' }}>
       
       {/* Header */}
       <div className="d-flex flex-column flex-md-row justify-content-between align-items-end mb-4 gap-3">
@@ -88,7 +88,7 @@ export default function SuppliesPage() {
               </div>
               <div className="table-responsive">
                   <table className="table table-hover align-middle mb-0 text-theme">
-                      <thead className="table-light sticky-top">
+                      <thead className="sticky-top">
                           <tr className="small text-secondary">
                               <th className="ps-4">ชื่อสิ่งของ</th>
                               <th>หมวดหมู่</th>

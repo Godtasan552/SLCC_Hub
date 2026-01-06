@@ -186,14 +186,14 @@ export default async function HomePage(props: Props) {
           <ul className="pagination justify-content-center">
             {/* First Page */}
             <li className={`page-item ${page <= 1 ? 'disabled' : ''}`}>
-              <Link className="page-link bg-dark text-light border-secondary" href="/?page=1" aria-label="First">
+              <Link className="page-link bg-secondary text-theme border-theme" href="/?page=1" aria-label="First">
                 <span aria-hidden="true">&laquo;</span>
               </Link>
             </li>
 
             {/* Previous Page */}
             <li className={`page-item ${page <= 1 ? 'disabled' : ''}`}>
-              <Link className="page-link bg-dark text-light border-secondary" href={`/?page=${page - 1}`} aria-label="Previous">
+              <Link className="page-link bg-secondary text-theme border-theme" href={`/?page=${page - 1}`} aria-label="Previous">
                 <span aria-hidden="true">&lsaquo;</span>
               </Link>
             </li>
@@ -223,7 +223,7 @@ export default async function HomePage(props: Props) {
                 if (item === '...') {
                   return (
                     <li key={`ellipsis-${index}`} className="page-item disabled">
-                      <span className="page-link bg-dark text-secondary border-secondary">...</span>
+                      <span className="page-link bg-secondary text-secondary border-theme">...</span>
                     </li>
                   );
                 }
@@ -231,7 +231,7 @@ export default async function HomePage(props: Props) {
                 return (
                   <li key={item} className={`page-item ${isActive ? 'active' : ''}`}>
                     <Link 
-                      className={`page-link border-secondary ${isActive ? 'bg-primary text-white border-primary' : 'bg-dark text-light'}`} 
+                      className={`page-link border-theme ${isActive ? 'btn-primary text-white border-primary' : 'bg-secondary text-theme'}`} 
                       href={`/?page=${item}`}
                     >
                       {item}
@@ -243,14 +243,14 @@ export default async function HomePage(props: Props) {
 
             {/* Next Page */}
             <li className={`page-item ${page >= totalPages ? 'disabled' : ''}`}>
-               <Link className="page-link bg-dark text-light border-secondary" href={`/?page=${page + 1}`} aria-label="Next">
+               <Link className="page-link bg-secondary text-theme border-theme" href={`/?page=${page + 1}`} aria-label="Next">
                  <span aria-hidden="true">&rsaquo;</span>
                </Link>
             </li>
 
              {/* Last Page */}
             <li className={`page-item ${page >= totalPages ? 'disabled' : ''}`}>
-               <Link className="page-link bg-dark text-light border-secondary" href={`/?page=${totalPages}`} aria-label="Last">
+               <Link className="page-link bg-secondary text-theme border-theme" href={`/?page=${totalPages}`} aria-label="Last">
                  <span aria-hidden="true">&raquo;</span>
                </Link>
             </li>
