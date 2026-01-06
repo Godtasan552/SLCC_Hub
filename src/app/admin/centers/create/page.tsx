@@ -14,17 +14,25 @@ export default function CreateCenterPage() {
     type: 'Shelter',
     district: '',
     subdistrict: '',
-    capacity: 0,
+    capacity: '' as string | number,
     phoneNumbers: [''],
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    const cap = Number(formData.capacity);
+    if (isNaN(cap) || cap < 0) {
+      showAlert.error('ข้อมูลไม่ถูกต้อง', 'ความจุต้องเป็นตัวเลขที่เท่ากับหรือมากกว่า 0');
+      return;
+    }
+
     setLoading(true);
     try {
       // Clean up empty phone numbers
       const cleanedData = {
         ...formData,
+        capacity: cap,
         phoneNumbers: formData.phoneNumbers.filter(p => p.trim() !== '')
       };
 
@@ -131,8 +139,15 @@ export default function CreateCenterPage() {
                       <input 
                         type="number" 
                         className="form-control" 
+                        min="0"
+                        placeholder="กรุณาระบุความจุ"
                         value={formData.capacity}
-                        onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) || 0 })}
+                        onKeyDown={(e) => {
+                          if (['-', '+', 'e', 'E', '.'].includes(e.key)) {
+                            e.preventDefault();
+                          }
+                        }}
+                        onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
                       />
                     </div>
                   )}

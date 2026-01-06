@@ -15,11 +15,17 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (!shelter) return NextResponse.json({ error: 'ไม่พบข้อมูล' }, { status: 404 });
 
     // --- Case 1: Update General Info (Admin Edit) ---
-    if (name || district || subdistrict !== undefined || capacity || phoneNumbers) {
+    if (name || district || subdistrict !== undefined || capacity !== undefined || phoneNumbers) {
       if (name) shelter.name = name;
       if (district) shelter.district = district;
       if (subdistrict !== undefined) shelter.subdistrict = subdistrict;
-      if (capacity) shelter.capacity = capacity;
+      if (capacity !== undefined) {
+        const cap = Number(capacity);
+        if (isNaN(cap) || cap < 0) {
+          return NextResponse.json({ error: 'ความจุต้องเป็นตัวเลขที่เท่ากับหรือมากกว่า 0' }, { status: 400 });
+        }
+        shelter.capacity = cap;
+      }
       if (phoneNumbers) shelter.phoneNumbers = phoneNumbers;
       
       await shelter.save();

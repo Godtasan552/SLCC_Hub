@@ -74,7 +74,7 @@ export default function AdminPage() {
     name: '',
     district: '',
     subdistrict: '',
-    capacity: 0,
+    capacity: '' as string | number,
     phoneNumbers: ''
   });
 
@@ -178,15 +178,22 @@ export default function AdminPage() {
 
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    const cap = Number(manualForm.capacity);
+    if (isNaN(cap) || cap < 0) {
+      showAlert.error('ข้อมูลไม่ถูกต้อง', 'ความจุต้องเป็นตัวเลขที่เท่ากับหรือมากกว่า 0');
+      setLoading(false);
+      return;
+    }
+
     try {
       const dataToSend = {
         ...manualForm,
+        capacity: cap,
         phoneNumbers: manualForm.phoneNumbers ? [manualForm.phoneNumbers] : []
       };
       await axios.post('/api/shelters', dataToSend);
       showAlert.success('เพิ่มสำเร็จ', `เพิ่มศูนย์ "${manualForm.name}" เรียบร้อยแล้ว`);
-      setManualForm({ name: '', district: '', subdistrict: '', capacity: 0, phoneNumbers: '' });
+      setManualForm({ name: '', district: '', subdistrict: '', capacity: '', phoneNumbers: '' });
       refreshData();
     } catch (err: unknown) {
       const error = err as { response?: { data?: { error?: string } }; message: string };
@@ -232,7 +239,7 @@ export default function AdminPage() {
                 name: String(row.getCell(1).value || ''),
                 district: String(row.getCell(2).value || ''),
                 subdistrict: String(row.getCell(3).value || ''),
-                capacity: Number(row.getCell(4).value) || 0,
+                capacity: Math.max(0, Number(row.getCell(4).value) || 0),
                 phoneNumbers: row.getCell(5).value ? [String(row.getCell(5).value)] : []
               });
             }
@@ -375,7 +382,19 @@ export default function AdminPage() {
                                     </div>
                                     <div className="col-md-6">
                                         <label className="form-label small fw-bold text-secondary">ความจุ (คน)</label>
-                                        <input type="number" className="form-control border" value={manualForm.capacity} onChange={(e) => setManualForm({...manualForm, capacity: Number(e.target.value)})} />
+                                        <input 
+                                          type="number" 
+                                          className="form-control border" 
+                                          min="0"
+                                          placeholder="ระบุความจุ"
+                                          value={manualForm.capacity} 
+                                          onKeyDown={(e) => {
+                                              if (['-', '+', 'e', 'E', '.'].includes(e.key)) {
+                                                  e.preventDefault();
+                                              }
+                                          }}
+                                          onChange={(e) => setManualForm({...manualForm, capacity: e.target.value})} 
+                                        />
                                     </div>
                                     <div className="col-12">
                                         <label className="form-label small fw-bold text-secondary">เบอร์โทรศัพท์ติดต่อ</label>
@@ -521,6 +540,12 @@ export default function AdminPage() {
                             className="form-control text-center fw-bold fs-5" 
                             value={modalState.amount} 
                             placeholder="ระบุจำนวน"
+                            min="0"
+                            onKeyDown={(e) => {
+                                if (['-', '+', 'e', 'E', '.'].includes(e.key)) {
+                                    e.preventDefault();
+                                }
+                            }}
                             onChange={(e) => {
                                 const val = e.target.value;
                                 if (val === '') {
