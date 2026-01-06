@@ -4,7 +4,6 @@ import { useState, useMemo } from 'react';
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
 import { showAlert } from '@/utils/swal-utils';
-import Swal from 'sweetalert2';
 
 interface Resource {
   _id: string;
@@ -50,100 +49,6 @@ export default function RequestListClient({ initialRequests }: RequestListClient
   const categories = useMemo(() => {
     return ['All', ...new Set(initialRequests.map(r => r.category))];
   }, [initialRequests]);
-
-  const handleApproveWithAdjustment = async (req: Resource) => {
-    setLoadingId(req._id);
-    let availableStock = 0;
-    
-    try {
-      // 1. Fetch current stock from source hub
-      if (req.sourceHubId) {
-        const suppliesRes = await axios.get(`/api/supplies?shelterId=${req.sourceHubId}`);
-        const hubSupplies = suppliesRes.data.data;
-        const matchingSupply = hubSupplies.find((s: any) => s.name === req.itemName);
-        availableStock = matchingSupply?.quantity || 0;
-      }
-    } catch (err) {
-      console.error('Failed to fetch stock:', err);
-      showAlert.error('ผิดพลาด', 'ไม่สามารถตรวจสอบสต็อกล่าสุดได้');
-      setLoadingId(null);
-      return;
-    } finally {
-      setLoadingId(null);
-    }
-
-    const { value: formValues } = await Swal.fire({
-      title: 'อนุมัติคำร้องขอ',
-      html: `
-        <div class="text-start">
-          <label class="form-label small fw-bold">รายการ: ${req.itemName}</label>
-          <div class="mb-3">
-            <div class="d-flex justify-content-between mb-1">
-              <label for="swal-amount" class="form-label small mb-0">ระบุจำนวนที่จะอนุมัติ (${req.unit})</label>
-              ${req.sourceHubId 
-                ? `<span class="badge ${availableStock > 0 ? 'bg-success' : 'bg-danger'}">คงเหลือในคลัง: ${availableStock} ${req.unit}</span>`
-                : `<span class="badge bg-secondary">ไม่มีข้อมูลคลังต้นทาง</span>`
-              }
-            </div>
-            <input id="swal-amount" type="number" class="form-control" min="1" step="1" value="${req.sourceHubId ? Math.min(req.amount, availableStock) : req.amount}">
-            ${req.sourceHubId && availableStock < req.amount ? `<div class="text-danger x-small mt-1"><i class="bi bi-exclamation-triangle-fill me-1"></i> จำนวนที่ขอ (${req.amount}) มากกว่าสต็อกที่มีอยู่</div>` : ''}
-          </div>
-          <div class="alert alert-warning p-2 small">
-            <i class="bi bi-info-circle me-1"></i> เมื่ออนุมัติแล้ว ระบบจะตัดสต็อกออกจากคลังต้นทางทันที
-          </div>
-        </div>
-      `,
-      focusConfirm: false,
-      showCancelButton: true,
-      confirmButtonText: 'อนุมัติรายการ',
-      cancelButtonText: 'ยกเลิก',
-      didOpen: () => {
-        const input = document.getElementById('swal-amount') as HTMLInputElement;
-        if (input) {
-          input.onkeydown = (e) => {
-            if (['-', '+', 'e', 'E', '.'].includes(e.key)) {
-              e.preventDefault();
-            }
-          };
-        }
-      },
-      preConfirm: () => {
-        const amountInput = document.getElementById('swal-amount') as HTMLInputElement;
-        const amount = parseInt(amountInput.value);
-        
-        if (!amountInput.value || amount <= 0) {
-          Swal.showValidationMessage('กรุณาระบุจำนวนที่ถูกต้อง (มากกว่า 0)');
-          return false;
-        }
-        if (req.sourceHubId && amount > availableStock) {
-          Swal.showValidationMessage(`จำนวนต้องไม่เกินสต็อกที่มีอยู่ (${availableStock} ${req.unit})`);
-          return false;
-        }
-        return { amount };
-      }
-    });
-
-    if (formValues) {
-      setLoadingId(req._id);
-      try {
-        const res = await axios.patch(`/api/shelters/${req.shelterId}/resources/${req._id}`, {
-          status: 'Approved',
-          amount: formValues.amount
-        });
-        
-        if (res.data.success) {
-          showAlert.success('สำเร็จ', 'อนุมัติและตัดสต็อกเรียบร้อยแล้ว');
-          router.refresh(); 
-        }
-      } catch (err: any) {
-        console.error('Approval failed:', err);
-        const msg = err.response?.data?.message || 'ไม่สามารถอนุมัติรายการได้';
-        showAlert.error('ผิดพลาด', msg);
-      } finally {
-        setLoadingId(null);
-      }
-    }
-  };
 
   const handleReceive = async (shelterId: string, resourceId: string) => {
     const isConfirmed = await showAlert.confirmDelete(
@@ -341,15 +246,6 @@ export default function RequestListClient({ initialRequests }: RequestListClient
                     }).format(new Date(req.requestedAt))}
                   </td>
                   <td className="text-end pe-4">
-                    {req.status === 'Pending' && (
-                      <button 
-                        className="btn btn-sm btn-primary px-3 rounded-pill fw-bold"
-                        disabled={loadingId === req._id}
-                        onClick={() => handleApproveWithAdjustment(req)}
-                      >
-                        {loadingId === req._id ? '⏳' : '✅ อนุมัติ'}
-                      </button>
-                    )}
                     {req.status === 'Approved' && (
                       <button 
                         className="btn btn-sm btn-success px-3 rounded-pill fw-bold"
@@ -358,6 +254,21 @@ export default function RequestListClient({ initialRequests }: RequestListClient
                       >
                         {loadingId === req._id ? '⏳' : '📥 ยืนยันรับของ'}
                       </button>
+                    )}
+                    {req.status === 'Pending' && (
+                      <span className="badge rounded-pill bg-warning text-dark px-3">
+                        ⏳ รออนุมัติ
+                      </span>
+                    )}
+                    {req.status === 'Received' && (
+                      <span className="badge rounded-pill bg-info text-white px-3">
+                        ✅ ได้รับแล้ว
+                      </span>
+                    )}
+                    {req.status === 'Rejected' && (
+                      <span className="badge rounded-pill bg-danger text-white px-3">
+                        ❌ ปฏิเสธแล้ว
+                      </span>
                     )}
                   </td>
                 </tr>
