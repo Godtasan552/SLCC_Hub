@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/dbConnect';
 import ShelterLog from '@/models/ShelterLog';
 import Shelter from '@/models/Shelter';
+import { calculateCurrentOccupancy, getAllShelterOccupancy } from '@/utils/shelter-server-utils';
 
 /**
  * POST /api/shelter-logs
@@ -45,6 +46,17 @@ export async function POST(req: Request) {
         { success: false, error: 'ไม่พบศูนย์พักพิงนี้ในระบบ' },
         { status: 404 }
       );
+    }
+
+    // ✅ ตรวจสอบจำนวนคนก่อนส่งออก (Exit Validation)
+    if (action === 'out') {
+      const currentOccupancy = await calculateCurrentOccupancy(shelterId);
+      if (amount > currentOccupancy) {
+        return NextResponse.json(
+          { success: false, error: `จำนวนคนไม่เพียงพอ (มีอยู่ ${currentOccupancy} คน)` },
+          { status: 400 }
+        );
+      }
     }
 
     // สร้าง Log ใหม่
@@ -141,12 +153,17 @@ export async function PATCH(req: Request) {
       shelterMap.set(s.name.trim(), s._id);
     });
 
+    // 2. ดึงจำนวนคนปัจจุบันของทุกศูนย์มาตรวจสอบ
+    const occupancyMap = await getAllShelterOccupancy();
+    const tempOccupancy = { ...occupancyMap }; // ใช้เก็บสถานะจำลองขณะลูปตรวจสอบ
+
     const logsToCreate = [];
     const skipped = [];
 
     for (const item of data) {
       const name = (item.name || '').trim();
       const shelterId = shelterMap.get(name);
+      const idStr = shelterId?.toString();
       
       const action = String(item.action).toLowerCase();
       const amount = Number(item.amount);
@@ -154,6 +171,18 @@ export async function PATCH(req: Request) {
       if (!shelterId || !['in', 'out'].includes(action) || isNaN(amount) || amount <= 0) {
         skipped.push({ name, error: !shelterId ? 'ไม่พบศูนย์' : 'ข้อมูลไม่ถูกต้อง' });
         continue;
+      }
+
+      // ✅ ตรวจสอบจำนวนคนสำหรับ Bulk (Exit Validation)
+      if (action === 'out') {
+        const currentCap = tempOccupancy[idStr] || 0;
+        if (amount > currentCap) {
+          skipped.push({ name, error: `จำนวนคนไม่พอ (มี ${currentCap})` });
+          continue;
+        }
+        tempOccupancy[idStr] -= amount; // หักออกจำลองเพื่อรายการถัดไปในไฟล์เดียวกัน
+      } else if (action === 'in') {
+        tempOccupancy[idStr] = (tempOccupancy[idStr] || 0) + amount;
       }
 
       logsToCreate.push({
