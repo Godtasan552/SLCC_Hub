@@ -95,6 +95,7 @@ export default function RequestListClient({ initialRequests }: RequestListClient
         showAlert.success('สำเร็จ', 'ยกเลิกคำร้องขอเรียบร้อยแล้ว');
         router.refresh();
       }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       console.error('Cancel failed:', err);
       const msg = err.response?.data?.message || 'ไม่สามารถยกเลิกคำร้องขอได้';
