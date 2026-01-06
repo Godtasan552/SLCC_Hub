@@ -1,11 +1,13 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
+import useSWR, { mutate } from 'swr';
 import ExcelJS from 'exceljs';
 import ShelterList from '@/components/dashboard/ShelterList';
 import { Shelter } from "@/types/shelter";
 import { Modal } from 'bootstrap';
 import { useSession } from 'next-auth/react';
+import { showAlert } from '@/utils/swal-utils';
 
 interface ShelterData {
   name: string;
@@ -25,20 +27,39 @@ export default function AdminPage() {
   const isAdmin = role === 'admin';
 
   // --- States ---
-  const [activeTab, setActiveTab] = useState<'daily' | 'management'>('daily');
+  const [activeTab, setActiveTab] = useState<'daily' | 'management' | 'logs'>('daily');
   const [activeImportSchema, setActiveImportSchema] = useState<'excel' | 'json'>('excel');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [shelters, setShelters] = useState<Shelter[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [timeRange, setTimeRange] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [filterCapacity, setFilterCapacity] = useState('All');
+  const [filterDistrict, setFilterDistrict] = useState('All');
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterCapacity, filterDistrict, timeRange]);
+
+  // --- SWR Data Fetching ---
+  const fetcher = (url: string) => axios.get(url).then(res => res.data);
+  const sheltersUrl = `/api/shelters?days=${timeRange}&page=${currentPage}&limit=30&searchTerm=${searchTerm}&district=${filterDistrict}&status=${filterCapacity}`;
+  const { data: swrData, error: swrError, isLoading: swrLoading } = useSWR(sheltersUrl, fetcher, {
+    revalidateOnFocus: false,
+    keepPreviousData: true
+  });
+
+  const shelters = swrData?.data || [];
+  const pagination = swrData?.pagination || { total: 0, page: 1, limit: 30, totalPages: 1 };
   
   // Action Modal State (In/Out)
-  const [modalState, setModalState] = useState<{ isOpen: boolean, shelter: Shelter | null, action: 'in' | 'out', amount: number }>({
+  const [modalState, setModalState] = useState<{ isOpen: boolean, shelter: Shelter | null, action: 'in' | 'out', amount: number | string }>({
     isOpen: false,
     shelter: null,
     action: 'in',
-    amount: 1
+    amount: ''
   });
   const modalRef = useRef<HTMLDivElement>(null);
   const bsModalRef = useRef<Modal | null>(null);
@@ -53,24 +74,14 @@ export default function AdminPage() {
     name: '',
     district: '',
     subdistrict: '',
-    capacity: 0,
-    currentOccupancy: 0,
+    capacity: '' as string | number,
     phoneNumbers: ''
   });
 
-  // --- Fetch Data ---
-  const fetchShelters = useCallback(async () => {
-    try {
-      const res = await axios.get('/api/shelters');
-      setShelters(res.data.data);
-    } catch (err) {
-      console.error('Fetch shelters failed:', err);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchShelters();
-  }, [fetchShelters]);
+  // No longer need manual fetchShelters with useEffect as SWR handles it
+  const refreshData = () => {
+    mutate(sheltersUrl);
+  };
 
   // --- Bootstrap Modals ---
   useEffect(() => {
@@ -85,26 +96,36 @@ export default function AdminPage() {
 
   // --- Actions ---
   const openActionModal = (id: string, action: 'in' | 'out') => {
-    const targetShelter = shelters.find(s => s._id === id);
+    const targetShelter = shelters.find((s: Shelter) => s._id === id);
     if (!targetShelter) return;
-    setModalState({ isOpen: true, shelter: targetShelter, action, amount: 1 });
+    setModalState({ isOpen: true, shelter: targetShelter, action, amount: '' });
     bsModalRef.current?.show();
   };
 
   const confirmAction = async () => {
     if (!modalState.shelter) return;
+    
+    const amountNum = parseInt(String(modalState.amount));
+    if (isNaN(amountNum) || amountNum <= 0) {
+      showAlert.error('ข้อมูลไม่ถูกต้อง', 'กรุณาระบุจำนวนที่มากกว่า 0');
+      return;
+    }
+
     setLoading(true);
     bsModalRef.current?.hide();
     try {
-      await axios.put(`/api/shelters/${modalState.shelter._id}`, { 
-          action: modalState.action, 
-          amount: modalState.amount 
+      // ✅ ใช้ API ใหม่ที่บันทึกลง ShelterLog
+      await axios.post('/api/shelter-logs', { 
+        shelterId: modalState.shelter._id,
+        action: modalState.action, 
+        amount: amountNum 
       });
-      fetchShelters();
-      showToast(`บันทึกข้อมูลเรียบร้อย: ${modalState.action === 'in' ? 'รับเข้า' : 'ส่งออก'} ${modalState.amount} คน`);
+      setLoading(false);
+      showAlert.success('บันทึกข้อมูลเรียบร้อย', `${modalState.action === 'in' ? 'รับเข้า' : 'ส่งออก'} ${amountNum} คน`);
+      refreshData();
     } catch (err) {
       console.error(err);
-      showToast('เกิดข้อผิดพลาดในการบันทึก');
+      showAlert.error('เกิดข้อผิดพลาด', 'ไม่สามารถบันทึกข้อมูลได้');
     } finally {
       setLoading(false);
     }
@@ -122,105 +143,237 @@ export default function AdminPage() {
     bsEditModalRef.current?.hide();
     try {
         await axios.put(`/api/shelters/${editingShelter._id}`, editingShelter);
-        showToast(`แก้ไขข้อมูล "${editingShelter.name}" เรียบร้อย`);
-        fetchShelters();
+        showAlert.success('แก้ไขสำเร็จ', `แก้ไขข้อมูล "${editingShelter.name}" เรียบร้อย`);
+        refreshData();
     } catch (err) {
         console.error(err);
-        showToast('แก้ไขข้อมูลล้มเหลว');
+        showAlert.error('แก้ไขล้มเหลว', 'ไม่สามารถบันทึกข้อมูลที่แก้ไขได้');
     } finally {
         setLoading(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('คุณแน่ใจหรือไม่ที่จะลบศูนย์พักพิงนี้? การกระทำนี้ไม่สามารถย้อนกลับได้')) return;
+    const isConfirmed = await showAlert.confirmDelete(
+      'คุณแน่ใจหรือไม่?',
+      'การลบศูนย์พักพิงนี้ไม่สามารถย้อนกลับได้!'
+    );
+
+    if (!isConfirmed) return;
+
     setLoading(true);
     try {
         await axios.delete(`/api/shelters/${id}`);
-        showToast('ลบข้อมูลเรียบร้อย');
-        // Optimistic update
-        setShelters(prev => prev.filter(s => s._id !== id));
-        fetchShelters();
+        showAlert.success('ลบเรียบร้อย');
+        refreshData();
     } catch (err) {
         console.error(err);
-        showToast('ลบข้อมูลล้มเหลว');
+        showAlert.error('ลบล้มเหลว', 'เกิดข้อผิดพลาดในการลบข้อมูล');
     } finally {
         setLoading(false);
     }
   };
 
-  const showToast = (msg: string) => {
-    setMessage(msg);
-    setTimeout(() => setMessage(''), 3000);
-  };
+
 
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    const cap = Number(manualForm.capacity);
+    if (isNaN(cap) || cap < 0) {
+      showAlert.error('ข้อมูลไม่ถูกต้อง', 'ความจุต้องเป็นตัวเลขที่เท่ากับหรือมากกว่า 0');
+      setLoading(false);
+      return;
+    }
+
     try {
       const dataToSend = {
         ...manualForm,
+        capacity: cap,
         phoneNumbers: manualForm.phoneNumbers ? [manualForm.phoneNumbers] : []
       };
       await axios.post('/api/shelters', dataToSend);
-      showToast(`เพิ่มศูนย์ "${manualForm.name}" เรียบร้อย`);
-      setManualForm({ name: '', district: '', subdistrict: '', capacity: 0, currentOccupancy: 0, phoneNumbers: '' });
-      fetchShelters();
+      showAlert.success('เพิ่มสำเร็จ', `เพิ่มศูนย์ "${manualForm.name}" เรียบร้อยแล้ว`);
+      setManualForm({ name: '', district: '', subdistrict: '', capacity: '', phoneNumbers: '' });
+      refreshData();
     } catch (err: unknown) {
       const error = err as { response?: { data?: { error?: string } }; message: string };
       const errorMessage = error.response?.data?.error || error.message;
-      showToast(`Error: ${errorMessage}`);
+      showAlert.error('เพิ่มไม่สำเร็จ', errorMessage);
     } finally {
       setLoading(false);
     }
   };
+
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setLoading(true);
-    setMessage('กำลังประมวลผลไฟล์...');
+    setUploadProgress(1); // เริ่มต้นที่ 1% เพื่อแสดง UI ทันที
+    setMessage('กำลังอ่านไฟล์...');
 
     try {
       let dataToImport: ShelterData[] = [];
+      
       if (file.name.endsWith('.json')) {
         const text = await file.text();
+        setUploadProgress(20);
         const json = JSON.parse(text);
         dataToImport = json.data || json;
+        setUploadProgress(40);
       } else if (file.name.endsWith('.xlsx')) {
         const arrayBuffer = await file.arrayBuffer();
+        setUploadProgress(15);
         const workbook = new ExcelJS.Workbook();
         await workbook.xlsx.load(arrayBuffer);
+        setUploadProgress(30);
         const worksheet = workbook.getWorksheet(1);
         if (worksheet) {
+          const totalRows = worksheet.rowCount;
+          let processedRows = 0;
+          
           worksheet.eachRow((row, rowNumber) => {
             if (rowNumber > 1) { 
               dataToImport.push({
                 name: String(row.getCell(1).value || ''),
                 district: String(row.getCell(2).value || ''),
                 subdistrict: String(row.getCell(3).value || ''),
-                capacity: Number(row.getCell(4).value) || 0,
+                capacity: Math.max(0, Number(row.getCell(4).value) || 0),
                 phoneNumbers: row.getCell(5).value ? [String(row.getCell(5).value)] : []
               });
             }
+            processedRows++;
+            // Update progress during parsing (30% to 40%)
+            const parseProgress = 30 + Math.round((processedRows / totalRows) * 10);
+            setUploadProgress(parseProgress);
           });
         }
       }
-      await axios.patch('/api/shelters', { data: dataToImport });
-      showToast('นำเข้าไฟล์สำเร็จ');
-      fetchShelters();
+      
+      setUploadProgress(40);
+      setMessage(`กำลังอัปโหลด ${dataToImport.length} รายการ...`);
+      
+      await axios.patch('/api/shelters', { data: dataToImport }, {
+        onUploadProgress: (progressEvent) => {
+            if (progressEvent.total) {
+                // Map upload progress from 40% to 90%
+                const uploadPercent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                const totalProgress = 40 + Math.round(uploadPercent * 0.5);
+                setUploadProgress(totalProgress);
+                
+                if (uploadPercent === 100) {
+                  setMessage('กำลังประมวลผลบนเซิร์ฟเวอร์...');
+                }
+            }
+        }
+      });
+      
+      setUploadProgress(100);
+      setMessage('นำเข้าไฟล์สำเร็จ!');
+      showAlert.success('สำเร็จ', 'นำเข้าข้อมูลไฟล์เรียบร้อยแล้ว');
+      refreshData();
+
+      // หน่วงเวลา 2 วินาทีก่อนปิด Progress bar
+      setTimeout(() => {
+        setLoading(false);
+        setUploadProgress(0);
+        setMessage('');
+        if (e.target) e.target.value = '';
+      }, 2000);
+
     } catch (err) {
-      showToast('ไฟล์ไม่ถูกต้อง หรือเกิดข้อผิดพลาด');
+      showAlert.error('ผิดพลาด', 'ไฟล์ไม่ถูกต้อง หรือเกิดข้อผิดพลาดในการนำเข้า');
       console.error(err);
-    } finally {
       setLoading(false);
-      e.target.value = '';
+      setUploadProgress(0);
+      setMessage('');
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  const handleLogFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLoading(true);
+    setUploadProgress(1);
+    setMessage('กำลังอ่านไฟล์บันทึกรายวัน...');
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let dataToImport: any[] = [];
+      
+      if (file.name.endsWith('.json')) {
+        const text = await file.text();
+        setUploadProgress(20);
+        const json = JSON.parse(text);
+        dataToImport = json.data || json;
+        setUploadProgress(40);
+      } else if (file.name.endsWith('.xlsx')) {
+        const arrayBuffer = await file.arrayBuffer();
+        setUploadProgress(15);
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(arrayBuffer);
+        setUploadProgress(30);
+        const worksheet = workbook.getWorksheet(1);
+        if (worksheet) {
+          const totalRows = worksheet.rowCount;
+          let processedRows = 0;
+          
+          worksheet.eachRow((row, rowNumber) => {
+            if (rowNumber > 1) { 
+              dataToImport.push({
+                name: String(row.getCell(1).value || '').trim(),
+                action: String(row.getCell(2).value || '').toLowerCase().trim(),
+                amount: Number(row.getCell(3).value) || 0
+              });
+            }
+            processedRows++;
+            const parseProgress = 30 + Math.round((processedRows / totalRows) * 10);
+            setUploadProgress(parseProgress);
+          });
+        }
+      }
+      
+      setUploadProgress(40);
+      setMessage(`กำลังนำเข้าบันทึก ${dataToImport.length} รายการ...`);
+      
+      const res = await axios.patch('/api/shelter-logs', { data: dataToImport }, {
+        onUploadProgress: (progressEvent) => {
+            if (progressEvent.total) {
+                const uploadPercent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                const totalProgress = 40 + Math.round(uploadPercent * 0.5);
+                setUploadProgress(totalProgress);
+            }
+        }
+      });
+      
+      setUploadProgress(100);
+      setMessage('นำเข้าสำเร็จ!');
+      const summary = res.data.summary;
+      showAlert.success('สำเร็จ', `นำเข้าบันทึกเข้า-ออกสำเร็จ ${summary.created} รายการ (ข้าม ${summary.skipped} รายการ)`);
+      
+      // Reset
+      if (e.target) e.target.value = '';
+      setTimeout(() => {
+          setLoading(false);
+          setUploadProgress(0);
+          setMessage('');
+          refreshData();
+      }, 2000);
+
+    } catch (err) {
+      showAlert.error('ผิดพลาด', 'ไฟล์ไม่ถูกต้อง หรือเกิดข้อผิดพลาดในการนำเข้า');
+      console.error(err);
+      setLoading(false);
+      setUploadProgress(0);
+      setMessage('');
     }
   };
 
   return (
-    <div className="container-fluid px-4 py-4" style={{ maxWidth: '1600px', minHeight: '100vh', backgroundColor: 'var(--bg-body)' }}>
+    <div className="container-fluid px-4 py-4" style={{ maxWidth: '1600px', minHeight: '100vh', backgroundColor: 'var(--bg-primary)' }}>
       
       {/* 1. Header & Tabs */}
       <div className="d-flex flex-column flex-md-row justify-content-between align-items-end mb-4 gap-3">
@@ -233,15 +386,24 @@ export default function AdminPage() {
         </div>
         
         {/* Tab Navigation */}
-        <div className="bg-white dark-mode-bg rounded-pill p-1 shadow-sm d-flex" style={{ border: '1px solid var(--border-color)' }}>
+        <div className="bg-secondary rounded-pill p-1 shadow-sm d-flex" style={{ border: '1px solid var(--border-color)' }}>
             <button 
-                className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'daily' ? 'btn-primary shadow-sm' : 'text-secondary hover-bg-light'}`}
+                className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'daily' ? 'btn-primary shadow-sm text-white' : 'text-theme'}`}
+                style={{ opacity: activeTab === 'daily' ? 1 : 0.75 }}
                 onClick={() => setActiveTab('daily')}
             >
                 <i className="bi bi-list-check me-2"></i>อัปเดตรายวัน
             </button>
             <button 
-                className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'management' ? 'btn-primary shadow-sm' : 'text-secondary hover-bg-light'}`}
+                className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'logs' ? 'btn-primary shadow-sm text-white' : 'text-theme'}`}
+                style={{ opacity: activeTab === 'logs' ? 1 : 0.75 }}
+                onClick={() => setActiveTab('logs')}
+            >
+                <i className="bi bi-clock-history me-2"></i>นำเข้าประวัติรายวัน
+            </button>
+            <button 
+                className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'management' ? 'btn-primary shadow-sm text-white' : 'text-theme'}`}
+                style={{ opacity: activeTab === 'management' ? 1 : 0.75 }}
                 onClick={() => setActiveTab('management')}
             >
                 <i className="bi bi-database-gear me-2"></i>จัดการฐานข้อมูล
@@ -249,15 +411,7 @@ export default function AdminPage() {
         </div>
       </div>
       
-      {/* Alert Toast (Fixed Top) */}
-      {message && (
-         <div className="position-fixed top-0 start-50 translate-middle-x mt-4 z-index-toast" style={{ zIndex: 1050 }}>
-            <div className={`alert ${message.includes('Error') || message.includes('ผิดพลาด') || message.includes('ล้มเหลว') ? 'alert-danger' : 'alert-success'} shadow-lg d-flex align-items-center py-2 px-4 rounded-pill border-0`}>
-             <i className={`bi ${message.includes('Error') || message.includes('ผิดพลาด') || message.includes('ล้มเหลว') ? 'bi-x-circle-fill' : 'bi-check-circle-fill'} me-2 fs-5`}></i>
-             <span className="fw-bold">{message}</span>
-           </div>
-         </div>
-      )}
+
 
       {/* 2. Content Area */}
       <div className="animate-fade-in">
@@ -273,6 +427,14 @@ export default function AdminPage() {
                         setTimeRange={setTimeRange}
                         searchTerm={searchTerm}
                         setSearchTerm={setSearchTerm}
+                        currentPage={currentPage}
+                        setCurrentPage={setCurrentPage}
+                        filterCapacity={filterCapacity}
+                        setFilterCapacity={setFilterCapacity}
+                        filterDistrict={filterDistrict}
+                        setFilterDistrict={setFilterDistrict}
+                        pagination={pagination}
+                        isLoading={swrLoading}
                         onAction={openActionModal}
                         onEdit={isAdmin ? handleEdit : undefined}
                         onDelete={isAdmin ? handleDelete : undefined}
@@ -307,7 +469,19 @@ export default function AdminPage() {
                                     </div>
                                     <div className="col-md-6">
                                         <label className="form-label small fw-bold text-secondary">ความจุ (คน)</label>
-                                        <input type="number" className="form-control border" value={manualForm.capacity} onChange={(e) => setManualForm({...manualForm, capacity: Number(e.target.value)})} />
+                                        <input 
+                                          type="number" 
+                                          className="form-control border" 
+                                          min="0"
+                                          placeholder="ระบุความจุ"
+                                          value={manualForm.capacity} 
+                                          onKeyDown={(e) => {
+                                              if (['-', '+', 'e', 'E', '.'].includes(e.key)) {
+                                                  e.preventDefault();
+                                              }
+                                          }}
+                                          onChange={(e) => setManualForm({...manualForm, capacity: e.target.value})} 
+                                        />
                                     </div>
                                     <div className="col-12">
                                         <label className="form-label small fw-bold text-secondary">เบอร์โทรศัพท์ติดต่อ</label>
@@ -331,40 +505,59 @@ export default function AdminPage() {
                             <h6 className="mb-0 fw-bold text-success"><i className="bi bi-file-earmark-excel me-2"></i>นำเข้า Excel / JSON</h6>
                         </div>
                         <div className="card-body p-4 d-flex flex-column justify-content-center text-center">
-                            <div className="upload-box p-5 rounded-4 border-2 border-dashed mb-3 cursor-pointer transition-all">
-                                <i className="bi bi-cloud-arrow-up-fill text-success" style={{ fontSize: '3rem', opacity: 0.8 }}></i>
-                                <h5 className="mt-3 fw-bold" style={{ color: 'var(--text-primary)' }}>ลากไฟล์มาวาง หรือ คลิกเพื่อเลือกไฟล์</h5>
-                                <p className="text-secondary small">รองรับไฟล์มาตรฐาน .xlsx และ .json</p>
-                                <button className="btn btn-outline-success btn-sm rounded-pill px-4 mt-2" onClick={() => document.getElementById('fileIn')?.click()}>
-                                    Browse Files
-                                </button>
-                                <input type="file" id="fileIn" className="d-none" accept=".json,.xlsx" onChange={handleFileUpload} />
+                            <div className="upload-box p-5 rounded-4 border-2 border-dashed mb-3 cursor-pointer transition-all" onClick={() => !loading && document.getElementById('fileIn')?.click()}>
+                                {loading && uploadProgress > 0 ? (
+                                    <div className="animate-fade-in py-3">
+                                        <h5 className="mb-3 text-success fw-bold">🚀 {message || 'กำลังดำเนินการ...'} {uploadProgress}%</h5>
+                                        <div className="progress rounded-pill shadow-sm" style={{ height: '20px', width: '80%', margin: '0 auto', backgroundColor: 'var(--bg-secondary)' }}>
+                                            <div 
+                                                className="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                                                role="progressbar" 
+                                                style={{ width: `${uploadProgress}%`, transition: 'width 0.3s ease-in-out' }} 
+                                                aria-valuenow={uploadProgress} 
+                                                aria-valuemin={0} 
+                                                aria-valuemax={100}
+                                            >
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <i className="bi bi-cloud-arrow-up-fill text-success" style={{ fontSize: '3rem', opacity: 0.8 }}></i>
+                                        <h5 className="mt-3 fw-bold" style={{ color: 'var(--text-primary)' }}>ลากไฟล์มาวาง หรือ คลิกเพื่อเลือกไฟล์</h5>
+                                        <p className="text-secondary small">รองรับไฟล์มาตรฐาน .xlsx และ .json</p>
+                                        <button className="btn btn-outline-success btn-sm rounded-pill px-4 mt-2" disabled={loading}>
+                                            Browse Files
+                                        </button>
+                                    </>
+                                )}
+                                <input type="file" id="fileIn" className="d-none" accept=".json,.xlsx" onChange={handleFileUpload} disabled={loading} />
                             </div>
                             <div className="mb-3 text-start">
                                 <div className="d-flex justify-content-between align-items-center mb-2">
                                     <label className="small fw-bold text-secondary mb-0">โครงสร้างไฟล์นำเข้า:</label>
-                                    <div className="btn-group btn-group-sm rounded-pill border" style={{ fontSize: '0.65rem' }}>
-                                        <button type="button" className={`btn btn-xs py-0 px-2 ${activeImportSchema === 'excel' ? 'btn-primary' : 'btn-light'}`} onClick={() => setActiveImportSchema('excel')}>Excel</button>
-                                        <button type="button" className={`btn btn-xs py-0 px-2 ${activeImportSchema === 'json' ? 'btn-primary' : 'btn-light'}`} onClick={() => setActiveImportSchema('json')}>JSON</button>
+                                    <div className="btn-group btn-group-sm rounded-pill border" style={{ fontSize: '0.65rem', backgroundColor: 'var(--bg-secondary)' }}>
+                                        <button type="button" className={`btn btn-xs py-0 px-2 ${activeImportSchema === 'excel' ? 'btn-primary text-white' : 'text-theme'}`} style={{ opacity: activeImportSchema === 'excel' ? 1 : 0.75 }} onClick={() => setActiveImportSchema('excel')}>Excel</button>
+                                        <button type="button" className={`btn btn-xs py-0 px-2 ${activeImportSchema === 'json' ? 'btn-primary text-white' : 'text-theme'}`} style={{ opacity: activeImportSchema === 'json' ? 1 : 0.75 }} onClick={() => setActiveImportSchema('json')}>JSON</button>
                                     </div>
                                 </div>
                                 
                                 {activeImportSchema === 'excel' ? (
                                     <div className="table-responsive rounded-3 border animate-fade-in">
                                         <table className="table table-sm table-bordered mb-0 x-small-text text-nowrap">
-                                            <thead className="table-light">
+                                            <thead>
                                                 <tr>
-                                                    <th className="py-1 px-2 text-center bg-light" style={{ width: '60px' }}>#</th>
-                                                    <th className="py-1 px-2 text-center bg-light">A (1)</th>
-                                                    <th className="py-1 px-2 text-center bg-light">B (2)</th>
-                                                    <th className="py-1 px-2 text-center bg-light">C (3)</th>
-                                                    <th className="py-1 px-2 text-center bg-light">D (4)</th>
-                                                    <th className="py-1 px-2 text-center bg-light">E (5)</th>
+                                                    <th className="py-1 px-2 text-center bg-secondary" style={{ width: '60px' }}>#</th>
+                                                    <th className="py-1 px-2 text-center bg-secondary">A (1)</th>
+                                                    <th className="py-1 px-2 text-center bg-secondary">B (2)</th>
+                                                    <th className="py-1 px-2 text-center bg-secondary">C (3)</th>
+                                                    <th className="py-1 px-2 text-center bg-secondary">D (4)</th>
+                                                    <th className="py-1 px-2 text-center bg-secondary">E (5)</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 <tr>
-                                                    <td className="py-1 px-2 fw-bold bg-light">ข้อมูล</td>
+                                                    <td className="py-1 px-2 fw-bold bg-secondary">ข้อมูล</td>
                                                     <td className="py-1 px-2">ชื่อศูนย์</td>
                                                     <td className="py-1 px-2">อำเภอ</td>
                                                     <td className="py-1 px-2">ตำบล</td>
@@ -372,7 +565,7 @@ export default function AdminPage() {
                                                     <td className="py-1 px-2">เบอร์โทร</td>
                                                 </tr>
                                                 <tr>
-                                                    <td className="py-1 px-2 fw-bold bg-light">ชนิด</td>
+                                                    <td className="py-1 px-2 fw-bold bg-secondary">ชนิด</td>
                                                     <td className="py-1 px-2 text-primary">อักษร</td>
                                                     <td className="py-1 px-2 text-primary">อักษร</td>
                                                     <td className="py-1 px-2 text-primary">อักษร</td>
@@ -383,7 +576,7 @@ export default function AdminPage() {
                                         </table>
                                     </div>
                                 ) : (
-                                    <div className="bg-light p-2 rounded-3 border animate-fade-in">
+                                    <div className="bg-secondary p-2 rounded-3 border animate-fade-in">
                                         <pre className="mb-0 x-small-text text-secondary" style={{ whiteSpace: 'pre-wrap' }}>
 {`[
   {
@@ -399,7 +592,7 @@ export default function AdminPage() {
                                 )}
                             </div>
 
-                            <div className="alert alert-light border small text-start d-flex gap-2">
+                            <div className="alert alert-secondary border small text-start d-flex gap-2">
                                 <i className="bi bi-info-circle text-primary mt-1"></i>
                                 <span className="text-secondary">การนำเข้าไฟล์จะอัปเดตข้อมูลที่มีอยู่แล้วหากชื่อตรงกัน และสร้างใหม่หากยังไม่มี</span>
                             </div>
@@ -407,6 +600,88 @@ export default function AdminPage() {
                     </div>
                 </div>
              </div>
+        )}
+
+        {/* TAB 3: Logs Bulk Import */}
+        {activeTab === 'logs' && (
+            <div className="row g-4 justify-content-center">
+                <div className="col-lg-8">
+                    <div className="card border-0 shadow-sm" style={{ backgroundColor: 'var(--bg-card)' }}>
+                        <div className="card-header bg-transparent border-bottom py-3 px-4">
+                            <h6 className="mb-0 fw-bold text-success"><i className="bi bi-file-earmark-excel-fill me-2"></i>นำเข้าบันทึกการเข้า-ออกรายวันแบบกลุ่ม</h6>
+                        </div>
+                        <div className="card-body p-5 text-center">
+                            <div className="upload-box p-5 rounded-4 border-2 border-dashed mb-4 cursor-pointer transition-all" onClick={() => !loading && document.getElementById('logFileIn')?.click()}>
+                                {loading && uploadProgress > 0 ? (
+                                    <div className="animate-fade-in py-3">
+                                        <h5 className="mb-3 text-success fw-bold">🚀 {message || 'กำลังดำเนินการ...'} {uploadProgress}%</h5>
+                                        <div className="progress rounded-pill shadow-sm mx-auto" style={{ height: '20px', width: '80%', backgroundColor: 'var(--bg-secondary)' }}>
+                                            <div 
+                                                className="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                                                role="progressbar" 
+                                                style={{ width: `${uploadProgress}%`, transition: 'width 0.3s ease-in-out' }} 
+                                                aria-valuenow={uploadProgress} 
+                                                aria-valuemin={0} 
+                                                aria-valuemax={100}
+                                            >
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <i className="bi bi-box-arrow-in-down-right text-success mb-3" style={{ fontSize: '4rem', opacity: 0.8 }}></i>
+                                        <h4 className="fw-bold mb-2">อัปโหลดไฟล์ Excel / JSON ประวัติรายวัน</h4>
+                                        <p className="text-secondary">ใช้สำหรับบันทึกการ เข้า-ออก จำนวนมากพร้อมกันหลายศูนย์</p>
+                                        <button className="btn btn-success rounded-pill px-5 mt-3 shadow-sm" disabled={loading}>
+                                            <i className="bi bi-folder2-open me-2"></i>เลือกไฟล์จากเครื่อง
+                                        </button>
+                                    </>
+                                )}
+                                <input type="file" id="logFileIn" className="d-none" accept=".json,.xlsx" onChange={handleLogFileUpload} disabled={loading} />
+                            </div>
+
+                            <div className="text-start mb-4">
+                                <label className="small fw-bold text-secondary mb-2">โครงสร้างไฟล์ที่รองรับ (Excel หัวตารางเริ่มแถว 2):</label>
+                                <div className="table-responsive rounded-3 border">
+                                    <table className="table table-sm table-bordered mb-0 small text-nowrap">
+                                        <thead className="table-light text-center">
+                                            <tr>
+                                                <th className="bg-light" style={{ width: '100px' }}>คอลัมน์</th>
+                                                <th>A (1)</th>
+                                                <th>B (2)</th>
+                                                <th>C (3)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr className="text-center">
+                                                <td className="fw-bold">ข้อมูล</td>
+                                                <td>ชื่อศูนย์พักพิง</td>
+                                                <td>ประเภท (in/out)</td>
+                                                <td>จำนวนคน</td>
+                                            </tr>
+                                            <tr className="text-center text-primary">
+                                                <td className="fw-bold text-dark">ตัวอย่าง</td>
+                                                <td>วัดศรีบุญเรือง</td>
+                                                <td>in</td>
+                                                <td>120</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div className="alert alert-info border-0 shadow-sm text-start mb-0">
+                                <h6 className="fw-bold mb-1"><i className="bi bi-lightbulb-fill me-2"></i>ข้อควรรู้</h6>
+                                <ul className="small mb-0 mt-2">
+                                    <li><strong>ชื่อศูนย์พักพิง:</strong> ต้องตรงกับชื่อที่มีในระบบ (ไม่สนเว้นวรรคหน้า-หลัง)</li>
+                                    <li><strong>ประเภท:</strong> ใส่ <code>in</code> สำหรับรับเข้า และ <code>out</code> สำหรับส่งออก</li>
+                                    <li><strong>จำนวนคน:</strong> ต้องเป็นตัวเลขบวกที่มากกว่า 0</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         )}
       </div>
 
@@ -428,9 +703,31 @@ export default function AdminPage() {
                     </div>
                     <label className="form-label small fw-bold text-secondary">จำนวนคน</label>
                     <div className="input-group mb-3">
-                        <button className="btn btn-outline-secondary" type="button" onClick={() => setModalState(prev => ({...prev, amount: Math.max(1, prev.amount - 1)}))}>-</button>
-                        <input type="number" className="form-control text-center fw-bold fs-5" value={modalState.amount} onChange={(e) => setModalState(prev => ({...prev, amount: Math.max(1, parseInt(e.target.value) || 0)}))} />
-                        <button className="btn btn-outline-secondary" type="button" onClick={() => setModalState(prev => ({...prev, amount: prev.amount + 1}))}>+</button>
+                        <button className="btn btn-outline-secondary" type="button" onClick={() => setModalState(prev => ({...prev, amount: Math.max(0, (parseInt(String(prev.amount)) || 0) - 1)}))}>-</button>
+                        <input 
+                            type="number" 
+                            className="form-control text-center fw-bold fs-5" 
+                            value={modalState.amount} 
+                            placeholder="ระบุจำนวน"
+                            min="0"
+                            onKeyDown={(e) => {
+                                if (['-', '+', 'e', 'E', '.'].includes(e.key)) {
+                                    e.preventDefault();
+                                }
+                            }}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === '') {
+                                    setModalState(prev => ({ ...prev, amount: '' }));
+                                } else {
+                                    const num = parseInt(val);
+                                    if (!isNaN(num)) {
+                                        setModalState(prev => ({ ...prev, amount: Math.max(0, num) }));
+                                    }
+                                }
+                            }} 
+                        />
+                        <button className="btn btn-outline-secondary" type="button" onClick={() => setModalState(prev => ({...prev, amount: (parseInt(String(prev.amount)) || 0) + 1}))}>+</button>
                     </div>
                     <button onClick={confirmAction} className={`btn w-100 py-2 fw-bold rounded-3 ${modalState.action === 'in' ? 'btn-success' : 'btn-danger'}`} disabled={loading}>
                         {loading ? 'กำลังบันทึก...' : 'ยืนยันรายการ'}
@@ -487,13 +784,14 @@ export default function AdminPage() {
         }
         .upload-box:hover {
             border-color: #198754;
-            background-color: rgba(25, 135, 84, 0.05);
+            background-color: var(--bg-opacity-success);
         }
         .dark-mode-bg {
              background-color: var(--bg-card) !important;
         }
         .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
         .x-small-text { font-size: 0.72rem; }
+        .hover-opacity-100:hover { opacity: 1 !important; }
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(5px); }
             to { opacity: 1; transform: translateY(0); }

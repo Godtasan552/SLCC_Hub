@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import axios from 'axios';
 import { SupplyCategory } from '@/types/supply';
 import { getItemsByCategory } from '@/constants/standardItems';
+import { showAlert } from '@/utils/swal-utils';
 
 interface ResourceRequestProps {
   shelterId: string;
@@ -18,10 +19,16 @@ export default function ResourceRequest({
   apiUrl,
   onSuccess 
 }: ResourceRequestProps) {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    category: string;
+    itemName: string;
+    amount: number | string;
+    unit: string;
+    urgency: string;
+  }>({
     category: initialItem?.category || SupplyCategory.MEDICINE,
     itemName: initialItem?.name || '',
-    amount: 1,
+    amount: '',
     unit: initialItem?.unit || '',
     urgency: 'medium'
   });
@@ -43,22 +50,29 @@ export default function ResourceRequest({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.itemName) {
-      alert('โปรดเลือกชื่อสิ่งของ');
+      showAlert.error('ข้อมูลไม่ครบ', 'โปรดเลือกชื่อสิ่งของ');
       return;
     }
+
+    const amountNum = parseInt(String(formData.amount));
+    if (isNaN(amountNum) || amountNum <= 0) {
+      showAlert.error('ข้อมูลไม่ถูกต้อง', 'กรุณาระบุจำนวนที่มากกว่า 0');
+      return;
+    }
+
     try {
       const url = apiUrl || `/api/shelters/${shelterId}/resources`;
-      await axios.post(url, formData);
-      alert('ส่งคำขอสำเร็จ');
+      await axios.post(url, { ...formData, amount: amountNum });
+      showAlert.success('สำเร็จ', 'ส่งคำขอสำเร็จ');
       if (onSuccess) onSuccess();
     } catch (err) {
       console.error('Error sending resource request:', err);
-      alert('เกิดข้อผิดพลาดในการส่งคำขอ');
+      showAlert.error('ผิดพลาด', 'เกิดข้อผิดพลาดในการส่งคำขอ');
     }
   };
 
   return (
-    <div className="card shadow-sm border-0 bg-white">
+    <div className="card shadow-sm border-0 bg-card">
       <div className="card-body p-0">
         <div className="alert alert-info py-2 small mb-3">
           <i className="bi bi-info-circle me-2"></i>สร้างคำขอสำหรับ: <strong>{shelterName}</strong>
@@ -102,9 +116,19 @@ export default function ResourceRequest({
               <input 
                 type="number" 
                 className="form-control" 
-                min="1"
+                placeholder="ระบุจำนวน"
                 value={formData.amount}
-                onChange={(e) => setFormData({...formData, amount: parseInt(e.target.value) || 1 })}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '') {
+                    setFormData({...formData, amount: ''});
+                  } else {
+                    const num = parseInt(val);
+                    if (!isNaN(num)) {
+                      setFormData({...formData, amount: Math.max(0, num)});
+                    }
+                  }
+                }}
               />
             </div>
             

@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { Shelter } from "@/types/shelter";
-import { getAggregatedMovement, getCapacityStatus } from "@/utils/shelter-utils";
+import { getCapacityStatus } from "@/utils/shelter-utils";
 
 interface ShelterListProps {
   shelters: Shelter[];
@@ -9,12 +9,23 @@ interface ShelterListProps {
   setTimeRange: (range: number) => void;
   searchTerm: string;
   setSearchTerm: (term: string) => void;
+  currentPage: number;
+  setCurrentPage: (page: number) => void;
+  filterCapacity: string;
+  setFilterCapacity: (status: string) => void;
+  filterDistrict: string;
+  setFilterDistrict: (district: string) => void;
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+  isLoading?: boolean;
   onAction?: (id: string, action: 'in' | 'out') => void;
   onEdit?: (shelter: Shelter) => void;
   onDelete?: (id: string) => void;
 }
-
-const ITEMS_PER_PAGE = 30;
 
 export default function ShelterList({ 
   shelters, 
@@ -22,41 +33,26 @@ export default function ShelterList({
   setTimeRange, 
   searchTerm, 
   setSearchTerm,
+  currentPage,
+  setCurrentPage,
+  filterCapacity,
+  setFilterCapacity,
+  filterDistrict,
+  setFilterDistrict,
+  pagination,
+  isLoading,
   onAction,
   onEdit,
   onDelete
 }: ShelterListProps) {
-  const [currentPage, setCurrentPage] = useState(1);
-  const [filterCapacity, setFilterCapacity] = useState('All');
-  const [filterDistrict, setFilterDistrict] = useState('All');
-
   const districts = useMemo(() => {
-    return ['All', ...new Set(shelters.map(s => s.district).filter(Boolean))];
-  }, [shelters]);
+    // Note: In a fully server-side system, this should ideally come from an API metadata
+    // But for now we can still extract from what's currently loaded or fixed list
+    return ['All', 'เมือง', 'วารินชำราบ', 'เดชอุดม', 'ตระการพืชผล', 'พิบูลมังสาหาร', 'เขมราฐ']; 
+  }, []);
 
-  const filteredShelters = useMemo(() => {
-    return shelters.filter(s => {
-      const matchSearch = (s.name?.toLowerCase().includes(searchTerm.toLowerCase())) || 
-                          (s.district?.toLowerCase().includes(searchTerm.toLowerCase()));
-      
-      const status = getCapacityStatus(s.currentOccupancy, s.capacity);
-      const matchCapacity = filterCapacity === 'All' || status.text === filterCapacity;
-      
-      const matchDistrict = filterDistrict === 'All' || s.district === filterDistrict;
-      
-      return matchSearch && matchCapacity && matchDistrict;
-    });
-  }, [shelters, searchTerm, filterCapacity, filterDistrict]);
-
-  const totalPages = Math.ceil(filteredShelters.length / ITEMS_PER_PAGE);
-  const paginatedShelters = filteredShelters.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, filterCapacity, filterDistrict]);
+  const totalPages = pagination.totalPages;
+  const paginatedShelters = shelters; // Data is already paginated from API
 
   const hasActions = onAction || onEdit || onDelete;
 
@@ -146,10 +142,10 @@ export default function ShelterList({
         <div className="card-body p-2 px-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
           <div className="d-flex align-items-center gap-2">
             <span className="text-secondary small">จำนวนศูนย์พักพิงที่พบ:</span>
-            <span className="badge bg-primary px-3 py-2 rounded-3">{filteredShelters.length} รายการ</span>
+            <span className="badge bg-primary px-3 py-2 rounded-3">{pagination.total} รายการ</span>
           </div>
           <div className="text-secondary small">
-            หน้า <span className="fw-bold text-primary">{currentPage}</span> จาก <span className="fw-bold">{totalPages || 1}</span>
+            หน้า <span className="fw-bold text-primary">{pagination.page}</span> จาก <span className="fw-bold">{pagination.totalPages || 1}</span>
           </div>
         </div>
       </div>
@@ -163,11 +159,11 @@ export default function ShelterList({
               </h6>
             </div>
             <div className="col-12 col-md-12 col-xl-8 d-flex justify-content-center justify-content-xl-end">
-              <div className="btn-group btn-group-sm p-1 rounded-pill overflow-auto" style={{ backgroundColor: 'rgba(0,0,0,0.05)', whiteSpace: 'nowrap' }}>
+              <div className="btn-group btn-group-sm p-1 rounded-pill overflow-auto" style={{ backgroundColor: 'var(--bg-secondary)', whiteSpace: 'nowrap' }}>
                 {[1, 3, 7, 14, 30].map((range) => (
                   <button 
                     key={range}
-                    className={`btn px-3 rounded-pill border-0 ${timeRange === range ? 'btn-primary shadow-sm' : 'text-secondary'}`}
+                    className={`btn px-3 rounded-pill border-0 ${timeRange === range ? 'btn-primary shadow-sm text-white' : 'text-secondary'}`}
                     onClick={() => setTimeRange(range)}
                   >
                     {range === 1 ? 'วันนี้' : `${range} วัน`}
@@ -194,8 +190,10 @@ export default function ShelterList({
           </thead>
           <tbody>
             {paginatedShelters.map((shelter) => {
-              const status = getCapacityStatus(shelter.currentOccupancy, shelter.capacity);
-              const movement = getAggregatedMovement(shelter.dailyLogs, timeRange);
+              const status = getCapacityStatus(shelter.currentOccupancy ?? 0, shelter.capacity);
+              // ✅ ใช้ข้อมูล movement ที่คำนวณมาจาก backend แล้ว
+              // หรือ default เป็น { in: 0, out: 0 } ถ้ายังไม่มี
+              const movement = shelter.recentMovement || { in: 0, out: 0 };
 
               return (
                 <tr key={shelter._id} className="border-bottom-theme">
@@ -231,7 +229,7 @@ export default function ShelterList({
                     </div>
                   </td>
                   <td className="text-center fw-bold d-none d-md-table-cell py-3">
-                     {shelter.currentOccupancy} / {shelter.capacity}
+                     {shelter.currentOccupancy ?? 0} / {shelter.capacity}
                   </td>
                   <td className="py-3">
                     <span className={`badge rounded-pill bg-${status.color}-subtle text-${status.color} px-2 py-1`} style={{ fontSize: '0.75rem' }}>
@@ -280,7 +278,7 @@ export default function ShelterList({
         <nav className="custom-pagination">
           <div className="pagination-container d-flex align-items-center">
             <button className="pag-btn" onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>«</button>
-            <button className="pag-btn" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>‹</button>
+            <button className="pag-btn" onClick={() => setCurrentPage(Math.max(1, currentPage - 1))} disabled={currentPage === 1}>‹</button>
             {(() => {
               const pages = [];
               const showRange = 2;
@@ -295,7 +293,7 @@ export default function ShelterList({
               }
               return pages;
             })()}
-            <button className="pag-btn" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>›</button>
+            <button className="pag-btn" onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))} disabled={currentPage === totalPages}>›</button>
             <button className="pag-btn" onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages}>»</button>
           </div>
         </nav>

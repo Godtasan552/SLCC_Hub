@@ -27,3 +27,59 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: false, error: 'ไม่สามารถสร้างคลังกลางได้' }, { status: 400 });
   }
 }
+
+// PATCH for Bulk Import/Update
+export async function PATCH(req: Request) {
+  await dbConnect();
+  try {
+    const body = await req.json();
+    const { data } = body;
+
+    if (!Array.isArray(data)) {
+      return NextResponse.json({ success: false, error: 'Data must be an array' }, { status: 400 });
+    }
+
+    const bulkOps = [];
+    const results = [];
+
+    for (const item of data) {
+      // Basic sanitization
+      const sanitizedName = (item.name || '').trim();
+      const updateData = {
+        name: sanitizedName,
+        district: (item.district || 'ไม่ระบุ').trim(),
+        subdistrict: (item.subdistrict || '').trim(),
+        phoneNumbers: Array.isArray(item.phoneNumbers) ? item.phoneNumbers : (item.phoneNumbers ? [item.phoneNumbers] : [])
+      };
+
+      if (!sanitizedName) continue;
+
+      bulkOps.push({
+        updateOne: {
+          filter: { name: sanitizedName },
+          update: { $set: updateData },
+          upsert: true
+        }
+      });
+      results.push({ name: sanitizedName });
+    }
+
+    if (bulkOps.length > 0) {
+      const bulkResult = await Hub.bulkWrite(bulkOps);
+      return NextResponse.json({ 
+        success: true, 
+        summary: {
+          matched: bulkResult.matchedCount,
+          modified: bulkResult.modifiedCount,
+          upserted: bulkResult.upsertedCount
+        },
+        results 
+      });
+    }
+
+    return NextResponse.json({ success: true, results: [] });
+  } catch (error) {
+    console.error('Failed to bulk import hubs:', error);
+    return NextResponse.json({ success: false, error: 'Failed to bulk import hubs' }, { status: 500 });
+  }
+}

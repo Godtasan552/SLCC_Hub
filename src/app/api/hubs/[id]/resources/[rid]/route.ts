@@ -71,3 +71,43 @@ export async function PATCH(
     return NextResponse.json({ success: false, message: errorMsg }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  req: Request,
+  { params }: { params: Promise<{ id: string; rid: string }> }
+) {
+  try {
+    await dbConnect();
+    const { id, rid } = await params;
+
+    const hub = await Hub.findById(id);
+    if (!hub) {
+      return NextResponse.json({ success: false, message: 'ไม่พบข้อมูลคลัง' }, { status: 404 });
+    }
+
+    const resource = hub.resources.id(rid);
+    if (!resource) {
+      return NextResponse.json({ success: false, message: 'ไม่พบคำร้อง' }, { status: 404 });
+    }
+
+    if (resource.status !== 'Pending') {
+      return NextResponse.json({ 
+        success: false, 
+        message: 'ไม่สามารถยกเลิกได้ เนื่องจากรายการถูกดำเนินการไปแล้ว' 
+      }, { status: 400 });
+    }
+
+    await Hub.findByIdAndUpdate(id, {
+      $pull: { resources: { _id: rid } }
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: 'ยกเลิกคำร้องขอเรียบร้อยแล้ว'
+    });
+
+  } catch (error: unknown) {
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ success: false, message: errorMsg }, { status: 500 });
+  }
+}

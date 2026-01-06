@@ -2,23 +2,63 @@
 
 /* Theme Variables */
 :root[data-theme="dark"] {
-  --bg-primary: #121416;
-  --bg-secondary: #1a1d21;
-  --bg-card: #22262b;
+  --bg-primary: #12141c;
+  --bg-secondary: #1a1d26;
+  --bg-card: #222632;
   --text-primary: #ffffff;
-  --text-secondary: #ced4da;
-  --border-color: #2d3238; /* Subtler border for dark mode */
-  --table-hover: #2c3036;
+  --text-secondary: #e9ecef;
+  --border-color: #3f444b;
+  --table-hover: #2c313c;
+  --bg-opacity-primary: rgba(13, 110, 253, 0.15);
+  --bg-opacity-success: rgba(25, 135, 84, 0.15);
+  --bg-opacity-warning: rgba(255, 193, 7, 0.15);
+  --bg-opacity-danger: rgba(220, 53, 69, 0.15);
+  --bg-body: #12141c;
+  
+  /* Semantic Text Colors (Dark Mode) */
+  --text-success: #2ecc71;
+  --text-warning: #f1c40f;
+  --text-danger: #e74c3c;
+  --text-info: #3498db;
+  
+  /* Semantic Backgrounds (Dark Mode) */
+  --bg-success: #198754;
+  --bg-warning: #ffc107;
+  --bg-danger: #dc3545;
+  --bg-info: #0dcaf0;
+
+  --bg-overlay: rgba(255, 255, 255, 0.05);
+  --bg-overlay-hover: rgba(255, 255, 255, 0.1);
 }
 
 :root[data-theme="light"] {
-  --bg-primary: #f8f9fa;
-  --bg-secondary: #f1f3f5;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f3f4f6;
   --bg-card: #ffffff;
-  --text-primary: #1a1d21;       /* Darker than before for crispness */
-  --text-secondary: #495057;     /* Darker grey for better readability */
-  --border-color: #dee2e6;
-  --table-hover: #f1f3f5;
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --border-color: #e5e7eb;
+  --table-hover: #f9fafb;
+  --bg-opacity-primary: rgba(13, 110, 253, 0.08);
+  --bg-opacity-success: rgba(25, 135, 84, 0.08);
+  --bg-opacity-warning: rgba(255, 193, 7, 0.08);
+  --bg-opacity-danger: rgba(220, 53, 69, 0.08);
+  --bg-body: #ffffff;
+
+  /* Semantic Text Colors (Light Mode) */
+  --text-success: #198754;
+  --text-warning: #d68910; /* Darker for better contrast on light bg */
+  --text-danger: #dc3545;
+  --text-info: #0dcaf0;
+
+  /* Semantic Backgrounds (Light Mode) */
+  --bg-success: #198754;
+  --bg-warning: #ffc107;
+  --bg-danger: #dc3545;
+  --bg-info: #0dcaf0;
+
+  --bg-overlay: rgba(0, 0, 0, 0.03);
+  --bg-overlay-hover: rgba(0, 0, 0, 0.05);
 }
 
 html,
@@ -26,14 +66,14 @@ body {
   max-width: 100vw;
   overflow-x: hidden;
   height: 100%;
+  background-color: var(--bg-primary); /* Move background here for better hydration */
+  color: var(--text-primary);
 }
 
 body {
-  color: var(--text-primary);
-  background: var(--bg-primary);
   font-family: 'Inter', 'Noto Sans Thai', Arial, sans-serif;
-  line-height: 1.6;               /* Better spacing between lines */
-  letter-spacing: -0.01em;       /* Modern spacing for Inter */
+  line-height: 1.6;
+  letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
@@ -59,10 +99,19 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Theme-aware table styles */
 .table {
-  --bs-table-bg: var(--bg-card);
-  --bs-table-color: var(--text-primary);
-  --bs-table-border-color: var(--border-color);
-  --bs-table-hover-bg: var(--table-hover);
+  --bs-table-bg: transparent !important;
+  --bs-table-color: var(--text-primary) !important;
+  --bs-table-border-color: var(--border-color) !important;
+  --bs-table-hover-bg: var(--table-hover) !important;
+  color: var(--text-primary) !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+
+[data-theme="dark"] .table > :not(caption) > * > * {
+  background-color: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-color) !important;
 }
 
 .table thead th {
@@ -73,10 +122,15 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 0.75rem;
   letter-spacing: 0.05em;
   border-bottom: 2px solid var(--border-color) !important;
+  padding: 1rem 0.75rem !important;
 }
 
-.table tbody {
-  color: var(--text-primary);
+.table tbody tr {
+  transition: all 0.2s ease;
+}
+
+.table-hover tbody tr:hover td {
+  background-color: var(--table-hover) !important;
 }
 
 /* Theme-aware card styles - Premium Look */
@@ -87,6 +141,13 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-primary) !important;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04) !important;
   transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+  overflow: hidden;
+}
+
+.card-header {
+  background-color: var(--bg-secondary) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  color: var(--text-primary) !important;
 }
 
 [data-theme="dark"] .card {
@@ -99,6 +160,16 @@ h1, h2, h3, h4, h5, h6 {
 
 [data-theme="dark"] .card:hover {
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Progress bar dark mode support */
+.progress {
+  background-color: var(--bg-secondary) !important;
+  border-radius: 10px !important;
+}
+
+.progress-bar {
+  border-radius: 10px !important;
 }
 
 /* Theme Utility Classes */
@@ -124,12 +195,24 @@ h1, h2, h3, h4, h5, h6 {
 .form-select {
   background-color: var(--bg-card) !important;
   color: var(--text-primary) !important;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border-color) !important;
   border-radius: 8px;
   padding: 0.6rem 1rem !important;
   font-size: 0.9rem !important;
   font-weight: 500 !important;
   transition: all 0.2s ease !important;
+}
+
+/* Fixed for floating labels in Dark Mode */
+.form-floating > label {
+  color: var(--text-secondary);
+}
+
+.form-floating > .form-control:focus ~ label,
+.form-floating > .form-control:not(:placeholder-shown) ~ label,
+.form-floating > .form-select ~ label {
+  color: var(--text-primary);
+  opacity: 0.8;
 }
 
 /* Fix for input-group connection */
@@ -152,7 +235,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .input-group-text {
-  background-color: var(--bg-card) !important;
+  background-color: var(--bg-secondary) !important;
   border: 1px solid var(--border-color) !important;
   color: var(--text-secondary) !important;
 }
@@ -167,7 +250,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 [data-theme="dark"] .form-select {
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ced4da' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23adb5bd' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
 }
 
 .form-control:focus,
@@ -196,8 +279,13 @@ input:-webkit-autofill:active {
 }
 
 /* Bootstrap Utility Overrides for Readability */
+.text-secondary {
+  color: var(--text-secondary) !important;
+}
+
 .text-muted {
   color: var(--text-secondary) !important;
+  opacity: 0.8;
 }
 
 .small, small {
@@ -205,7 +293,16 @@ input:-webkit-autofill:active {
   font-weight: 500;
 }
 
+/* Override Bootstrap BG classes to respect theme */
 .bg-light {
+  background-color: var(--bg-secondary) !important;
+}
+
+.bg-secondary {
+  background-color: var(--bg-secondary) !important;
+}
+
+.bg-body-tertiary {
   background-color: var(--bg-secondary) !important;
 }
 
@@ -213,9 +310,39 @@ input:-webkit-autofill:active {
   background-color: var(--bg-card) !important;
 }
 
+.bg-primary-subtle {
+  background-color: var(--bg-opacity-primary) !important;
+}
+
+.bg-success-subtle {
+  background-color: var(--bg-opacity-success) !important;
+}
+
+.bg-warning-subtle {
+  background-color: var(--bg-opacity-warning) !important;
+}
+
+.bg-danger-subtle {
+  background-color: var(--bg-opacity-danger) !important;
+}
+
 .border {
   border-color: var(--border-color) !important;
 }
+
+/* Override Bootstrap Text Utilities */
+.text-success { color: var(--text-success) !important; }
+.text-warning { color: var(--text-warning) !important; }
+.text-danger { color: var(--text-danger) !important; }
+.text-info { color: var(--text-info) !important; }
+.text-dark { color: var(--text-primary) !important; } /* In dark mode, text-dark should actually be light */
+.text-body { color: var(--text-primary) !important; }
+
+/* Override Bootstrap Background Utilities */
+.bg-success { background-color: var(--bg-success) !important; }
+.bg-warning { background-color: var(--bg-warning) !important; }
+.bg-danger { background-color: var(--bg-danger) !important; }
+.bg-info { background-color: var(--bg-info) !important; }
 
 /* Badge readable improvements */
 .badge {

@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import Shelter from '../models/Shelter';
+import Hub from '../models/Hub';
 import dotenv from 'dotenv';
 import path from 'path';
 
@@ -22,27 +23,36 @@ const analyzePhones = async () => {
       phoneNumbers: { $exists: true, $not: { $size: 0 } } 
     }).select('name phoneNumbers');
 
-    console.log(`Analyzing ${shelters.length} shelters with phone numbers...`);
+    const hubs = await Hub.find({ 
+      phoneNumbers: { $exists: true, $not: { $size: 0 } } 
+    }).select('name phoneNumbers');
+
+    const allLocations = [
+        ...shelters.map(s => ({ ...s.toObject(), type: 'Shelter' })),
+        ...hubs.map(h => ({ ...h.toObject(), type: 'Hub' }))
+    ];
+
+    console.log(`Analyzing ${allLocations.length} locations with phone numbers...`);
 
     let shortPhones = 0;
     let longPhones = 0;
     let normalPhones = 0;
     const examples: { short: string[], long: string[], normal: string[] } = { short: [], long: [], normal: [] };
 
-    for (const shelter of shelters) {
-        for (const phone of shelter.phoneNumbers) {
+    for (const loc of allLocations) {
+        for (const phone of loc.phoneNumbers) {
             // Remove non-digit characters for counting length
             const cleanPhone = phone.replace(/\D/g, '');
             if (cleanPhone.length > 0) { // Should check length of clean phone, but context implies stored as strings potentially with dashes
                 if (cleanPhone.length < 9) {
                     shortPhones++;
-                    if (examples.short.length < 5) examples.short.push(`${phone} (${shelter.name})`);
+                    if (examples.short.length < 5) examples.short.push(`${phone} (${loc.name})`);
                 } else if (cleanPhone.length > 10) {
                     longPhones++;
-                    if (examples.long.length < 5) examples.long.push(`${phone} (${shelter.name})`);
+                    if (examples.long.length < 5) examples.long.push(`${phone} (${loc.name})`);
                 } else {
                     normalPhones++;
-                     if (examples.normal.length < 2) examples.normal.push(`${phone} (${shelter.name})`);
+                     if (examples.normal.length < 2) examples.normal.push(`${phone} (${loc.name})`);
                 }
             }
         }

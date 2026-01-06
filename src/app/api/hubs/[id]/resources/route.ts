@@ -21,6 +21,9 @@ export async function POST(
       if (!res.itemName || !res.amount) {
         return NextResponse.json({ success: false, error: 'ข้อมูลไม่ครบถ้วน (itemName and amount are required)' }, { status: 400 });
       }
+      if (Number(res.amount) <= 0) {
+        return NextResponse.json({ success: false, error: 'จำนวนต้องมากกว่า 0' }, { status: 400 });
+      }
     }
 
     const hub = await Hub.findByIdAndUpdate(
