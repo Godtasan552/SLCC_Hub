@@ -66,7 +66,7 @@ export default function CreateRequestClient() {
   // Transform allSupplies into unique catalog items (NO GROUPING)
   const catalogItems = useMemo(() => {
     return allSupplies
-      .filter(s => s.quantity > 0)
+      .filter(s => s.quantity > 0 && s.shelterId && hubs.some(h => h._id === s.shelterId))
       .map(s => {
         const standard = STANDARD_ITEMS.find(si => si.name === s.name);
         const hub = hubs.find(h => h._id === s.shelterId);
@@ -286,9 +286,9 @@ export default function CreateRequestClient() {
                         {paginatedCatalog.map(item => {
                           const isSelected = cart.find(c => c.name === item.name && c.sourceHubId === item.sourceHubId);
                           return (
-                            <div key={item.name} className="col-6 col-sm-4 col-md-3 col-lg-2 px-1 mb-2">
+                            <div key={item._id} className="col-6 col-sm-4 col-md-3 col-lg-2 px-1 mb-2">
                               <div 
-                                className={`card cursor-pointer border transition-all p-2 text-center position-relative ${isSelected ? 'border-primary shadow-sm bg-primary bg-opacity-5' : 'border-secondary bg-light bg-opacity-10'}`}
+                                className={`card cursor-pointer border transition-all p-2 text-center position-relative ${isSelected ? 'border-primary shadow-sm bg-primary bg-opacity-10' : 'border-theme bg-card'}`}
                                 style={{ 
                                   borderRadius: '12px', 
                                   aspectRatio: '4 / 5',
@@ -300,12 +300,12 @@ export default function CreateRequestClient() {
                               >
                                 {isSelected && <div className="position-absolute top-0 end-0 p-2"><i className="bi bi-check-circle-fill text-primary" style={{ fontSize: '0.9rem' }}></i></div>}
                                 <div className="d-flex flex-column align-items-center justify-content-center flex-grow-1 p-1">
-                                   <div className={`p-2 rounded-circle mb-2 ${isSelected ? 'bg-primary text-white' : 'bg-white text-primary border border-2'}`} style={{ width: '42px', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                   <div className={`p-2 rounded-circle mb-2 ${isSelected ? 'bg-primary text-white' : 'bg-body text-primary border border-2'}`} style={{ width: '42px', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                       <i className={`bi ${item.icon} fs-5`}></i>
                                    </div>
-                                   <div className="text-muted mb-1 text-truncate w-100" style={{ fontSize: '0.6rem', letterSpacing: '-0.1px' }}>{item.category}</div>
-                                   <div className="fw-bold px-1 text-center w-100" style={{ fontSize: '0.75rem', lineHeight: '1.2', maxHeight: '2.4em', overflow: 'hidden' }}>{item.name}</div>
-                                   <div className="text-secondary small mt-1 text-truncate w-100" style={{ fontSize: '0.6rem' }}>
+                                   <div className="text-theme-secondary mb-1 text-truncate w-100" style={{ fontSize: '0.6rem', letterSpacing: '-0.1px' }}>{item.category}</div>
+                                   <div className="fw-bold px-1 text-center w-100 text-theme" style={{ fontSize: '0.75rem', lineHeight: '1.2', maxHeight: '2.4em', overflow: 'hidden' }}>{item.name}</div>
+                                   <div className="text-theme-secondary small mt-1 text-truncate w-100" style={{ fontSize: '0.6rem' }}>
                                       <i className="bi bi-building me-1"></i>{item.sourceHubName}
                                    </div>
                                 </div>
@@ -351,7 +351,7 @@ export default function CreateRequestClient() {
                             <button 
                                 className="btn btn-primary px-5 py-2 rounded-pill fw-bold shadow-sm" 
                                 onClick={() => setStep(2)}
-                                disabled={cart.some(c => !c.requestQuantity || parseInt(String(c.requestQuantity)) <= 0)}
+                                disabled={cart.some(c => !c.requestQuantity || parseInt(String(c.requestQuantity)) <= 0 || parseInt(String(c.requestQuantity)) > (c.totalStockAvailable || 0))}
                             >
                                 ถัดไป: เลือกศูนย์ปลายทาง <i className="bi bi-arrow-right ms-2"></i>
                             </button>
@@ -462,7 +462,7 @@ export default function CreateRequestClient() {
                                 </thead>
                                 <tbody>
                                     {cart.map(item => (
-                                        <tr key={item.name}>
+                                        <tr key={`${item.name}-${item.sourceHubId}`}>
                                             <td className="ps-3 fw-bold">{item.name}</td>
                                             <td className="text-center">{item.requestQuantity}</td>
                                             <td className="text-center small">
@@ -487,7 +487,7 @@ export default function CreateRequestClient() {
                 </div>
 
                 {/* Right Summary Pane (Shopping Cart style) */}
-                <div className="col-lg-4 p-4 border-start bg-light bg-opacity-50">
+                <div className="col-lg-4 p-4 border-start bg-secondary bg-opacity-10">
                     <div className="d-flex justify-content-between align-items-center mb-4">
                        <h6 className="fw-bold mb-0">รายการที่เลือก ({cart.length})</h6>
                        <button className="btn btn-link btn-sm text-danger p-0 text-decoration-none" onClick={() => setCart([])}>ล้างรายการ</button>
@@ -496,12 +496,14 @@ export default function CreateRequestClient() {
                     <div className="cart-container overflow-auto pe-2" style={{ maxHeight: '600px' }}>
                         {cart.map(item => {
                             const stock = item.totalStockAvailable || 0;
+                            const qty = parseInt(String(item.requestQuantity)) || 0;
+                            const isOverStock = qty > stock;
                             return (
-                                <div key={`${item.name}-${item.sourceHubId}`} className="card border-light shadow-sm mb-3">
+                                <div key={`${item.name}-${item.sourceHubId}`} className={`card shadow-sm mb-3 ${isOverStock ? 'border-danger' : 'border-light'}`} style={{ backgroundColor: 'var(--bg-card)' }}>
                                     <div className="card-body p-3">
                                         <div className="d-flex justify-content-between mb-2">
                                             <div>
-                                                <div className="fw-bold small">{item.name}</div>
+                                                <div className={`fw-bold small ${isOverStock ? 'text-danger' : 'text-theme'}`}>{item.name}</div>
                                                 <div className="text-secondary" style={{ fontSize: '0.65rem' }}>
                                                     <i className="bi bi-building me-1"></i>{item.sourceHubName}
                                                 </div>
@@ -513,7 +515,7 @@ export default function CreateRequestClient() {
                                                 <button className="btn btn-outline-secondary" onClick={() => updateCartQuantity(item.name, item.sourceHubId, (parseInt(String(item.requestQuantity)) || 0) - 1)}>-</button>
                                                 <input 
                                                   type="number" 
-                                                  className="form-control text-center fw-bold" 
+                                                  className={`form-control text-center fw-bold ${parseInt(String(item.requestQuantity)) > stock ? 'is-invalid text-danger border-danger' : ''}`}
                                                   value={item.requestQuantity} 
                                                   placeholder="0"
                                                   onKeyDown={(e) => {
