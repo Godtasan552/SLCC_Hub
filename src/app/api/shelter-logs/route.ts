@@ -115,3 +115,72 @@ export async function GET(req: Request) {
     }, { status: 500 });
   }
 }
+
+/**
+ * PATCH /api/shelter-logs
+ * 
+ * นำเข้าข้อมูลการรับเข้า/ส่งออก แบบกลุ่ม (Bulk Import)
+ */
+export async function PATCH(req: Request) {
+  await dbConnect();
+  try {
+    const body = await req.json();
+    const { data } = body;
+
+    if (!Array.isArray(data)) {
+      return NextResponse.json({ success: false, error: 'ข้อมูลต้องเป็นอาเรย์' }, { status: 400 });
+    }
+
+    // 1. ดึงรายชื่อศูนย์ทั้งหมดมาทำ Map เพื่อความเร็วในการค้นหา
+    const shelters = await Shelter.find({}, '_id name');
+    const shelterMap = new Map();
+    shelters.forEach(s => {
+      shelterMap.set(s.name.trim(), s._id);
+    });
+
+    const logsToCreate = [];
+    const skipped = [];
+
+    for (const item of data) {
+      const name = (item.name || '').trim();
+      const shelterId = shelterMap.get(name);
+      
+      const action = String(item.action).toLowerCase();
+      const amount = Number(item.amount);
+
+      if (!shelterId || !['in', 'out'].includes(action) || isNaN(amount) || amount <= 0) {
+        skipped.push({ name, error: !shelterId ? 'ไม่พบศูนย์' : 'ข้อมูลไม่ถูกต้อง' });
+        continue;
+      }
+
+      logsToCreate.push({
+        shelterId,
+        action,
+        amount,
+        date: item.date ? new Date(item.date) : new Date()
+      });
+    }
+
+    if (logsToCreate.length > 0) {
+      const result = await ShelterLog.insertMany(logsToCreate);
+      return NextResponse.json({
+        success: true,
+        summary: {
+          created: result.length,
+          skipped: skipped.length
+        },
+        skippedItems: skipped
+      });
+    }
+
+    return NextResponse.json({ 
+      success: false, 
+      error: 'ไม่มีข้อมูลที่ถูกต้องในการนำเข้า',
+      skippedItems: skipped 
+    }, { status: 400 });
+
+  } catch (error) {
+    console.error('Failed to bulk import logs:', error);
+    return NextResponse.json({ success: false, error: 'เกิดข้อผิดพลาดในการนำเข้าข้อมูล' }, { status: 500 });
+  }
+}

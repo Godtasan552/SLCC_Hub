@@ -27,7 +27,7 @@ export default function AdminPage() {
   const isAdmin = role === 'admin';
 
   // --- States ---
-  const [activeTab, setActiveTab] = useState<'daily' | 'management'>('daily');
+  const [activeTab, setActiveTab] = useState<'daily' | 'management' | 'logs'>('daily');
   const [activeImportSchema, setActiveImportSchema] = useState<'excel' | 'json'>('excel');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -292,6 +292,86 @@ export default function AdminPage() {
     }
   };
 
+  const handleLogFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLoading(true);
+    setUploadProgress(1);
+    setMessage('กำลังอ่านไฟล์บันทึกรายวัน...');
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let dataToImport: any[] = [];
+      
+      if (file.name.endsWith('.json')) {
+        const text = await file.text();
+        setUploadProgress(20);
+        const json = JSON.parse(text);
+        dataToImport = json.data || json;
+        setUploadProgress(40);
+      } else if (file.name.endsWith('.xlsx')) {
+        const arrayBuffer = await file.arrayBuffer();
+        setUploadProgress(15);
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(arrayBuffer);
+        setUploadProgress(30);
+        const worksheet = workbook.getWorksheet(1);
+        if (worksheet) {
+          const totalRows = worksheet.rowCount;
+          let processedRows = 0;
+          
+          worksheet.eachRow((row, rowNumber) => {
+            if (rowNumber > 1) { 
+              dataToImport.push({
+                name: String(row.getCell(1).value || '').trim(),
+                action: String(row.getCell(2).value || '').toLowerCase().trim(),
+                amount: Number(row.getCell(3).value) || 0
+              });
+            }
+            processedRows++;
+            const parseProgress = 30 + Math.round((processedRows / totalRows) * 10);
+            setUploadProgress(parseProgress);
+          });
+        }
+      }
+      
+      setUploadProgress(40);
+      setMessage(`กำลังนำเข้าบันทึก ${dataToImport.length} รายการ...`);
+      
+      const res = await axios.patch('/api/shelter-logs', { data: dataToImport }, {
+        onUploadProgress: (progressEvent) => {
+            if (progressEvent.total) {
+                const uploadPercent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                const totalProgress = 40 + Math.round(uploadPercent * 0.5);
+                setUploadProgress(totalProgress);
+            }
+        }
+      });
+      
+      setUploadProgress(100);
+      setMessage('นำเข้าสำเร็จ!');
+      const summary = res.data.summary;
+      showAlert.success('สำเร็จ', `นำเข้าบันทึกเข้า-ออกสำเร็จ ${summary.created} รายการ (ข้าม ${summary.skipped} รายการ)`);
+      
+      // Reset
+      if (e.target) e.target.value = '';
+      setTimeout(() => {
+          setLoading(false);
+          setUploadProgress(0);
+          setMessage('');
+          refreshData();
+      }, 2000);
+
+    } catch (err) {
+      showAlert.error('ผิดพลาด', 'ไฟล์ไม่ถูกต้อง หรือเกิดข้อผิดพลาดในการนำเข้า');
+      console.error(err);
+      setLoading(false);
+      setUploadProgress(0);
+      setMessage('');
+    }
+  };
+
   return (
     <div className="container-fluid px-4 py-4" style={{ maxWidth: '1600px', minHeight: '100vh', backgroundColor: 'var(--bg-primary)' }}>
       
@@ -313,6 +393,13 @@ export default function AdminPage() {
                 onClick={() => setActiveTab('daily')}
             >
                 <i className="bi bi-list-check me-2"></i>อัปเดตรายวัน
+            </button>
+            <button 
+                className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'logs' ? 'btn-primary shadow-sm text-white' : 'text-white'}`}
+                style={{ opacity: activeTab === 'logs' ? 1 : 0.75 }}
+                onClick={() => setActiveTab('logs')}
+            >
+                <i className="bi bi-clock-history me-2"></i>นำเข้าประวัติรายวัน
             </button>
             <button 
                 className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'management' ? 'btn-primary shadow-sm text-white' : 'text-white'}`}
@@ -513,6 +600,88 @@ export default function AdminPage() {
                     </div>
                 </div>
              </div>
+        )}
+
+        {/* TAB 3: Logs Bulk Import */}
+        {activeTab === 'logs' && (
+            <div className="row g-4 justify-content-center">
+                <div className="col-lg-8">
+                    <div className="card border-0 shadow-sm" style={{ backgroundColor: 'var(--bg-card)' }}>
+                        <div className="card-header bg-transparent border-bottom py-3 px-4">
+                            <h6 className="mb-0 fw-bold text-success"><i className="bi bi-file-earmark-excel-fill me-2"></i>นำเข้าบันทึกการเข้า-ออกรายวันแบบกลุ่ม</h6>
+                        </div>
+                        <div className="card-body p-5 text-center">
+                            <div className="upload-box p-5 rounded-4 border-2 border-dashed mb-4 cursor-pointer transition-all" onClick={() => !loading && document.getElementById('logFileIn')?.click()}>
+                                {loading && uploadProgress > 0 ? (
+                                    <div className="animate-fade-in py-3">
+                                        <h5 className="mb-3 text-success fw-bold">🚀 {message || 'กำลังดำเนินการ...'} {uploadProgress}%</h5>
+                                        <div className="progress rounded-pill shadow-sm mx-auto" style={{ height: '20px', width: '80%', backgroundColor: 'var(--bg-secondary)' }}>
+                                            <div 
+                                                className="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                                                role="progressbar" 
+                                                style={{ width: `${uploadProgress}%`, transition: 'width 0.3s ease-in-out' }} 
+                                                aria-valuenow={uploadProgress} 
+                                                aria-valuemin={0} 
+                                                aria-valuemax={100}
+                                            >
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <i className="bi bi-box-arrow-in-down-right text-success mb-3" style={{ fontSize: '4rem', opacity: 0.8 }}></i>
+                                        <h4 className="fw-bold mb-2">อัปโหลดไฟล์ Excel / JSON ประวัติรายวัน</h4>
+                                        <p className="text-secondary">ใช้สำหรับบันทึกการ เข้า-ออก จำนวนมากพร้อมกันหลายศูนย์</p>
+                                        <button className="btn btn-success rounded-pill px-5 mt-3 shadow-sm" disabled={loading}>
+                                            <i className="bi bi-folder2-open me-2"></i>เลือกไฟล์จากเครื่อง
+                                        </button>
+                                    </>
+                                )}
+                                <input type="file" id="logFileIn" className="d-none" accept=".json,.xlsx" onChange={handleLogFileUpload} disabled={loading} />
+                            </div>
+
+                            <div className="text-start mb-4">
+                                <label className="small fw-bold text-secondary mb-2">โครงสร้างไฟล์ที่รองรับ (Excel หัวตารางเริ่มแถว 2):</label>
+                                <div className="table-responsive rounded-3 border">
+                                    <table className="table table-sm table-bordered mb-0 small text-nowrap">
+                                        <thead className="table-light text-center">
+                                            <tr>
+                                                <th className="bg-light" style={{ width: '100px' }}>คอลัมน์</th>
+                                                <th>A (1)</th>
+                                                <th>B (2)</th>
+                                                <th>C (3)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr className="text-center">
+                                                <td className="fw-bold">ข้อมูล</td>
+                                                <td>ชื่อศูนย์พักพิง</td>
+                                                <td>ประเภท (in/out)</td>
+                                                <td>จำนวนคน</td>
+                                            </tr>
+                                            <tr className="text-center text-primary">
+                                                <td className="fw-bold text-dark">ตัวอย่าง</td>
+                                                <td>วัดศรีบุญเรือง</td>
+                                                <td>in</td>
+                                                <td>120</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div className="alert alert-info border-0 shadow-sm text-start mb-0">
+                                <h6 className="fw-bold mb-1"><i className="bi bi-lightbulb-fill me-2"></i>ข้อควรรู้</h6>
+                                <ul className="small mb-0 mt-2">
+                                    <li><strong>ชื่อศูนย์พักพิง:</strong> ต้องตรงกับชื่อที่มีในระบบ (ไม่สนเว้นวรรคหน้า-หลัง)</li>
+                                    <li><strong>ประเภท:</strong> ใส่ <code>in</code> สำหรับรับเข้า และ <code>out</code> สำหรับส่งออก</li>
+                                    <li><strong>จำนวนคน:</strong> ต้องเป็นตัวเลขบวกที่มากกว่า 0</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         )}
       </div>
 
