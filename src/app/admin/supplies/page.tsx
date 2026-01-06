@@ -294,7 +294,7 @@ function SuppliesPageContent() {
            </div>
            <p className="text-secondary small mb-0 ps-1">ระบบบริหารจัดการทรัพยากร สิ่งของบริจาค และเวชภัณฑ์</p>
         </div>
-        <div className="bg-secondary rounded-pill p-1 shadow-sm d-flex" style={{ border: '1px solid var(--border-color)', backgroundColor: '#4b5563' }}>
+        <div className="bg-secondary rounded-pill p-1 shadow-sm d-flex" style={{ border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-secondary)' }}>
             <button 
                 className={`btn btn-sm rounded-pill px-4 fw-bold transition-all ${activeTab === 'inventory' ? 'btn-primary shadow-sm text-white' : 'text-white'}`} 
                 style={{ opacity: activeTab === 'inventory' ? 1 : 0.75 }}
@@ -332,7 +332,7 @@ function SuppliesPageContent() {
                         </div>
                         <div className="col-12 col-md-5 d-flex gap-2">
                             {/* View Mode Toggle */}
-                            <div className="btn-group btn-group-sm p-1 rounded-pill border" style={{ backgroundColor: '#4b5563' }}>
+                            <div className="btn-group btn-group-sm p-1 rounded-pill border" style={{ backgroundColor: 'var(--bg-secondary)' }}>
                                 <button className={`btn btn-sm rounded-pill px-3 ${viewMode === 'hubs' ? 'btn-primary shadow-sm text-white' : 'text-white'}`} style={{ opacity: viewMode === 'hubs' ? 1 : 0.75 }} onClick={() => setViewMode('hubs')}>🏢 คลังกลาง</button>
                                 <button className={`btn btn-sm rounded-pill px-3 ${viewMode === 'all' ? 'btn-primary shadow-sm text-white' : 'text-white'}`} style={{ opacity: viewMode === 'all' ? 1 : 0.75 }} onClick={() => setViewMode('all')}>ทั้งหมด</button>
                             </div>
