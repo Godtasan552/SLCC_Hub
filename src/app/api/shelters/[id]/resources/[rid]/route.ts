@@ -105,3 +105,46 @@ export async function PATCH(
     return NextResponse.json({ success: false, message: errorMsg }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  req: Request,
+  { params }: { params: Promise<{ id: string; rid: string }> }
+) {
+  try {
+    await dbConnect();
+    const { id, rid } = await params;
+
+    // 1. Find the shelter and check the resource status
+    const shelter = await Shelter.findById(id);
+    if (!shelter) {
+      return NextResponse.json({ success: false, message: 'ไม่พบศูนย์พักพิง' }, { status: 404 });
+    }
+
+    const resource = shelter.resources.id(rid);
+    if (!resource) {
+      return NextResponse.json({ success: false, message: 'ไม่พบคำร้อง' }, { status: 404 });
+    }
+
+    // 2. Only allow deletion if status is 'Pending'
+    if (resource.status !== 'Pending') {
+      return NextResponse.json({ 
+        success: false, 
+        message: 'ไม่สามารถยกเลิกได้ เนื่องจากรายการถูกดำเนินการไปแล้ว' 
+      }, { status: 400 });
+    }
+
+    // 3. Remove the resource using $pull
+    await Shelter.findByIdAndUpdate(id, {
+      $pull: { resources: { _id: rid } }
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: 'ยกเลิกคำร้องขอเรียบร้อยแล้ว'
+    });
+
+  } catch (error: unknown) {
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ success: false, message: errorMsg }, { status: 500 });
+  }
+}

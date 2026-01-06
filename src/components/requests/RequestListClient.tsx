@@ -18,6 +18,7 @@ interface Resource {
   shelterId: string;
   sourceHubId?: string;
   sourceHubName?: string;
+  isHub: boolean;
 }
 
 interface RequestListClientProps {
@@ -70,6 +71,34 @@ export default function RequestListClient({ initialRequests }: RequestListClient
     } catch (err) {
       console.error('Confirm receipt failed:', err);
       showAlert.error('เกิดข้อผิดพลาด', 'ไม่สามารถยืนยันรายการได้');
+    } finally {
+      setLoadingId(null);
+    }
+  };
+
+  const handleCancel = async (shelterId: string, resourceId: string, isHub: boolean, itemName: string) => {
+    const isConfirmed = await showAlert.confirmDelete(
+      'ยืนยันการยกเลิก?',
+      `คุณต้องการยกเลิกคำร้องขอ "${itemName}" ใช่หรือไม่?`
+    );
+    if (!isConfirmed) return;
+
+    setLoadingId(resourceId);
+    try {
+      // Note: We'll assume the item source (Hub/Shelter) based on the flag passed from UI
+      const endpoint = isHub 
+        ? `/api/hubs/${shelterId}/resources/${resourceId}`
+        : `/api/shelters/${shelterId}/resources/${resourceId}`;
+        
+      const res = await axios.delete(endpoint);
+      if (res.data.success) {
+        showAlert.success('สำเร็จ', 'ยกเลิกคำร้องขอเรียบร้อยแล้ว');
+        router.refresh();
+      }
+    } catch (err: any) {
+      console.error('Cancel failed:', err);
+      const msg = err.response?.data?.message || 'ไม่สามารถยกเลิกคำร้องขอได้';
+      showAlert.error('ผิดพลาด', msg);
     } finally {
       setLoadingId(null);
     }
@@ -246,30 +275,41 @@ export default function RequestListClient({ initialRequests }: RequestListClient
                     }).format(new Date(req.requestedAt))}
                   </td>
                   <td className="text-end pe-4">
-                    {req.status === 'Approved' && (
-                      <button 
-                        className="btn btn-sm btn-success px-3 rounded-pill fw-bold"
-                        disabled={loadingId === req._id}
-                        onClick={() => handleReceive(req.shelterId, req._id)}
-                      >
-                        {loadingId === req._id ? '⏳' : '📥 ยืนยันรับของ'}
-                      </button>
-                    )}
-                    {req.status === 'Pending' && (
-                      <span className="badge rounded-pill bg-warning text-dark px-3">
-                        ⏳ รออนุมัติ
-                      </span>
-                    )}
-                    {req.status === 'Received' && (
-                      <span className="badge rounded-pill bg-info text-white px-3">
-                        ✅ ได้รับแล้ว
-                      </span>
-                    )}
-                    {req.status === 'Rejected' && (
-                      <span className="badge rounded-pill bg-danger text-white px-3">
-                        ❌ ปฏิเสธแล้ว
-                      </span>
-                    )}
+                    <div className="d-flex justify-content-end gap-2">
+                      {req.status === 'Approved' && (
+                        <button 
+                          className="btn btn-sm btn-success px-3 rounded-pill fw-bold"
+                          disabled={loadingId === req._id}
+                          onClick={() => handleReceive(req.shelterId, req._id)}
+                        >
+                          {loadingId === req._id ? '⏳' : '📥 ยืนยันรับของ'}
+                        </button>
+                      )}
+                      {req.status === 'Pending' && (
+                        <>
+                          <span className="badge rounded-pill bg-warning text-dark px-3 d-flex align-items-center">
+                            ⏳ รออนุมัติ
+                          </span>
+                          <button 
+                            className="btn btn-sm btn-outline-danger px-3 rounded-pill fw-bold"
+                            disabled={loadingId === req._id}
+                            onClick={() => handleCancel(req.shelterId, req._id, req.isHub, req.itemName)}
+                          >
+                            {loadingId === req._id ? '⏳' : '🚫 ยกเลิก'}
+                          </button>
+                        </>
+                      )}
+                      {req.status === 'Received' && (
+                        <span className="badge rounded-pill bg-info text-white px-3 d-flex align-items-center">
+                          ✅ ได้รับแล้ว
+                        </span>
+                      )}
+                      {req.status === 'Rejected' && (
+                        <span className="badge rounded-pill bg-danger text-white px-3 d-flex align-items-center">
+                          ❌ ปฏิเสธแล้ว
+                        </span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
