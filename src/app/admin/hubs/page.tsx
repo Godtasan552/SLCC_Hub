@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import Link from 'next/link';
+import ExcelJS from 'exceljs';
 import { Modal } from 'bootstrap';
 import { useSession } from 'next-auth/react';
 import { showAlert } from '@/utils/swal-utils';
@@ -29,14 +30,23 @@ interface UserWithRole {
   role?: string;
 }
 
+interface HubData {
+  name: string;
+  district: string;
+  subdistrict?: string;
+  phoneNumbers?: string[];
+}
+
 export default function HubsManagementPage() {
   const { data: session } = useSession();
   const role = (session?.user as UserWithRole)?.role;
   const isAdmin = role === 'admin';
 
   const [activeTab, setActiveTab] = useState<'overview' | 'management'>('overview');
+  const [activeImportSchema, setActiveImportSchema] = useState<'excel' | 'json'>('excel');
   const [hubs, setHubs] = useState<Hub[]>([]);
   const [loading, setLoading] = useState(true);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [supplies, setSupplies] = useState<{ shelterId: string }[]>([]);
   const [message, setMessage] = useState('');
 
@@ -146,6 +156,86 @@ export default function HubsManagementPage() {
     } catch (err: unknown) {
         const error = err as { response?: { data?: { error?: string } }; message: string };
         showAlert.error('ผิดพลาด', error.response?.data?.error || error.message);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLoading(true);
+    setUploadProgress(1);
+    setMessage('กำลังอ่านไฟล์...');
+
+    try {
+      let dataToImport: HubData[] = [];
+      
+      if (file.name.endsWith('.json')) {
+        const text = await file.text();
+        setUploadProgress(20);
+        const json = JSON.parse(text);
+        dataToImport = json.data || json;
+        setUploadProgress(40);
+      } else if (file.name.endsWith('.xlsx')) {
+        const arrayBuffer = await file.arrayBuffer();
+        setUploadProgress(15);
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(arrayBuffer);
+        setUploadProgress(30);
+        const worksheet = workbook.getWorksheet(1);
+        if (worksheet) {
+          const totalRows = worksheet.rowCount;
+          let processedRows = 0;
+          
+          worksheet.eachRow((row, rowNumber) => {
+            if (rowNumber > 1) { 
+              dataToImport.push({
+                name: String(row.getCell(1).value || ''),
+                district: String(row.getCell(2).value || ''),
+                subdistrict: String(row.getCell(3).value || ''),
+                phoneNumbers: row.getCell(4).value ? [String(row.getCell(4).value)] : []
+              });
+            }
+            processedRows++;
+            const parseProgress = 30 + Math.round((processedRows / totalRows) * 10);
+            setUploadProgress(parseProgress);
+          });
+        }
+      }
+      
+      setUploadProgress(40);
+      setMessage(`กำลังนำเข้า ${dataToImport.length} รายการ...`);
+      
+      await axios.patch('/api/hubs', { data: dataToImport }, {
+        onUploadProgress: (progressEvent) => {
+            if (progressEvent.total) {
+                const uploadPercent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                const totalProgress = 40 + Math.round(uploadPercent * 0.5);
+                setUploadProgress(totalProgress);
+                if (uploadPercent === 100) setMessage('กำลังประมวลผลบนเซิร์ฟเวอร์...');
+            }
+        }
+      });
+      
+      setUploadProgress(100);
+      setMessage('นำเข้าไฟล์สำเร็จ!');
+      showAlert.success('สำเร็จ', 'นำเข้าข้อมูลไฟล์เรียบร้อยแล้ว');
+      fetchData();
+
+      setTimeout(() => {
+        setLoading(false);
+        setUploadProgress(0);
+        setMessage('');
+        if (e.target) e.target.value = '';
+      }, 2000);
+
+    } catch (err) {
+      showAlert.error('ผิดพลาด', 'ไฟล์ไม่ถูกต้อง หรือเกิดข้อผิดพลาดในการนำเข้า');
+      console.error(err);
+      setLoading(false);
+      setUploadProgress(0);
+      setMessage('');
+      if (e.target) e.target.value = '';
     }
   };
 
@@ -339,18 +429,97 @@ export default function HubsManagementPage() {
             <div className="col-lg-6">
                 <div className="card border-0 shadow-sm h-100" style={{ backgroundColor: 'var(--bg-card)' }}>
                    <div className="card-header bg-transparent border-bottom py-3 px-4">
-                      <h6 className="mb-0 fw-bold text-secondary"><i className="bi bi-info-circle me-2"></i>ข้อมูลเพิ่มเติม</h6>
+                      <h6 className="mb-0 fw-bold text-success"><i className="bi bi-file-earmark-excel me-2"></i>นำเข้า Excel / JSON</h6>
                   </div>
-                  <div className="card-body p-4">
-                      <div className="alert alert-info border-0 shadow-sm">
-                          <h6 className="fw-bold"><i className="bi bi-lightbulb me-2"></i>เกี่ยวกับ Hub</h6>
-                          <p className="small mb-0">คลังกลาง (Hub) เป็นจุดพักสินค้าหลักในแต่ละพื้นที่ มีหน้าที่เก็บสำรองสินค้าเพื่อส่งต่อไปยังศูนย์พักพิงต่างๆ</p>
+                  <div className="card-body p-4 d-flex flex-column justify-content-center text-center">
+                      <div className="upload-box p-5 rounded-4 border-2 border-dashed mb-3 cursor-pointer transition-all" onClick={() => !loading && document.getElementById('hubFileIn')?.click()}>
+                          {loading && uploadProgress > 0 ? (
+                              <div className="animate-fade-in py-3">
+                                  <h5 className="mb-3 text-success fw-bold">🚀 {message || 'กำลังดำเนินการ...'} {uploadProgress}%</h5>
+                                  <div className="progress rounded-pill shadow-sm" style={{ height: '20px', width: '80%', margin: '0 auto', backgroundColor: 'var(--bg-secondary)' }}>
+                                      <div 
+                                          className="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                                          role="progressbar" 
+                                          style={{ width: `${uploadProgress}%`, transition: 'width 0.3s ease-in-out' }} 
+                                          aria-valuenow={uploadProgress} 
+                                          aria-valuemin={0} 
+                                          aria-valuemax={100}
+                                      >
+                                      </div>
+                                  </div>
+                              </div>
+                          ) : (
+                              <>
+                                  <i className="bi bi-cloud-arrow-up-fill text-success" style={{ fontSize: '3rem', opacity: 0.8 }}></i>
+                                  <h5 className="mt-3 fw-bold" style={{ color: 'var(--text-primary)' }}>ลากไฟล์มาวาง หรือ คลิกเพื่อเลือกไฟล์</h5>
+                                  <p className="text-secondary small">รองรับไฟล์มาตรฐาน .xlsx และ .json สำหรับคลังสินค้า</p>
+                                  <button className="btn btn-outline-success btn-sm rounded-pill px-4 mt-2" disabled={loading}>
+                                      Browse Files
+                                  </button>
+                              </>
+                          )}
+                          <input type="file" id="hubFileIn" className="d-none" accept=".json,.xlsx" onChange={handleFileUpload} disabled={loading} />
                       </div>
-                      <ul className="list-group list-group-flush small">
-                          <li className="list-group-item bg-transparent px-0 text-secondary"><i className="bi bi-check2 text-success me-2"></i> สามารถเพิ่มรายการสต็อกได้ในเมนู &quot;จัดการคลังสิ่งของ&quot;</li>
-                          <li className="list-group-item bg-transparent px-0 text-secondary"><i className="bi bi-check2 text-success me-2"></i> ศูนย์พักพิงสามารถเลือกขอเบิกทรัพยากรจากคลังเหล่านี้ได้</li>
-                          <li className="list-group-item bg-transparent px-0 text-secondary"><i className="bi bi-check2 text-success me-2"></i> ยึดตามหลัก First-In-First-Out (FIFO)</li>
-                      </ul>
+
+                      <div className="mb-3 text-start">
+                          <div className="d-flex justify-content-between align-items-center mb-2">
+                              <label className="small fw-bold text-secondary mb-0">โครงสร้างไฟล์นำเข้า:</label>
+                              <div className="btn-group btn-group-sm rounded-pill border" style={{ fontSize: '0.65rem', backgroundColor: '#4b5563' }}>
+                                  <button type="button" className={`btn btn-xs py-0 px-2 ${activeImportSchema === 'excel' ? 'btn-primary text-white' : 'text-white'}`} onClick={() => setActiveImportSchema('excel')}>Excel</button>
+                                  <button type="button" className={`btn btn-xs py-0 px-2 ${activeImportSchema === 'json' ? 'btn-primary text-white' : 'text-white'}`} onClick={() => setActiveImportSchema('json')}>JSON</button>
+                              </div>
+                          </div>
+                          
+                          {activeImportSchema === 'excel' ? (
+                              <div className="table-responsive rounded-3 border animate-fade-in">
+                                  <table className="table table-sm table-bordered mb-0 x-small-text text-nowrap">
+                                      <thead>
+                                          <tr>
+                                              <th className="py-1 px-2 text-center bg-secondary" style={{ width: '60px' }}>#</th>
+                                              <th className="py-1 px-2 text-center bg-secondary">A (1)</th>
+                                              <th className="py-1 px-2 text-center bg-secondary">B (2)</th>
+                                              <th className="py-1 px-2 text-center bg-secondary">C (3)</th>
+                                              <th className="py-1 px-2 text-center bg-secondary">D (4)</th>
+                                          </tr>
+                                      </thead>
+                                      <tbody>
+                                          <tr>
+                                              <td className="py-1 px-2 fw-bold bg-secondary">ข้อมูล</td>
+                                              <td className="py-1 px-2">ชื่อคลัง</td>
+                                              <td className="py-1 px-2">อำเภอ</td>
+                                              <td className="py-1 px-2">ตำบล</td>
+                                              <td className="py-1 px-2">เบอร์โทร</td>
+                                          </tr>
+                                          <tr>
+                                              <td className="py-1 px-2 fw-bold bg-secondary">ชนิด</td>
+                                              <td className="py-1 px-2 text-primary">อักษร</td>
+                                              <td className="py-1 px-2 text-primary">อักษร</td>
+                                              <td className="py-1 px-2 text-primary">อักษร</td>
+                                              <td className="py-1 px-2 text-primary">อักษร</td>
+                                          </tr>
+                                      </tbody>
+                                  </table>
+                              </div>
+                          ) : (
+                              <div className="bg-secondary p-2 rounded-3 border animate-fade-in">
+                                  <pre className="mb-0 x-small-text text-secondary" style={{ whiteSpace: 'pre-wrap' }}>
+{`[
+  {
+    "name": "ชื่อคลังสินค้าหลัก",
+    "district": "อำเภอ",
+    "subdistrict": "ตำบล",
+    "phoneNumbers": ["081-xxx-xxxx"]
+  }
+]`}
+                                  </pre>
+                              </div>
+                          )}
+                      </div>
+
+                      <div className="alert alert-secondary border small text-start d-flex gap-2">
+                          <i className="bi bi-info-circle text-primary mt-1"></i>
+                          <span className="text-secondary">นำเข้าข้อมูลสำหรับ Hub เท่านั้น ข้อมูลที่มีชื่อซ้ำจะถูกอัปเดต</span>
+                      </div>
                   </div>
                 </div>
             </div>
