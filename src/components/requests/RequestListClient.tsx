@@ -52,14 +52,41 @@ export default function RequestListClient({ initialRequests }: RequestListClient
   }, [initialRequests]);
 
   const handleApproveWithAdjustment = async (req: Resource) => {
+    setLoadingId(req._id);
+    let availableStock = 0;
+    
+    try {
+      // 1. Fetch current stock from source hub
+      if (req.sourceHubId) {
+        const suppliesRes = await axios.get(`/api/supplies?shelterId=${req.sourceHubId}`);
+        const hubSupplies = suppliesRes.data.data;
+        const matchingSupply = hubSupplies.find((s: any) => s.name === req.itemName);
+        availableStock = matchingSupply?.quantity || 0;
+      }
+    } catch (err) {
+      console.error('Failed to fetch stock:', err);
+      showAlert.error('ผิดพลาด', 'ไม่สามารถตรวจสอบสต็อกล่าสุดได้');
+      setLoadingId(null);
+      return;
+    } finally {
+      setLoadingId(null);
+    }
+
     const { value: formValues } = await Swal.fire({
       title: 'อนุมัติคำร้องขอ',
       html: `
         <div class="text-start">
           <label class="form-label small fw-bold">รายการ: ${req.itemName}</label>
           <div class="mb-3">
-            <label for="swal-amount" class="form-label small">ระบุจำนวนที่จะอนุมัติ (${req.unit})</label>
-            <input id="swal-amount" type="number" class="form-control" value="${req.amount}">
+            <div class="d-flex justify-content-between mb-1">
+              <label for="swal-amount" class="form-label small mb-0">ระบุจำนวนที่จะอนุมัติ (${req.unit})</label>
+              ${req.sourceHubId 
+                ? `<span class="badge ${availableStock > 0 ? 'bg-success' : 'bg-danger'}">คงเหลือในคลัง: ${availableStock} ${req.unit}</span>`
+                : `<span class="badge bg-secondary">ไม่มีข้อมูลคลังต้นทาง</span>`
+              }
+            </div>
+            <input id="swal-amount" type="number" class="form-control" min="1" step="1" value="${req.sourceHubId ? Math.min(req.amount, availableStock) : req.amount}">
+            ${req.sourceHubId && availableStock < req.amount ? `<div class="text-danger x-small mt-1"><i class="bi bi-exclamation-triangle-fill me-1"></i> จำนวนที่ขอ (${req.amount}) มากกว่าสต็อกที่มีอยู่</div>` : ''}
           </div>
           <div class="alert alert-warning p-2 small">
             <i class="bi bi-info-circle me-1"></i> เมื่ออนุมัติแล้ว ระบบจะตัดสต็อกออกจากคลังต้นทางทันที
@@ -81,12 +108,18 @@ export default function RequestListClient({ initialRequests }: RequestListClient
         }
       },
       preConfirm: () => {
-        const amount = (document.getElementById('swal-amount') as HTMLInputElement).value;
-        if (!amount || parseInt(amount) <= 0) {
-          Swal.showValidationMessage('กรุณาระบุจำนวนที่ถูกต้อง');
+        const amountInput = document.getElementById('swal-amount') as HTMLInputElement;
+        const amount = parseInt(amountInput.value);
+        
+        if (!amountInput.value || amount <= 0) {
+          Swal.showValidationMessage('กรุณาระบุจำนวนที่ถูกต้อง (มากกว่า 0)');
           return false;
         }
-        return { amount: parseInt(amount) };
+        if (req.sourceHubId && amount > availableStock) {
+          Swal.showValidationMessage(`จำนวนต้องไม่เกินสต็อกที่มีอยู่ (${availableStock} ${req.unit})`);
+          return false;
+        }
+        return { amount };
       }
     });
 

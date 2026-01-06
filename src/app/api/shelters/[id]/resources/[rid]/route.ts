@@ -25,7 +25,12 @@ export async function PATCH(
 
     // 2. Handle Stock Deduction if status becomes 'Approved'
     if (status === 'Approved') {
-      const finalAmount = body.amount || resource.amount;
+      const finalAmount = typeof body.amount === 'number' ? body.amount : resource.amount;
+      
+      if (finalAmount <= 0) {
+        return NextResponse.json({ success: false, message: 'จำนวนต้องมากกว่า 0' }, { status: 400 });
+      }
+
       if (resource.sourceHubId) {
         const sourceHubSupply = await Supply.findOne({
           shelterId: resource.sourceHubId,
