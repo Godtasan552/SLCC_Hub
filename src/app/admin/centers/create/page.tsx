@@ -177,7 +177,7 @@ export default function CreateCenterPage() {
                     <label className="form-label fw-bold small text-secondary">ประเภทการลงทะเบียน</label>
                     <div className="d-flex gap-2">
                       <div 
-                        className={`flex-grow-1 p-3 border rounded cursor-pointer text-center transition-all ${formData.type === 'Hub' ? 'border-primary bg-primary bg-opacity-10 text-primary shadow-sm' : 'bg-light opacity-50'}`}
+                        className={`flex-grow-1 p-3 border rounded cursor-pointer text-center transition-all ${formData.type === 'Hub' ? 'border-primary bg-primary bg-opacity-10 text-primary shadow-sm' : 'border-secondary border-opacity-25 text-secondary'}`}
                         onClick={() => setFormData({ ...formData, type: 'Hub' })}
                         style={{ cursor: 'pointer' }}
                       >
@@ -185,7 +185,7 @@ export default function CreateCenterPage() {
                         <span className="small fw-bold">คลังกลาง (Hub)</span>
                       </div>
                       <div 
-                        className={`flex-grow-1 p-3 border rounded cursor-pointer text-center transition-all ${formData.type === 'Shelter' ? 'border-success bg-success bg-opacity-10 text-success shadow-sm' : 'bg-light opacity-50'}`}
+                        className={`flex-grow-1 p-3 border rounded cursor-pointer text-center transition-all ${formData.type === 'Shelter' ? 'border-success bg-success bg-opacity-10 text-success shadow-sm' : 'border-secondary border-opacity-25 text-secondary'}`}
                         onClick={() => setFormData({ ...formData, type: 'Shelter' })}
                         style={{ cursor: 'pointer' }}
                       >
@@ -336,26 +336,26 @@ export default function CreateCenterPage() {
                 <label className="small fw-bold text-secondary mb-2"><i className="bi bi-info-circle me-1"></i>โครงสร้างไฟล์ Excel (หัวตารางเริ่มบรรทัด 2):</label>
                 <div className="table-responsive rounded-3 border">
                   <table className="table table-sm table-bordered mb-0 x-small-text text-nowrap">
-                    <thead className="table-light">
+                    <thead className="bg-secondary bg-opacity-10">
                       <tr className="text-center">
-                        <th className="bg-light">A (1)</th>
-                        <th className="bg-light">B (2)</th>
-                        <th className="bg-light">C (3)</th>
-                        <th className="bg-light">D (4)</th>
-                        {formData.type === 'Shelter' && <th className="bg-light">E (5)</th>}
+                        <th className="bg-transparent text-secondary">A (1)</th>
+                        <th className="bg-transparent text-secondary">B (2)</th>
+                        <th className="bg-transparent text-secondary">C (3)</th>
+                        <th className="bg-transparent text-secondary">D (4)</th>
+                        {formData.type === 'Shelter' && <th className="bg-transparent text-secondary">E (5)</th>}
                       </tr>
                     </thead>
                     <tbody>
-                      <tr className="text-center">
-                        <td className="bg-white">ชื่อ</td>
-                        <td className="bg-white">อำเภอ</td>
-                        <td className="bg-white">ตำบล</td>
+                      <tr className="text-center" style={{ color: 'var(--text-primary)' }}>
+                        <td className="bg-transparent">ชื่อ</td>
+                        <td className="bg-transparent">อำเภอ</td>
+                        <td className="bg-transparent">ตำบล</td>
                         {formData.type === 'Hub' ? (
-                          <td className="bg-white">เบอร์โทร</td>
+                          <td className="bg-transparent">เบอร์โทร</td>
                         ) : (
                           <>
-                            <td className="bg-white">ความจุ</td>
-                            <td className="bg-white">เบอร์โทร</td>
+                            <td className="bg-transparent">ความจุ</td>
+                            <td className="bg-transparent">เบอร์โทร</td>
                           </>
                         )}
                       </tr>
@@ -374,12 +374,12 @@ export default function CreateCenterPage() {
 
       <style jsx>{`
         .upload-box {
-          border: 2px dashed #dee2e6;
-          background-color: #f8f9fa;
+          border: 2px dashed var(--border-color);
+          background-color: var(--bg-secondary);
         }
         .upload-box:hover {
           border-color: #198754;
-          background-color: rgba(25, 135, 84, 0.05);
+          background-color: var(--bg-overlay-hover);
           transform: translateY(-2px);
           box-shadow: 0 .25rem .75rem rgba(0,0,0,.05);
         }

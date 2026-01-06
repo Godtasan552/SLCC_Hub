@@ -14,6 +14,21 @@
   --bg-opacity-warning: rgba(255, 193, 7, 0.15);
   --bg-opacity-danger: rgba(220, 53, 69, 0.15);
   --bg-body: #12141c;
+  
+  /* Semantic Text Colors (Dark Mode) */
+  --text-success: #2ecc71;
+  --text-warning: #f1c40f;
+  --text-danger: #e74c3c;
+  --text-info: #3498db;
+  
+  /* Semantic Backgrounds (Dark Mode) */
+  --bg-success: #198754;
+  --bg-warning: #ffc107;
+  --bg-danger: #dc3545;
+  --bg-info: #0dcaf0;
+
+  --bg-overlay: rgba(255, 255, 255, 0.05);
+  --bg-overlay-hover: rgba(255, 255, 255, 0.1);
 }
 
 :root[data-theme="light"] {
@@ -29,6 +44,21 @@
   --bg-opacity-warning: rgba(255, 193, 7, 0.08);
   --bg-opacity-danger: rgba(220, 53, 69, 0.08);
   --bg-body: #ffffff;
+
+  /* Semantic Text Colors (Light Mode) */
+  --text-success: #198754;
+  --text-warning: #d68910; /* Darker for better contrast on light bg */
+  --text-danger: #dc3545;
+  --text-info: #0dcaf0;
+
+  /* Semantic Backgrounds (Light Mode) */
+  --bg-success: #198754;
+  --bg-warning: #ffc107;
+  --bg-danger: #dc3545;
+  --bg-info: #0dcaf0;
+
+  --bg-overlay: rgba(0, 0, 0, 0.03);
+  --bg-overlay-hover: rgba(0, 0, 0, 0.05);
 }
 
 html,
@@ -299,6 +329,20 @@ input:-webkit-autofill:active {
 .border {
   border-color: var(--border-color) !important;
 }
+
+/* Override Bootstrap Text Utilities */
+.text-success { color: var(--text-success) !important; }
+.text-warning { color: var(--text-warning) !important; }
+.text-danger { color: var(--text-danger) !important; }
+.text-info { color: var(--text-info) !important; }
+.text-dark { color: var(--text-primary) !important; } /* In dark mode, text-dark should actually be light */
+.text-body { color: var(--text-primary) !important; }
+
+/* Override Bootstrap Background Utilities */
+.bg-success { background-color: var(--bg-success) !important; }
+.bg-warning { background-color: var(--bg-warning) !important; }
+.bg-danger { background-color: var(--bg-danger) !important; }
+.bg-info { background-color: var(--bg-info) !important; }
 
 /* Badge readable improvements */
 .badge {

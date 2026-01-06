@@ -107,8 +107,8 @@ export default function RequestListClient({ initialRequests }: RequestListClient
   const getUrgencyBadge = (urgency: string) => {
     switch (urgency) {
       case 'high': return <span className="badge bg-danger">ด่วนมาก</span>;
-      case 'medium': return <span className="badge bg-warning text-dark">ด่วน</span>;
-      case 'low': return <span className="badge bg-info text-dark">ปกติ</span>;
+      case 'medium': return <span className="badge bg-warning text-black">ด่วน</span>;
+      case 'low': return <span className="badge bg-info text-black">ปกติ</span>;
       default: return <span className="badge bg-secondary">ทั่วไป</span>;
     }
   };
@@ -117,7 +117,7 @@ export default function RequestListClient({ initialRequests }: RequestListClient
     switch (status) {
       case 'Pending': return <span className="badge rounded-pill border border-warning text-warning">⏳ รออนุมัติ</span>;
       case 'Approved': return <span className="badge rounded-pill bg-success text-white">✅ อนุมัติแล้ว</span>;
-      case 'Received': return <span className="badge rounded-pill bg-info text-white">📥 ได้รับแล้ว</span>;
+      case 'Received': return <span className="badge rounded-pill bg-info text-black">📥 ได้รับแล้ว</span>;
       case 'Rejected': return <span className="badge rounded-pill bg-danger text-white">❌ ปฏิเสธแล้ว</span>;
       default: return <span className="badge rounded-pill bg-secondary">{status}</span>;
     }
@@ -169,7 +169,7 @@ export default function RequestListClient({ initialRequests }: RequestListClient
                 }}>
             <div className="card-body d-flex align-items-center py-2 px-3">
               <div className="d-flex align-items-center justify-content-center rounded-3 bg-warning p-0 me-3 shadow-warning" style={{ width: '56px', height: '56px', minWidth: '56px', backgroundColor: '#ffbc00 !important' }}>
-                <i className="bi bi-bell-fill fs-2 text-dark"></i>
+                <i className="bi bi-bell-fill fs-2 text-black"></i>
               </div>
               <div>
                 <h6 className="text-warning fw-bold mb-0" style={{ fontSize: '0.95rem' }}>ของด่วนมาก (รออนุมัติ)</h6>
@@ -287,7 +287,7 @@ export default function RequestListClient({ initialRequests }: RequestListClient
                       )}
                       {req.status === 'Pending' && (
                         <>
-                          <span className="badge rounded-pill bg-warning text-dark px-3 d-flex align-items-center">
+                          <span className="badge rounded-pill bg-warning text-black px-3 d-flex align-items-center">
                             ⏳ รออนุมัติ
                           </span>
                           <button 
@@ -300,7 +300,7 @@ export default function RequestListClient({ initialRequests }: RequestListClient
                         </>
                       )}
                       {req.status === 'Received' && (
-                        <span className="badge rounded-pill bg-info text-white px-3 d-flex align-items-center">
+                        <span className="badge rounded-pill bg-info text-black px-3 d-flex align-items-center">
                           ✅ ได้รับแล้ว
                         </span>
                       )}

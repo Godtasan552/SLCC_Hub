@@ -64,7 +64,7 @@ export default async function HomePage(props: Props) {
 
   const getStatusBadge = (status: string) => {
     if (status === 'ล้นศูนย์') return <span className="badge rounded-pill bg-danger">ล้นศูนย์</span>;
-    if (status === 'ใกล้เต็ม') return <span className="badge rounded-pill bg-warning text-white">ใกล้เต็ม</span>;
+    if (status === 'ใกล้เต็ม') return <span className="badge rounded-pill bg-warning text-dark">ใกล้เต็ม</span>;
     return <span className="badge rounded-pill bg-success">รองรับได้</span>;
   };
 

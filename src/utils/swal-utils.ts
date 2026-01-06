@@ -5,10 +5,18 @@ import Swal from 'sweetalert2';
  * ปรับแต่งสไตล์และค่าเริ่มต้นให้เหมือนกันทั้งระบบ
  */
 
+const themeConfig = {
+  background: 'var(--bg-card)',
+  color: 'var(--text-primary)',
+  confirmButtonColor: '#0d6efd', // Bootstrap Primary
+  cancelButtonColor: '#6c757d',  // Bootstrap Secondary
+};
+
 export const showAlert = {
   // ✅ แจ้งเตือนสำเร็จ (Toast - ปิดเองได้)
   success: (title: string, text?: string) => {
     return Swal.fire({
+      ...themeConfig,
       icon: 'success',
       title,
       text,
@@ -23,10 +31,11 @@ export const showAlert = {
   // ❌ แจ้งเตือนผิดพลาด (Modal - ต้องกดปิด)
   error: (title: string, text?: string) => {
     return Swal.fire({
+      ...themeConfig,
       icon: 'error',
       title,
       text: text || 'เกิดข้อผิดพลาดบางอย่าง กรุณาลองใหม่อีกครั้ง',
-      confirmButtonColor: '#3085d6',
+      confirmButtonColor: '#dc3545',
       position: 'top',
     });
   },
@@ -34,12 +43,13 @@ export const showAlert = {
   // ⚠️ ยืนยันการลบ (Confirmation)
   confirmDelete: async (title: string = 'คุณแน่ใจหรือไม่?', text: string = 'ข้อมูลนี้จะถูกลบและไม่สามารถกู้คืนได้!') => {
     const result = await Swal.fire({
+      ...themeConfig,
       title,
       text,
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
+      confirmButtonColor: '#dc3545', // Use danger for delete
+      cancelButtonColor: '#6c757d',
       confirmButtonText: 'ใช่, ลบเลย!',
       cancelButtonText: 'ยกเลิก',
       reverseButtons: true,
@@ -51,10 +61,11 @@ export const showAlert = {
   // ℹ️ แจ้งเตือนข้อมูลทั่วไป
   info: (title: string, text?: string) => {
     return Swal.fire({
+      ...themeConfig,
       icon: 'info',
       title,
       text,
-      confirmButtonColor: '#3085d6',
+      confirmButtonColor: '#0dcaf0',
       position: 'top',
     });
   },
@@ -62,13 +73,12 @@ export const showAlert = {
   // ⌨️ รับค่าจากผู้ใช้ (Prompt)
   prompt: async (title: string, inputLabel: string, defaultValue: string = '') => {
     const { value } = await Swal.fire({
+      ...themeConfig,
       title,
       input: 'text',
       inputLabel,
       inputValue: defaultValue,
       showCancelButton: true,
-      confirmButtonColor: '#3085d6',
-      cancelButtonColor: '#6e7881',
       confirmButtonText: 'ตกลง',
       cancelButtonText: 'ยกเลิก',
       position: 'top',
@@ -84,13 +94,12 @@ export const showAlert = {
   // 🔢 รับค่าตัวเลขจากผู้ใช้ (Number Prompt)
   numberPrompt: async (title: string, inputLabel: string, defaultValue: number | string = 0) => {
     const { value } = await Swal.fire({
+      ...themeConfig,
       title,
       input: 'number',
       inputLabel,
       inputValue: defaultValue,
       showCancelButton: true,
-      confirmButtonColor: '#3085d6',
-      cancelButtonColor: '#6e7881',
       confirmButtonText: 'ตกลง',
       cancelButtonText: 'ยกเลิก',
       position: 'top',

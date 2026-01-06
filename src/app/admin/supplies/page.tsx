@@ -370,7 +370,7 @@ function SuppliesPageContent() {
                                 </td>
                                 <td><span className="badge bg-secondary-subtle text-secondary border border-secondary fw-normal">{s.category}</span></td>
                                 <td className="text-center">
-                                    <span className={`badge ${s.quantity === 0 ? 'bg-danger' : s.quantity < 10 ? 'bg-warning text-white' : 'bg-success'} rounded-pill px-3`}>
+                                    <span className={`badge ${s.quantity === 0 ? 'bg-danger' : s.quantity < 10 ? 'bg-warning text-dark' : 'bg-success'} rounded-pill px-3`}>
                                         {s.quantity} {s.unit}
                                     </span>
                                 </td>

@@ -21,8 +21,8 @@ export default function RecentRequests({ requests }: RecentRequestsProps) {
   const getUrgencyBadge = (urgency: string) => {
     switch (urgency) {
       case 'high': return <span className="badge bg-danger">ด่วนมาก</span>;
-      case 'medium': return <span className="badge bg-warning text-white">ด่วน</span>;
-      case 'low': return <span className="badge bg-info text-white">ปกติ</span>;
+      case 'medium': return <span className="badge bg-warning text-dark">ด่วน</span>;
+      case 'low': return <span className="badge bg-info text-dark">ปกติ</span>;
       default: return <span className="badge bg-secondary">{urgency}</span>;
     }
   };
