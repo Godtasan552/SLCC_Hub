@@ -118,6 +118,14 @@ export default function ResourceRequest({
                 className="form-control" 
                 placeholder="ระบุจำนวน"
                 value={formData.amount}
+                onKeyDown={(e) => {
+                  if (
+                    ['-', '+', 'e', 'E', '.'].includes(e.key) || 
+                    (e.key.length === 1 && !/^[0-9]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey)
+                  ) {
+                    e.preventDefault();
+                  }
+                }}
                 onChange={(e) => {
                   const val = e.target.value;
                   if (val === '') {

@@ -519,7 +519,10 @@ export default function CreateRequestClient() {
                                                   value={item.requestQuantity} 
                                                   placeholder="0"
                                                   onKeyDown={(e) => {
-                                                      if (['-', '+', 'e', 'E', '.'].includes(e.key)) {
+                                                      if (
+                                                        ['-', '+', 'e', 'E', '.'].includes(e.key) || 
+                                                        (e.key.length === 1 && !/^[0-9]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey)
+                                                      ) {
                                                           e.preventDefault();
                                                       }
                                                    }}

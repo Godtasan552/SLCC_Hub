@@ -111,7 +111,10 @@ export const showAlert = {
         const input = Swal.getInput();
         if (input) {
           input.onkeydown = (e) => {
-            if (['-', '+', 'e', 'E', '.'].includes(e.key)) {
+            if (
+              ['-', '+', 'e', 'E', '.'].includes(e.key) || 
+              (e.key.length === 1 && !/^[0-9]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey)
+            ) {
               e.preventDefault();
             }
           };
