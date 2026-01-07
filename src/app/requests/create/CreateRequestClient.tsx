@@ -122,6 +122,7 @@ export default function CreateRequestClient() {
     });
   }, [shelters, shelterSearch, shelterDistrict]);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const toggleCartItem = (item: any) => {
     setCart(prev => {
       // Check if this SPECIFIC item from this SPECIFIC hub is already in cart

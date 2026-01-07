@@ -10,7 +10,7 @@ export async function POST(req: Request) {
   
   try {
     const body = await req.json();
-    const { shelterId, resourceId, action, hubId } = body;
+    const { shelterId, resourceId, action, hubId, approvedAmount } = body;
     // action: 'approve' or 'reject'
 
     // Check if we have either shelterId or hubId (identifying where the request came from)
@@ -53,6 +53,11 @@ export async function POST(req: Request) {
     }
 
     if (action === 'approve') {
+      // 📝 Update amount if approvedAmount is provided
+      if (approvedAmount && approvedAmount > 0) {
+        resource.amount = approvedAmount;
+      }
+
       // 🎯 ดึงเฉพาะคันที่สร้างขึ้นเอง (Hubs)
       const allHubs = await Hub.find({}).select('_id');
       const hubIds = allHubs.map(h => h._id);

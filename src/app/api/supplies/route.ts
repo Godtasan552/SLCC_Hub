@@ -79,6 +79,7 @@ export async function PATCH(req: NextRequest) {
     // เตรียม Operations สำหรับ BulkWrite
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const operations: any[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const errors: { item: any, error: string }[] = [];
     
     for (const item of data) {
@@ -88,6 +89,7 @@ export async function PATCH(req: NextRequest) {
         }
 
         // สร้าง Filter Query
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const filter: Record<string, any> = { 
           name: item.name, 
           category: item.category
