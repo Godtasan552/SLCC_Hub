@@ -476,7 +476,10 @@ export default function AdminPage() {
                                           placeholder="ระบุความจุ"
                                           value={manualForm.capacity} 
                                           onKeyDown={(e) => {
-                                              if (['-', '+', 'e', 'E', '.'].includes(e.key)) {
+                                              if (
+                                                ['-', '+', 'e', 'E', '.'].includes(e.key) || 
+                                                (e.key.length === 1 && !/^[0-9]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey)
+                                              ) {
                                                   e.preventDefault();
                                               }
                                           }}
@@ -711,7 +714,10 @@ export default function AdminPage() {
                             placeholder="ระบุจำนวน"
                             min="0"
                             onKeyDown={(e) => {
-                                if (['-', '+', 'e', 'E', '.'].includes(e.key)) {
+                                if (
+                                    ['-', '+', 'e', 'E', '.'].includes(e.key) || 
+                                    (e.key.length === 1 && !/^[0-9]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey)
+                                ) {
                                     e.preventDefault();
                                 }
                             }}
