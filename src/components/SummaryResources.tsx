@@ -116,9 +116,20 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
   };
 
   // NEW: Approve function (Admin only)
-  const handleApprove = async (shelterId: string, resourceId: string, isHub: boolean) => {
-    const isConfirmed = await showAlert.confirmDelete('ยืนยันการอนุมัติ?', 'ระบบจะตัดสต็อกจากคลังกลางอัตโนมัติ');
-    if (!isConfirmed) return;
+  const handleApprove = async (shelterId: string, resourceId: string, isHub: boolean, currentAmount: number) => {
+    // 1. ถามจำนวนที่จะอนุมัติ
+    const result = await showAlert.numberPrompt(
+      'ระบุจำนวนที่อนุมัติ',
+      'กรุณาระบุจำนวนทรัพยากรที่ต้องการอนุมัติ (ระบบจะตัดสต็อกตามจริง)',
+      currentAmount
+    );
+
+    if (!result) return; // กด Cancel หรือไม่กรอก
+
+    const approvedAmount = parseInt(result);
+    if (isNaN(approvedAmount) || approvedAmount <= 0) {
+      return showAlert.error('ข้อมูลไม่ถูกต้อง', 'กรุณาระบุจำนวนที่มากกว่า 0');
+    }
     
     setLoadingId(resourceId);
     try {
@@ -126,12 +137,13 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
         shelterId: isHub ? undefined : shelterId,
         hubId: isHub ? shelterId : undefined,
         resourceId, 
-        action: 'approve' 
+        action: 'approve',
+        approvedAmount // ✅ ส่งจำนวนที่แก้แล้วไปด้วย
       });
       
       if (res.data.success) {
         mutate();
-        showAlert.success('อนุมัติสำเร็จ', `ตัดสต็อก: ${res.data.stockDeducted} หน่วย`);
+        showAlert.success('อนุมัติสำเร็จ', `อนุมัติ ${approvedAmount} ${res.data.data.unit} (ตัดสต็อกแล้ว)`);
       }
     } catch (err: unknown) {
       const errorMsg = axios.isAxiosError(err) ? err.response?.data?.error : (err as Error).message;
@@ -354,7 +366,7 @@ export default function SummaryResources({ allShelters }: SummaryResourcesProps)
                           <button 
                             className="btn btn-success px-3 rounded-start-pill fw-bold"
                             disabled={loadingId === req._id}
-                            onClick={() => handleApprove(req.shelterId!, req._id!, !!req.isHub)}
+                            onClick={() => handleApprove(req.shelterId!, req._id!, !!req.isHub, req.amount)}
                           >
                             {loadingId === req._id ? '⏳' : '✅ อนุมัติ'}
                           </button>
