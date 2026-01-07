@@ -116,11 +116,11 @@ export default function RequestListClient({ initialRequests }: RequestListClient
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'Pending': return <span className="badge rounded-pill border border-warning text-warning">⏳ รออนุมัติ</span>;
-      case 'Approved': return <span className="badge rounded-pill bg-success text-white">✅ อนุมัติแล้ว</span>;
-      case 'Received': return <span className="badge rounded-pill bg-info text-black">📥 ได้รับแล้ว</span>;
-      case 'Rejected': return <span className="badge rounded-pill bg-danger text-white">❌ ปฏิเสธแล้ว</span>;
-      default: return <span className="badge rounded-pill bg-secondary">{status}</span>;
+      case 'Pending': return <span className="badge rounded-pill border border-warning text-warning px-2 py-1">⏳ รออนุมัติ</span>;
+      case 'Approved': return <span className="badge rounded-pill bg-success text-white px-2 py-1">✅ อนุมัติแล้ว</span>;
+      case 'Received': return <span className="badge rounded-pill bg-info text-black px-2 py-1">📥 ได้รับแล้ว</span>;
+      case 'Rejected': return <span className="badge rounded-pill bg-danger text-white px-2 py-1">❌ ปฏิเสธแล้ว</span>;
+      default: return <span className="badge rounded-pill bg-secondary px-2 py-1">{status}</span>;
     }
   };
 
@@ -276,19 +276,19 @@ export default function RequestListClient({ initialRequests }: RequestListClient
                     }).format(new Date(req.requestedAt))}
                   </td>
                   <td className="text-end pe-4">
-                    <div className="d-flex justify-content-end gap-2">
+                    <div className="d-flex justify-content-end align-items-center gap-2">
                       {req.status === 'Approved' && (
                         <button 
-                          className="btn btn-sm btn-success px-3 rounded-pill fw-bold"
+                          className="btn btn-sm btn-success px-3 rounded-pill fw-bold shadow-sm"
                           disabled={loadingId === req._id}
                           onClick={() => handleReceive(req.shelterId, req._id)}
                         >
-                          {loadingId === req._id ? '⏳' : '📥 ยืนยันรับของ'}
+                          {loadingId === req._id ? '⏳' : <><i className="bi bi-download me-1"></i>ยืนยันรับของ</>}
                         </button>
                       )}
                       {req.status === 'Pending' && (
                         <>
-                          <span className="badge rounded-pill bg-warning text-black px-3 d-flex align-items-center">
+                          <span className="badge rounded-pill bg-warning text-black px-3 py-1 fw-bold" style={{ fontSize: '0.75rem' }}>
                             ⏳ รออนุมัติ
                           </span>
                           <button 
@@ -296,17 +296,17 @@ export default function RequestListClient({ initialRequests }: RequestListClient
                             disabled={loadingId === req._id}
                             onClick={() => handleCancel(req.shelterId, req._id, req.isHub, req.itemName)}
                           >
-                            {loadingId === req._id ? '⏳' : '🚫 ยกเลิก'}
+                            {loadingId === req._id ? '⏳' : <><i className="bi bi-x-circle me-1"></i>ยกเลิก</>}
                           </button>
                         </>
                       )}
                       {req.status === 'Received' && (
-                        <span className="badge rounded-pill bg-info text-black px-3 d-flex align-items-center">
+                        <span className="badge rounded-pill bg-info text-black px-3 py-1 fw-bold" style={{ fontSize: '0.75rem' }}>
                           ✅ ได้รับแล้ว
                         </span>
                       )}
                       {req.status === 'Rejected' && (
-                        <span className="badge rounded-pill bg-danger text-white px-3 d-flex align-items-center">
+                        <span className="badge rounded-pill bg-danger text-white px-3 py-1 fw-bold" style={{ fontSize: '0.75rem' }}>
                           ❌ ปฏิเสธแล้ว
                         </span>
                       )}
