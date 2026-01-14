@@ -1,0 +1,11 @@
+version: "3.9"
+
+services:
+  web:
+    image: myapp                # ใช้ image ที่ build / load มาแล้ว
+    container_name: myapp-web   # ตั้งชื่อ container ชัดเจน
+    ports:
+      - "3000:3000"             # expose พอร์ต
+    env_file:
+      - .env                    # โหลด environment variables
+    restart: unless-stopped     # ใช้จริงใน prod
